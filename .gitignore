@@ -1,0 +1,58 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache and output
+# Replace 'dist' with your actual output directory if it's different (e.g., 'build', 'out')
+dist/
+.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+# Optional eslint cache
+.eslintcache
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by testing tools like istanbul/nyc
+coverage/
+.nyc_output/
+
+# Environment variables
+# Keep sensitive API keys and configuration out of version control
+.env
+.env.*
+# Commit .env.example
+!.env.example
+
+# Editor-specific files
+.vscode/ # VS Code configuration, adjust as needed if shared config is desired
+.idea/    # WebStorm/IntelliJ configuration
+
+# OS-specific files
+.DS_Store # macOS
+Thumbs.db # Windows
+
+# Yarn v2+ files
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+node_modules
+dist
+keys
