@@ -1,11 +1,11 @@
 import { createLogger, format, transports } from "winston";
 
-const logger = createLogger({
-  level: "warn",
+export const logger = createLogger({
+  level: "info",
   format: format.combine(
     format.timestamp(),
     format.errors({ stack: true }),
-    format.json()
+    format.json(),
   ),
   transports: [
     new transports.Console(),
@@ -13,5 +13,3 @@ const logger = createLogger({
     new transports.File({ filename: "logs/mixed.log" }),
   ],
 });
-
-export default logger;

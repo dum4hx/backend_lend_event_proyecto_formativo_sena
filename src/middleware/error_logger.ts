@@ -1,22 +1,25 @@
 import type { NextFunction, Request, Response } from "express";
-import logger from "../utils/logger.ts";
+import { logger } from "../utils/logger.ts";
 
-// Define express middleware
-
-const error_logger = (
+const errorLogger = (
   err: Error,
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  logger.error(err.message, err);
+  // Log the error
+  logger.error("Unexpected error occurred", err);
 
-  // Delegate to express error handler if headers sent
+  // Respond to the client
+  // If headers are already sent, delegate to the default Express error handler
   if (res.headersSent) {
     return next(err);
   }
 
-  res.status(500).json({ message: err.message });
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
 };
 
-export default error_logger;
+export default errorLogger;
