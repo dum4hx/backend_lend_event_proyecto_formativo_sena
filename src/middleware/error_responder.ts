@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { AppError } from "../utils/types/AppError.ts";
+import { AppError } from "../errors/AppError.ts";
 
 interface ErrorResponsePayload {
   status: "error" | "fail";
@@ -15,12 +15,6 @@ export const errorResponder = (
   res: Response,
   next: NextFunction,
 ): void => {
-  // If headers are already sent, delegate to Express' default handler
-  if (res.headersSent) {
-    next(err);
-    return;
-  }
-
   let appError: AppError;
 
   // Normalize all errors into AppError
@@ -45,3 +39,31 @@ export const errorResponder = (
 
   res.status(appError.statusCode).json(payload);
 };
+// import { type NextFunction, type Request, type Response } from "express";
+// import { AppError } from "../errors/AppError.ts";
+
+// /**
+//  * Sends a JSON response for errors.
+//  * If the error is an `AppError`, it uses the status code and message from it.
+//  * Otherwise, it sends a generic 500 Internal Server Error.
+//  */
+// export const errorResponder = (
+//   err: Error,
+//   req: Request,
+//   res: Response,
+//   next: NextFunction,
+// ): void => {
+//   if (err instanceof AppError) {
+//     res.status(err.statusCode).json({
+//       status: err.code,
+//       message: err.message,
+//       code: err.code,
+//     });
+//   } else {
+//     const error = AppError.internal("An unexpected error occurred", err);
+//     res.status(error.statusCode).json({
+//       status: error.code,
+//       message: error.message,
+//     });
+//   }
+// };

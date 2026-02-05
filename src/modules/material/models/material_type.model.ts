@@ -22,13 +22,15 @@ export const MaterialModelZodSchema = z.object({
 export type MaterialModelInput = z.infer<typeof MaterialModelZodSchema>;
 
 // Material Model mongoose schema
-const materialModelSchema = new Schema(
+const materialTypeSchema = new Schema(
   {
-    categoryId: {
-      type: Schema.Types.ObjectId,
-      ref: "Category",
-      required: true,
-    },
+    categoryId: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Category",
+        required: true,
+      },
+    ],
     name: {
       type: String,
       required: true,
@@ -53,10 +55,10 @@ const materialModelSchema = new Schema(
 );
 
 // Index for better query performance
-materialModelSchema.index({ categoryId: 1 });
+materialTypeSchema.index({ categoryId: 1 });
 
-export type MaterialModelDocument = InferSchemaType<typeof materialModelSchema>;
+export type MaterialModelDocument = InferSchemaType<typeof materialTypeSchema>;
 export const MaterialModel = model<MaterialModelDocument>(
   "MaterialModel",
-  materialModelSchema,
+  materialTypeSchema,
 );

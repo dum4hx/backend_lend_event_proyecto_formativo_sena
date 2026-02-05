@@ -13,7 +13,7 @@ export const MaterialPlanZodSchema = z.object({
     .min(1, "Description is required")
     .max(500, "Maximum 500 characters")
     .trim(),
-  materialModelIds: z
+  materialTypeIds: z
     .array(
       z.string().refine((val) => Types.ObjectId.isValid(val), {
         message: "Invalid Material Model ID format",
@@ -44,7 +44,7 @@ const materialPlanSchema = new Schema(
       maxlength: 500,
       trim: true,
     },
-    materialModelIds: [
+    materialTypeIds: [
       {
         type: Schema.Types.ObjectId,
         ref: "MaterialModel",
@@ -65,7 +65,7 @@ const materialPlanSchema = new Schema(
 );
 
 // Index for better query performance
-materialPlanSchema.index({ materialModelIds: 1 });
+materialPlanSchema.index({ materialTypeIds: 1 });
 
 export type MaterialPlanDocument = InferSchemaType<typeof materialPlanSchema>;
 export const MaterialPlan = model<MaterialPlanDocument>(

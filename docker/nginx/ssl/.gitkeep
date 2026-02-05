@@ -1,0 +1,2 @@
+# SSL certificates go here
+# Generate with: mkcert api.test.local

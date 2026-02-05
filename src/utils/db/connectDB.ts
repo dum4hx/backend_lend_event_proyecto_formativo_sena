@@ -1,6 +1,6 @@
 import { connect } from "mongoose";
 import { logger } from "../logger.ts";
-import { AppError } from "../types/AppError.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 export const connectDB = async () => {
   try {

@@ -35,7 +35,7 @@ const materialInstanceSchema = new Schema(
   {
     modelId: {
       type: Schema.Types.ObjectId,
-      ref: "MaterialModel",
+      ref: "MaterialType",
       required: true,
     },
     serialNumber: {
@@ -65,7 +65,6 @@ const materialInstanceSchema = new Schema(
 materialInstanceSchema.index({ modelId: 1 });
 materialInstanceSchema.index({ locationId: 1 });
 materialInstanceSchema.index({ status: 1 });
-materialInstanceSchema.index({ serialNumber: 1 });
 
 export type MaterialInstanceDocument = InferSchemaType<
   typeof materialInstanceSchema

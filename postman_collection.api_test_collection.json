@@ -1,0 +1,1633 @@
+{
+  "info": {
+    "name": "API Test Collection",
+    "description": "Postman collection to test endpoints from docs/API_REFERENCE.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.test.com/api/v1" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "organizationId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "customerId", "value": "" },
+    { "key": "materialTypeId", "value": "" },
+    { "key": "materialInstanceId", "value": "" },
+    { "key": "requestId", "value": "" },
+    { "key": "loanId", "value": "" },
+    { "key": "inspectionId", "value": "" },
+    { "key": "invoiceId", "value": "" },
+    { "key": "packageId", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "locationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"organization\":{\"name\":\"Company Name\",\"legalName\":\"Company Legal Name S.A.S\",\"email\":\"company@example.com\",\"phone\":\"+573001234567\",\"taxId\":\"900123456-1\",\"address\":{\"street\":\"Calle 100 #15-20\",\"city\":\"Bogotá\",\"country\":\"Colombia\",\"postalCode\":\"110111\"}},\"owner\":{\"name\":{\"firstName\":\"Juan\",\"secondName\":\"Carlos\",\"firstSurname\":\"García\",\"secondSurname\":\"López\"},\"email\":\"juan@example.com\",\"phone\":\"+573001234567\",\"password\":\"SecurePassword123!\"}}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function(){ pm.response.to.have.status(201); });",
+                  "var res = pm.response.json(); if(res && res.data && res.data.organization) { pm.collectionVariables.set('organizationId', res.data.organization.id || ''); }",
+                  "if(res && res.data && res.data.user){ pm.collectionVariables.set('userId', res.data.user.id || ''); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"juan@example.com\",\"password\":\"SecurePassword123!\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });",
+                  "var r = pm.response.json(); if(r && r.data && r.data.user){ pm.collectionVariables.set('userId', r.data.user.id || ''); }",
+                  "var token = (r && r.data && r.data.accessToken) ? r.data.accessToken : null; if(!token){ token = pm.response.cookies.get('access_token'); }",
+                  "if(token){ pm.collectionVariables.set('access_token', token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });",
+                  "var r = pm.response.json(); if(r && r.data && r.data.accessToken){ pm.collectionVariables.set('access_token', r.data.accessToken); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET /users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /users/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /users/invite",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/invite",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "invite"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":{\"firstName\":\"María\",\"firstSurname\":\"Rodríguez\"},\"email\":\"maria@example.com\",\"phone\":\"+573009876543\",\"role\":\"commercial_advisor\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function(){ pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /users/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":{\"firstName\":\"María\",\"firstSurname\":\"García\"},\"phone\":\"+573001112233\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /users/:id/role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/role",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "role"]
+            },
+            "body": { "mode": "raw", "raw": "{\"role\":\"manager\"}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /users/:id/deactivate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "deactivate"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /users/:id/reactivate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/reactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "reactivate"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "GET /customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":{\"firstName\":\"Carlos\",\"firstSurname\":\"Martínez\"},\"email\":\"carlos@email.com\",\"phone\":\"+573001234567\",\"idType\":\"CC\",\"idNumber\":\"1234567890\",\"address\":{\"street\":\"Carrera 50 #30-20\",\"city\":\"Medellín\",\"country\":\"Colombia\"}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                  "var r = pm.response.json(); if(r && r.data && r.data.customer){ pm.collectionVariables.set('customerId', r.data.customer.id || ''); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /customers/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "{{customerId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /customers/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "{{customerId}}"]
+            },
+            "body": { "mode": "raw", "raw": "{\"phone\":\"+573002223334\"}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /customers/:id/blacklist",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/blacklist",
+              "host": ["{{baseUrl}}"],
+              "path": ["customers", "{{customerId}}", "blacklist"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Repeated late returns and unpaid damages\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Materials",
+      "item": [
+        {
+          "name": "GET /materials/types",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/types?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "types"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /materials/types",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/types",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "types"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Canon EOS R5\",\"sku\":\"CAM-001\",\"categoryId\":\"{{categoryId}}\",\"description\":\"Professional mirrorless camera body\",\"pricePerDay\":150000,\"replacementValue\":15000000,\"specifications\":{\"sensor\":\"45MP Full Frame\",\"video\":\"8K RAW\"}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.materialType){ pm.collectionVariables.set('materialTypeId', r.data.materialType.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "GET /materials/instances",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/instances?materialTypeId={{materialTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "instances"],
+              "query": [
+                { "key": "materialTypeId", "value": "{{materialTypeId}}" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /materials/instances",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/instances",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "instances"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"materialTypeId\":\"{{materialTypeId}}\",\"serialNumber\":\"CR5-2024-002\",\"locationId\":\"{{locationId}}\",\"purchaseDate\":\"2024-01-15\",\"purchasePrice\":14500000}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.instance){ pm.collectionVariables.set('materialInstanceId', r.data.instance.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "PATCH /materials/instances/:id/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/instances/{{materialInstanceId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "materials",
+                "instances",
+                "{{materialInstanceId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"maintenance\",\"notes\":\"Sensor cleaning required\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /materials/categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "categories"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /materials/categories",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/materials/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["materials", "categories"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Cameras\",\"description\":\"Photo and video cameras\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.category){ pm.collectionVariables.set('categoryId', r.data.category.id || ''); }"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Packages",
+      "item": [
+        {
+          "name": "GET /packages",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["packages"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /packages",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages",
+              "host": ["{{baseUrl}}"],
+              "path": ["packages"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"Wedding Photography Kit\",\"description\":\"Complete kit for wedding photography\",\"pricePerDay\":350000,\"items\":[{\"materialTypeId\":\"{{materialTypeId}}\",\"quantity\":2}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.package){ pm.collectionVariables.set('packageId', r.data.package.id || ''); }"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Requests",
+      "item": [
+        {
+          "name": "GET /requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{customerId}}\",\"items\":[{\"type\":\"package\",\"referenceId\":\"{{packageId}}\",\"quantity\":1},{\"type\":\"material\",\"referenceId\":\"{{materialTypeId}}\",\"quantity\":2}],\"startDate\":\"2026-02-10\",\"endDate\":\"2026-02-12\",\"notes\":\"Customer prefers afternoon pickup\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.request){ pm.collectionVariables.set('requestId', r.data.request.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "GET /requests/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests/:id/approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "approve"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"notes\":\"Approved for loyal customer\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests/:id/reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "reject"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Requested dates unavailable\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests/:id/assign-materials",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/assign-materials",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "assign-materials"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"assignments\":[{\"materialTypeId\":\"{{materialTypeId}}\",\"materialInstanceId\":\"{{materialInstanceId}}\"}]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests/:id/mark-ready",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/mark-ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "mark-ready"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /requests/:id/cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/requests/{{requestId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests", "{{requestId}}", "cancel"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Customer requested cancellation\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Loans",
+      "item": [
+        {
+          "name": "GET /loans",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /loans/overdue",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/overdue",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "overdue"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /loans/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/{{loanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "{{loanId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /loans/from-request/:requestId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/from-request/{{requestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "from-request", "{{requestId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.loan){ pm.collectionVariables.set('loanId', r.data.loan.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "POST /loans/:id/extend",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/{{loanId}}/extend",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "{{loanId}}", "extend"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"newEndDate\":\"2026-02-05T18:00:00Z\",\"notes\":\"Customer requested 2-day extension\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /loans/:id/return",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/{{loanId}}/return",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "{{loanId}}", "return"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"notes\":\"All items returned, customer mentioned camera was dropped\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /loans/:id/complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/loans/{{loanId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["loans", "{{loanId}}", "complete"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inspections",
+      "item": [
+        {
+          "name": "GET /inspections",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inspections?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["inspections"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /inspections/pending-loans",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inspections/pending-loans",
+              "host": ["{{baseUrl}}"],
+              "path": ["inspections", "pending-loans"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /inspections",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inspections",
+              "host": ["{{baseUrl}}"],
+              "path": ["inspections"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"loanId\":\"{{loanId}}\",\"items\":[{\"materialInstanceId\":\"{{materialInstanceId}}\",\"condition\":\"good\",\"notes\":\"No issues\"},{\"materialInstanceId\":\"{{materialInstanceId}}\",\"condition\":\"damaged\",\"damageDescription\":\"Cracked lens filter\",\"damageCost\":50000}],\"overallNotes\":\"One item damaged, customer acknowledged\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.inspection){ pm.collectionVariables.set('inspectionId', r.data.inspection.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "GET /inspections/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inspections/{{inspectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["inspections", "{{inspectionId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "GET /invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /invoices/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices", "{{invoiceId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /invoices",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{customerId}}\",\"loanId\":\"{{loanId}}\",\"type\":\"late_fee\",\"lineItems\":[{\"description\":\"Late return fee - 2 days\",\"quantity\":2,\"unitPrice\":25000,\"totalPrice\":50000}],\"dueDate\":\"2026-03-01\",\"notes\":\"Late return for loan #12345\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": [
+                "pm.test('Status 201', function(){ pm.response.to.have.status(201); });",
+                "var r = pm.response.json(); if(r && r.data && r.data.invoice){ pm.collectionVariables.set('invoiceId', r.data.invoice.id || ''); }"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "POST /invoices/:id/pay",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices", "{{invoiceId}}", "pay"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":59500,\"paymentMethodId\":\"cash\",\"notes\":\"Paid in full at counter\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /invoices/:id/void",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/void",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices", "{{invoiceId}}", "void"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"reason\":\"Duplicate invoice created in error\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /invoices/:id/send",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["invoices", "{{invoiceId}}", "send"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "GET /billing/subscription",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "subscription"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /billing/create-checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/create-checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "create-checkout"]
+            },
+            "body": { "mode": "raw", "raw": "{\"plan\":\"professional\"}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /billing/create-portal",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/billing/create-portal",
+              "host": ["{{baseUrl}}"],
+              "path": ["billing", "create-portal"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "item": [
+        {
+          "name": "GET /organization",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organization",
+              "host": ["{{baseUrl}}"],
+              "path": ["organization"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /organization",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organization",
+              "host": ["{{baseUrl}}"],
+              "path": ["organization"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"New Company Name\",\"phone\":\"+573009999999\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /organization/usage",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/organization/usage",
+              "host": ["{{baseUrl}}"],
+              "path": ["organization", "usage"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Common",
+      "item": [
+        {
+          "name": "Rate limits - HEAD request (generic)",
+          "request": {
+            "method": "HEAD",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Has rate limit headers', function(){ pm.response.to.have.header('X-RateLimit-Limit'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

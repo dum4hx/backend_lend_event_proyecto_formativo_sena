@@ -2,6 +2,7 @@
 
 // 1. Check for uncommitted changes
 let status = await $`git status --porcelain`;
+console.log("DEBUG: Git detected these files ->", status.stdout);
 if (status.stdout.trim().length > 0) {
   console.log(chalk.red("\n[ERROR] You have uncommitted changes!"));
   console.log(
