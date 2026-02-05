@@ -2,6 +2,12 @@
 node_modules/
 jspm_packages/
 
+# Playwright test artifacts
+test-results
+playwright-report/
+playwright/.auth/
+tests/utils/auth/storageState.json
+
 # TypeScript cache and output
 # Replace 'dist' with your actual output directory if it's different (e.g., 'build', 'out')
 dist/

@@ -5,7 +5,6 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { Types } from "mongoose";
 import { userService } from "../modules/user/user.service.ts";
 import { authService } from "../modules/auth/auth.service.ts";
 import {
@@ -16,7 +15,6 @@ import {
 import {
   validateBody,
   validateQuery,
-  objectIdParamSchema,
   paginationSchema,
 } from "../middleware/validation.ts";
 import {

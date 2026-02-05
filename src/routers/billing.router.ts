@@ -27,8 +27,8 @@ const billingRouter = Router();
 const createCheckoutSchema = z.object({
   plan: z.enum(["starter", "professional", "enterprise"]),
   seatCount: z.number().int().positive().default(1),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: z.url(),
+  cancelUrl: z.url(),
 });
 
 const updateSeatsSchema = z.object({
@@ -40,7 +40,7 @@ const cancelSubscriptionSchema = z.object({
 });
 
 const createPortalSchema = z.object({
-  returnUrl: z.string().url(),
+  returnUrl: z.url(),
 });
 
 /* ---------- Authenticated Routes ---------- */

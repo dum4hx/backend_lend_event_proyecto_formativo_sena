@@ -19,6 +19,7 @@ import {
 } from "../middleware/auth.ts";
 import { verifyRefreshToken } from "../utils/auth/jwt.ts";
 import { AppError } from "../errors/AppError.ts";
+import { access } from "node:fs";
 
 const authRouter = Router();
 

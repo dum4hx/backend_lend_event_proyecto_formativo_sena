@@ -1,6 +1,6 @@
 # API Reference
 
-Base URL: `https://api.test.com/api/v1`
+Base URL: `https://api.test.local/api/v1`
 
 ## Authentication
 

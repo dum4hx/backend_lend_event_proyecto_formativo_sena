@@ -33,7 +33,7 @@ const itemInspectionZodSchema = z.object({
   conditionBefore: z.enum(conditionOptions),
   conditionAfter: z.enum(conditionOptions),
   damageDescription: z.string().max(500).trim().optional(),
-  evidenceUrls: z.array(z.string().url()).max(10).optional(),
+  evidenceUrls: z.array(z.url()).max(10).optional(),
   repairRequired: z.boolean().default(false),
   estimatedRepairCost: z.number().min(0).optional(),
   chargeToCustomer: z.number().min(0).optional(),

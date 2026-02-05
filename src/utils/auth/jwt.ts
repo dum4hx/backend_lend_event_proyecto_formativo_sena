@@ -5,6 +5,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { AppError } from "../../errors/AppError.ts";
 import type { UserRole } from "../../modules/user/models/user.model.ts";
+import { logger } from "../logger.ts";
 
 // Define KeyLike as the union type (jose 6.x uses CryptoKey | KeyObject)
 type KeyLike = CryptoKey | KeyObject;
