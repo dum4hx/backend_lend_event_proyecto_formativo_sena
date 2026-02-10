@@ -42,13 +42,29 @@ POST /auth/register
 
 ```json
 {
-  "email": "owner@company.com",
-  "password": "SecurePassword123!",
-  "organizationName": "Acme Rentals",
-  "profile": {
-    "firstName": "John",
-    "lastName": "Doe",
-    "phone": "+1234567890"
+  "organization": {
+    "name": "EventPro Rentals",
+    "legalName": "EventPro Rentals LLC",
+    "email": "contact@eventpro.com",
+    "phone": "+1234567890",
+    "taxId": "123-456-789",
+    "address": {
+      "street": "123 Main St",
+      "city": "New York",
+      "country": "USA",
+      "postalCode": "10001"
+    }
+  },
+  "owner": {
+    "email": "owner@eventpro.com",
+    "password": "SecurePassword123!",
+    "phone": "+1987654321",
+    "name": {
+      "firstName": "John",
+      "secondName": "D.",
+      "firstSurname": "Doe",
+      "secondSurname": "Smith"
+    }
   }
 }
 ```
@@ -59,11 +75,30 @@ POST /auth/register
 {
   "status": "success",
   "data": {
-    "user": { ... },
-    "organization": { ... }
+    "organization": {
+      "id": "60d0fe4f5311236168a109ca",
+      "name": "EventPro Rentals",
+      "email": "contact@eventpro.com"
+    },
+    "user": {
+      "id": "60d0fe4f5311236168a109cb",
+      "email": "owner@eventpro.com",
+      "name": {
+        "firstName": "John",
+        "secondName": "D.",
+        "firstSurname": "Doe",
+        "secondSurname": "Smith"
+      },
+      "role": "owner"
+    }
   }
 }
 ```
+
+**Cookies Set:**
+
+- `access_token` (HTTP-only, 15min expiry)
+- `refresh_token` (HTTP-only, 7 days expiry)
 
 ---
 
@@ -79,8 +114,8 @@ POST /auth/login
 
 ```json
 {
-  "email": "user@company.com",
-  "password": "password123"
+  "email": "owner@eventpro.com",
+  "password": "SecurePassword123!"
 }
 ```
 
@@ -91,10 +126,15 @@ POST /auth/login
   "status": "success",
   "data": {
     "user": {
-      "id": "...",
-      "email": "user@company.com",
-      "role": "owner",
-      "organizationId": "..."
+      "id": "60d0fe4f5311236168a109cb",
+      "email": "owner@eventpro.com",
+      "name": {
+        "firstName": "John",
+        "secondName": "D.",
+        "firstSurname": "Doe",
+        "secondSurname": "Smith"
+      },
+      "role": "owner"
     }
   }
 }
@@ -102,8 +142,8 @@ POST /auth/login
 
 **Cookies Set:**
 
-- `accessToken` (HTTP-only, 15min expiry)
-- `refreshToken` (HTTP-only, 7 days expiry)
+- `access_token` (HTTP-only, 15min expiry)
+- `refresh_token` (HTTP-only, 7 days expiry)
 
 ---
 
@@ -115,14 +155,19 @@ Refreshes the access token using the refresh token cookie.
 POST /auth/refresh
 ```
 
+**Request Headers:**
+Cookie: `refresh_token=...`
+
 **Response:** `200 OK`
 
 ```json
 {
   "status": "success",
-  "message": "Token refreshed successfully"
+  "message": "Tokens refreshed"
 }
 ```
+
+**Cookies Updated:** `access_token`, `refresh_token`
 
 ---
 
@@ -135,6 +180,13 @@ POST /auth/logout
 ```
 
 **Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Logged out successfully"
+}
+```
 
 ---
 
@@ -152,7 +204,22 @@ GET /auth/me
 {
   "status": "success",
   "data": {
-    "user": { ... }
+    "user": {
+      "_id": "60d0fe4f5311236168a109cb",
+      "organizationId": {
+        "_id": "60d0fe4f5311236168a109ca",
+        "name": "EventPro Rentals",
+        "email": "contact@eventpro.com"
+      },
+      "name": {
+        "firstName": "John",
+        "firstSurname": "Doe"
+      },
+      "email": "owner@eventpro.com",
+      "role": "owner",
+      "status": "active",
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    }
   }
 }
 ```

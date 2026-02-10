@@ -31,7 +31,7 @@ import { connectDB } from "./utils/db/connectDB.ts";
 /* ---------- Environment Variables ---------- */
 
 const PORT = process.env.PORT || 8080;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://app.test.local";
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "https://app.test.local";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 /* ---------- Express App ---------- */
