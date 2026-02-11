@@ -3,10 +3,10 @@ import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import {
   Organization,
-  planLimits,
   type SubscriptionPlan,
 } from "../organization/models/organization.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
+import { subscriptionTypeService } from "../subscription_type/subscription_type.service.ts";
 import { BillingEvent } from "./models/billing_event.model.ts";
 import type { Types } from "mongoose";
 
@@ -21,28 +21,6 @@ if (!STRIPE_SECRET_KEY) {
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
-/* ---------- Price IDs (from Stripe Dashboard) ---------- */
-
-// Stripe configuration
-const STRIPE_PRICE_IDS: Record<
-  SubscriptionPlan,
-  { base: string; seat: string } | null
-> = {
-  free: null,
-  starter: {
-    base: process.env.STRIPE_PRICE_STARTER_BASE ?? "",
-    seat: process.env.STRIPE_PRICE_STARTER_SEAT ?? "",
-  },
-  professional: {
-    base: process.env.STRIPE_PRICE_PROFESSIONAL_BASE ?? "",
-    seat: process.env.STRIPE_PRICE_PROFESSIONAL_SEAT ?? "",
-  },
-  enterprise: {
-    base: process.env.STRIPE_PRICE_ENTERPRISE_BASE ?? "",
-    seat: process.env.STRIPE_PRICE_ENTERPRISE_SEAT ?? "",
-  },
-};
-
 /* ---------- Helper Functions ---------- */
 
 const ensureStripe = (): Stripe => {
@@ -50,6 +28,25 @@ const ensureStripe = (): Stripe => {
     throw AppError.internal("Stripe is not configured");
   }
   return stripe;
+};
+
+/**
+ * Gets Stripe price IDs for a plan from the SubscriptionType.
+ */
+const getStripePriceIds = async (
+  plan: SubscriptionPlan,
+): Promise<{ base: string; seat: string } | null> => {
+  if (plan === "free") return null;
+
+  const limits = await subscriptionTypeService.getPlanLimits(plan);
+  if (!limits.stripePriceIdBase || !limits.stripePriceIdSeat) {
+    return null;
+  }
+
+  return {
+    base: limits.stripePriceIdBase,
+    seat: limits.stripePriceIdSeat,
+  };
 };
 
 /* ---------- Billing Service ---------- */
@@ -102,7 +99,7 @@ export const billingService = {
       throw AppError.badRequest("Cannot create checkout for free plan");
     }
 
-    const priceIds = STRIPE_PRICE_IDS[plan];
+    const priceIds = await getStripePriceIds(plan);
     if (!priceIds?.base || !priceIds?.seat) {
       throw AppError.internal(`Price IDs not configured for plan: ${plan}`);
     }
@@ -201,17 +198,11 @@ export const billingService = {
     }
 
     const plan = (org.subscription.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
 
-    // Validate seat limit
-    if (limits.maxSeats !== -1 && newSeatCount > limits.maxSeats) {
-      throw AppError.badRequest(
-        `Plan ${plan} allows maximum ${limits.maxSeats} seats`,
-        { code: "PLAN_LIMIT_REACHED" },
-      );
-    }
+    // Validate seat limit using subscriptionTypeService
+    await subscriptionTypeService.validateSeatCount(plan, newSeatCount);
 
-    const priceIds = STRIPE_PRICE_IDS[plan];
+    const priceIds = await getStripePriceIds(plan);
     if (!priceIds?.seat) {
       throw AppError.internal("Seat price not configured for this plan");
     }

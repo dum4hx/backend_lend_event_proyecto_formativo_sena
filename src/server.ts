@@ -25,8 +25,11 @@ import requestRouter from "./routers/request.router.ts";
 import loanRouter from "./routers/loan.router.ts";
 import inspectionRouter from "./routers/inspection.router.ts";
 import invoiceRouter from "./routers/invoice.router.ts";
+import subscriptionTypeRouter from "./routers/subscription_type.router.ts";
+import { adminRouter } from "./routers/admin.router.ts";
 
 import { connectDB } from "./utils/db/connectDB.ts";
+import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
 
 /* ---------- Environment Variables ---------- */
 
@@ -124,6 +127,12 @@ app.use(`${apiV1}/inspections`, inspectionRouter);
 // Invoice routes
 app.use(`${apiV1}/invoices`, invoiceRouter);
 
+// Subscription type routes (super admin management)
+app.use(`${apiV1}/subscription-types`, subscriptionTypeRouter);
+
+// Admin routes (super admin analytics)
+app.use(`${apiV1}/admin`, adminRouter);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -143,6 +152,9 @@ app.use(errorResponder);
 const startServer = async (): Promise<void> => {
   try {
     await connectDB();
+
+    // Seed default subscription types if none exist
+    await subscriptionTypeService.seedDefaults();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

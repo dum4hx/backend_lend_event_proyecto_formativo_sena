@@ -2,11 +2,11 @@ import type { Types, ClientSession } from "mongoose";
 import {
   Organization,
   type OrganizationInput,
-  planLimits,
   type SubscriptionPlan,
 } from "./models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import type { PlanUsage } from "./types/index.ts";
+import { subscriptionTypeService } from "../subscription_type/subscription_type.service.ts";
 
 /* ---------- Organization Service ---------- */
 
@@ -90,7 +90,7 @@ export const organizationService = {
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
+    const limits = await subscriptionTypeService.getPlanLimits(plan);
     const currentCount = org.subscription?.catalogItemCount ?? 0;
 
     // -1 means unlimited
@@ -115,19 +115,14 @@ export const organizationService = {
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
     const currentCount = org.subscription?.catalogItemCount ?? 0;
 
-    // Check limit (-1 means unlimited)
-    if (
-      limits.maxCatalogItems !== -1 &&
-      currentCount + count > limits.maxCatalogItems
-    ) {
-      throw AppError.badRequest(
-        "Catalog item limit reached. Please upgrade your plan.",
-        { code: "PLAN_LIMIT_REACHED", resource: "catalog_items" },
-      );
-    }
+    // Validate against plan limits
+    await subscriptionTypeService.validateCatalogItemCount(
+      plan,
+      currentCount,
+      count,
+    );
 
     const updateOptions = session ? { session } : undefined;
     await Organization.updateOne(
@@ -164,7 +159,7 @@ export const organizationService = {
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
+    const limits = await subscriptionTypeService.getPlanLimits(plan);
     const currentSeats = org.subscription?.seatCount ?? 1;
 
     // -1 means unlimited
@@ -188,15 +183,9 @@ export const organizationService = {
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
 
-    // Check limit (-1 means unlimited)
-    if (limits.maxSeats !== -1 && seatCount > limits.maxSeats) {
-      throw AppError.badRequest(
-        "Seat limit reached. Please upgrade your plan.",
-        { code: "PLAN_LIMIT_REACHED", resource: "seats" },
-      );
-    }
+    // Validate against plan limits
+    await subscriptionTypeService.validateSeatCount(plan, seatCount);
 
     const updateOptions = session ? { session } : undefined;
     await Organization.updateOne(
@@ -219,7 +208,7 @@ export const organizationService = {
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
-    const limits = planLimits[plan];
+    const limits = await subscriptionTypeService.getPlanLimits(plan);
     const currentCatalogItems = org.subscription?.catalogItemCount ?? 0;
     const currentSeats = org.subscription?.seatCount ?? 1;
 

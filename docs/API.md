@@ -2,11 +2,11 @@
 
 ## Overview
 
-This API provides a multi-tenant material rental/loan management system with organization-based access control, billing integration via Stripe, and comprehensive inventory lifecycle management.
+Multi-tenant material rental and loan management API with organization-based access control, billing via Stripe, and inventory lifecycle tracking.
 
 **Base URL:** `http://localhost:8080/api/v1`
 
-**Authentication:** JWT tokens stored in HTTP-only cookies. All protected routes require the `accessToken` cookie.
+**Authentication:** JWT tokens stored in HTTP-only cookies. Protected routes require the `access_token` cookie.
 
 ---
 
@@ -14,7 +14,7 @@ This API provides a multi-tenant material rental/loan management system with org
 
 1. [Authentication](#authentication)
 2. [Users](#users)
-3. [Organizations](#organizations)
+3. [Organization](#organization)
 4. [Billing](#billing)
 5. [Customers](#customers)
 6. [Materials](#materials)
@@ -23,8 +23,10 @@ This API provides a multi-tenant material rental/loan management system with org
 9. [Loans](#loans)
 10. [Inspections](#inspections)
 11. [Invoices](#invoices)
-12. [RBAC Roles & Permissions](#rbac-roles--permissions)
-13. [Error Responses](#error-responses)
+12. [Subscription Types](#subscription-types)
+13. [Admin Analytics](#admin-analytics)
+14. [RBAC Roles & Permissions](#rbac-roles--permissions)
+15. [Error Responses](#error-responses)
 
 ---
 
@@ -32,7 +34,7 @@ This API provides a multi-tenant material rental/loan management system with org
 
 ### Register Organization & Owner
 
-Creates a new organization and registers the owner user.
+Creates a new organization and owner user.
 
 ```
 POST /auth/register
@@ -43,31 +45,33 @@ POST /auth/register
 ```json
 {
   "organization": {
-    "name": "EventPro Rentals",
-    "legalName": "EventPro Rentals LLC",
-    "email": "contact@eventpro.com",
+    "name": "Acme Rentals",
+    "legalName": "Acme Rentals LLC",
+    "email": "billing@company.com",
+    "taxId": "900123456-7",
     "phone": "+1234567890",
-    "taxId": "123-456-789",
     "address": {
-      "street": "123 Main St",
-      "city": "New York",
-      "country": "USA",
-      "postalCode": "10001"
+      "country": "Colombia",
+      "city": "Bogota",
+      "street": "Calle 123",
+      "postalCode": "110111"
     }
   },
   "owner": {
-    "email": "owner@eventpro.com",
-    "password": "SecurePassword123!",
-    "phone": "+1987654321",
     "name": {
       "firstName": "John",
-      "secondName": "D.",
+      "secondName": "",
       "firstSurname": "Doe",
-      "secondSurname": "Smith"
-    }
+      "secondSurname": ""
+    },
+    "email": "owner@company.com",
+    "phone": "+573001234567",
+    "password": "SecurePassword123!"
   }
 }
 ```
+
+**Optional fields:** `organization.taxId`, `organization.phone`, `organization.address`, `organization.address.postalCode`, `owner.name.secondName`, `owner.name.secondSurname`.
 
 **Response:** `201 Created`
 
@@ -76,19 +80,14 @@ POST /auth/register
   "status": "success",
   "data": {
     "organization": {
-      "id": "60d0fe4f5311236168a109ca",
-      "name": "EventPro Rentals",
-      "email": "contact@eventpro.com"
+      "id": "...",
+      "name": "Acme Rentals",
+      "email": "billing@company.com"
     },
     "user": {
-      "id": "60d0fe4f5311236168a109cb",
-      "email": "owner@eventpro.com",
-      "name": {
-        "firstName": "John",
-        "secondName": "D.",
-        "firstSurname": "Doe",
-        "secondSurname": "Smith"
-      },
+      "id": "...",
+      "email": "owner@company.com",
+      "name": { "firstName": "John", "firstSurname": "Doe" },
       "role": "owner"
     }
   }
@@ -126,15 +125,10 @@ POST /auth/login
   "status": "success",
   "data": {
     "user": {
-      "id": "60d0fe4f5311236168a109cb",
-      "email": "owner@eventpro.com",
-      "name": {
-        "firstName": "John",
-        "secondName": "D.",
-        "firstSurname": "Doe",
-        "secondSurname": "Smith"
-      },
-      "role": "owner"
+      "id": "...",
+      "email": "user@company.com",
+      "name": { "firstName": "Jane", "firstSurname": "Smith" },
+      "role": "manager"
     }
   }
 }
@@ -142,7 +136,7 @@ POST /auth/login
 
 **Cookies Set:**
 
-- `access_token` (HTTP-only, 15min expiry)
+- `access_token` (HTTP-only, 15 min expiry)
 - `refresh_token` (HTTP-only, 7 days expiry)
 
 ---
@@ -203,24 +197,7 @@ GET /auth/me
 ```json
 {
   "status": "success",
-  "data": {
-    "user": {
-      "_id": "60d0fe4f5311236168a109cb",
-      "organizationId": {
-        "_id": "60d0fe4f5311236168a109ca",
-        "name": "EventPro Rentals",
-        "email": "contact@eventpro.com"
-      },
-      "name": {
-        "firstName": "John",
-        "firstSurname": "Doe"
-      },
-      "email": "owner@eventpro.com",
-      "role": "owner",
-      "status": "active",
-      "createdAt": "2023-01-01T00:00:00.000Z"
-    }
-  }
+  "data": { "user": { ... } }
 }
 ```
 
@@ -245,7 +222,7 @@ POST /auth/change-password
 
 ## Users
 
-All user routes require authentication and appropriate permissions.
+All user routes require authentication and an active organization.
 
 ### List Users
 
@@ -257,8 +234,11 @@ GET /users
 
 - `page` (number, default: 1)
 - `limit` (number, default: 20)
-- `role` (string, optional): owner | manager | warehouse_operator | commercial_advisor
-- `status` (string, optional): active | inactive | pending
+- `sortBy` (string, optional)
+- `sortOrder` (string, optional: asc | desc)
+- `role` (string, optional): super_admin | owner | manager | warehouse_operator | commercial_advisor
+- `status` (string, optional): active | inactive | invited | suspended
+- `search` (string, optional)
 
 **Required Permission:** `users:read`
 
@@ -276,8 +256,6 @@ GET /users/:id
 
 ### Invite User
 
-Creates a new user invitation within the organization.
-
 ```
 POST /users/invite
 ```
@@ -286,14 +264,19 @@ POST /users/invite
 
 ```json
 {
-  "email": "newuser@company.com",
-  "role": "commercial_advisor",
-  "profile": {
+  "name": {
     "firstName": "Jane",
-    "lastName": "Smith"
-  }
+    "secondName": "",
+    "firstSurname": "Smith",
+    "secondSurname": ""
+  },
+  "email": "newuser@company.com",
+  "phone": "+573001234567",
+  "role": "commercial_advisor"
 }
 ```
+
+**Optional fields:** `name.secondName`, `name.secondSurname`, `role`.
 
 **Required Permission:** `users:create`
 
@@ -305,14 +288,17 @@ POST /users/invite
 PATCH /users/:id
 ```
 
-**Request Body:**
+**Request Body (all optional):**
 
 ```json
 {
-  "profile": {
+  "name": {
     "firstName": "Updated",
-    "phone": "+1987654321"
-  }
+    "firstSurname": "Name"
+  },
+  "email": "updated@company.com",
+  "phone": "+573001111111",
+  "role": "manager"
 }
 ```
 
@@ -334,7 +320,7 @@ PATCH /users/:id/role
 }
 ```
 
-**Required Permission:** `users:role:update`
+**Required Permission:** `users:update`
 
 ---
 
@@ -344,7 +330,7 @@ PATCH /users/:id/role
 POST /users/:id/deactivate
 ```
 
-**Required Permission:** `users:update`
+**Required Permission:** `users:delete`
 
 ---
 
@@ -368,12 +354,12 @@ DELETE /users/:id
 
 ---
 
-## Organizations
+## Organization
 
 ### Get Organization
 
 ```
-GET /organizations
+GET /organization
 ```
 
 Returns the current user's organization details.
@@ -383,60 +369,48 @@ Returns the current user's organization details.
 ### Update Organization
 
 ```
-PATCH /organizations
+PATCH /organization
 ```
 
-**Request Body:**
+**Request Body (all optional):**
 
 ```json
 {
   "name": "Updated Company Name",
-  "settings": {
-    "defaultCurrency": "USD",
-    "timezone": "America/New_York"
+  "legalName": "Updated Company Name LLC",
+  "taxId": "900123456-7",
+  "email": "billing@company.com",
+  "phone": "+573001234567",
+  "address": {
+    "country": "Colombia",
+    "city": "Bogota",
+    "street": "Calle 123",
+    "postalCode": "110111"
   }
 }
 ```
 
-**Required Role:** Owner
+**Required Permission:** `organization:update`
 
 ---
 
 ### Get Organization Usage
 
 ```
-GET /organizations/usage
+GET /organization/usage
 ```
 
-Returns current usage statistics vs plan limits.
-
-**Response:**
-
-```json
-{
-  "status": "success",
-  "data": {
-    "usage": {
-      "activeSeats": 5,
-      "maxSeats": 10,
-      "catalogItems": 150,
-      "maxCatalogItems": 500,
-      "activeLoans": 45,
-      "maxActiveLoans": 200
-    }
-  }
-}
-```
+**Required Permission:** `organization:read`
 
 ---
 
 ### Get Available Plans
 
 ```
-GET /organizations/plans
+GET /organization/plans
 ```
 
-Returns available subscription plans and their limits.
+Authentication required. No additional permission is enforced.
 
 ---
 
@@ -461,14 +435,14 @@ POST /billing/checkout
 }
 ```
 
+**Optional fields:** `seatCount` (default: 1).
+
 **Response:**
 
 ```json
 {
   "status": "success",
-  "data": {
-    "checkoutUrl": "https://checkout.stripe.com/..."
-  }
+  "data": { "checkoutUrl": "https://checkout.stripe.com/..." }
 }
 ```
 
@@ -478,8 +452,6 @@ POST /billing/checkout
 
 ### Create Portal Session
 
-Creates a Stripe Billing Portal session.
-
 ```
 POST /billing/portal
 ```
@@ -487,8 +459,15 @@ POST /billing/portal
 **Request Body:**
 
 ```json
+{ "returnUrl": "https://app.example.com/settings" }
+```
+
+**Response:**
+
+```json
 {
-  "returnUrl": "https://app.example.com/settings"
+  "status": "success",
+  "data": { "portalUrl": "https://billing.stripe.com/..." }
 }
 ```
 
@@ -505,9 +484,7 @@ PATCH /billing/seats
 **Request Body:**
 
 ```json
-{
-  "seatCount": 10
-}
+{ "seatCount": 10 }
 ```
 
 **Required Role:** Owner
@@ -523,10 +500,10 @@ POST /billing/cancel
 **Request Body:**
 
 ```json
-{
-  "cancelImmediately": false
-}
+{ "cancelImmediately": false }
 ```
+
+**Optional fields:** `cancelImmediately` (default: false).
 
 **Required Role:** Owner
 
@@ -540,7 +517,7 @@ GET /billing/history
 
 **Query Parameters:**
 
-- `limit` (number, default: 50)
+- `limit` (number, optional, default: 50)
 
 **Required Role:** Owner
 
@@ -552,7 +529,7 @@ GET /billing/history
 POST /billing/webhook
 ```
 
-Handles Stripe webhook events. Requires raw body and Stripe signature verification.
+Requires raw body and `stripe-signature` header.
 
 ---
 
@@ -567,8 +544,8 @@ GET /customers
 **Query Parameters:**
 
 - `page`, `limit`, `sortBy`, `sortOrder`
-- `status`: active | inactive | blacklisted
-- `search`: searches email, name, document number
+- `status` (optional): active | inactive | blacklisted
+- `search` (optional): matches email, name, document number
 
 **Required Permission:** `customers:read`
 
@@ -597,19 +574,25 @@ POST /customers
   "email": "customer@example.com",
   "name": {
     "firstName": "Carlos",
-    "firstSurname": "García"
+    "secondName": "",
+    "firstSurname": "Garcia",
+    "secondSurname": ""
   },
-  "documentType": "CC",
-  "documentNumber": "1234567890",
   "phone": "+573001234567",
+  "documentType": "cc",
+  "documentNumber": "1234567890",
   "address": {
+    "country": "Colombia",
+    "city": "Bogota",
     "street": "Calle 123",
-    "city": "Bogotá",
-    "state": "Cundinamarca",
-    "country": "Colombia"
-  }
+    "postalCode": "110111",
+    "additionalInfo": "Apartment 301"
+  },
+  "notes": "VIP customer"
 }
 ```
+
+**Optional fields:** `name.secondName`, `name.secondSurname`, `documentType`, `documentNumber`, `address`, `address.postalCode`, `address.additionalInfo`, `notes`.
 
 **Required Permission:** `customers:create`
 
@@ -620,6 +603,8 @@ POST /customers
 ```
 PATCH /customers/:id
 ```
+
+**Request Body:** any customer fields (all optional).
 
 **Required Permission:** `customers:update`
 
@@ -641,6 +626,8 @@ POST /customers/:id/blacklist
 DELETE /customers/:id
 ```
 
+Soft delete by setting status to inactive.
+
 **Required Permission:** `customers:delete`
 
 ---
@@ -661,6 +648,15 @@ GET /materials/categories
 POST /materials/categories
 ```
 
+**Request Body:**
+
+```json
+{
+  "name": "Cameras",
+  "description": "All camera equipment"
+}
+```
+
 ---
 
 ### Material Types (Catalog)
@@ -674,18 +670,14 @@ GET /materials/types
 **Query Parameters:**
 
 - `page`, `limit`
-- `categoryId`
-- `search`
-
----
+- `categoryId` (optional)
+- `search` (optional)
 
 #### Get Material Type
 
 ```
 GET /materials/types/:id
 ```
-
----
 
 #### Create Material Type
 
@@ -697,21 +689,14 @@ POST /materials/types
 
 ```json
 {
+  "categoryId": "...",
   "name": "Canon EOS R5",
   "description": "Professional mirrorless camera",
-  "categoryId": "...",
-  "pricePerDay": 150.0,
-  "replacementValue": 3899.0,
-  "specifications": {
-    "sensor": "45MP Full Frame",
-    "video": "8K RAW"
-  }
+  "pricePerDay": 150.0
 }
 ```
 
 **Required Permission:** `materials:create`
-
----
 
 #### Update Material Type
 
@@ -719,9 +704,9 @@ POST /materials/types
 PATCH /materials/types/:id
 ```
 
-**Required Permission:** `materials:update`
+**Request Body:** any material type fields (all optional).
 
----
+**Required Permission:** `materials:update`
 
 #### Delete Material Type
 
@@ -744,19 +729,15 @@ GET /materials/instances
 **Query Parameters:**
 
 - `page`, `limit`
-- `status`: available | reserved | loaned | returned | maintenance | damaged | lost | retired
-- `materialTypeId`
-- `search` (serial number)
-
----
+- `status` (optional): available | reserved | loaned | returned | maintenance | damaged | lost | retired
+- `materialTypeId` (optional)
+- `search` (optional, serial number)
 
 #### Get Material Instance
 
 ```
 GET /materials/instances/:id
 ```
-
----
 
 #### Create Material Instance
 
@@ -770,13 +751,12 @@ POST /materials/instances
 {
   "modelId": "...",
   "serialNumber": "CANON-R5-001",
-  "acquisitionDate": "2024-01-15",
-  "acquisitionCost": 3500.0,
-  "condition": "new"
+  "status": "available",
+  "locationId": "..."
 }
 ```
 
----
+**Optional fields:** `status` (default: available). Allowed values: available | in_use | maintenance | damaged | retired.
 
 #### Update Material Instance Status
 
@@ -793,15 +773,17 @@ PATCH /materials/instances/:id/status
 }
 ```
 
-**Required Permission:** `materials:state:update`
+**Optional fields:** `notes`.
 
----
+**Required Permission:** `materials:state:update`
 
 #### Delete Material Instance
 
 ```
 DELETE /materials/instances/:id
 ```
+
+Only allowed when instance status is `available` or `retired`.
 
 **Required Permission:** `materials:delete`
 
@@ -820,18 +802,14 @@ GET /packages
 **Query Parameters:**
 
 - `page`, `limit`
-- `isActive`: true | false
-- `search`
-
----
+- `isActive` (optional): true | false
+- `search` (optional)
 
 ### Get Package
 
 ```
 GET /packages/:id
 ```
-
----
 
 ### Create Package
 
@@ -845,15 +823,17 @@ POST /packages
 {
   "name": "Professional Photo Kit",
   "description": "Complete setup for professional photography",
-  "pricePerDay": 350.0,
-  "materialTypes": [
+  "items": [
     { "materialTypeId": "...", "quantity": 1 },
     { "materialTypeId": "...", "quantity": 2 }
-  ]
+  ],
+  "pricePerDay": 350.0,
+  "discountRate": 0.1,
+  "depositAmount": 500.0
 }
 ```
 
----
+**Optional fields:** `description`, `discountRate` (default: 0), `depositAmount` (default: 0).
 
 ### Update Package
 
@@ -861,7 +841,7 @@ POST /packages
 PATCH /packages/:id
 ```
 
----
+**Request Body:** any package fields (all optional).
 
 ### Activate Package
 
@@ -869,15 +849,11 @@ PATCH /packages/:id
 POST /packages/:id/activate
 ```
 
----
-
 ### Deactivate Package
 
 ```
 POST /packages/:id/deactivate
 ```
-
----
 
 ### Delete Package
 
@@ -889,7 +865,7 @@ DELETE /packages/:id
 
 ## Requests
 
-Loan requests follow this workflow: **pending → approved → assigned → ready → completed**
+Loan requests follow this workflow: **pending → approved → deposit_pending → assigned → ready → expired / rejected / cancelled**
 
 ### List Requests
 
@@ -900,11 +876,9 @@ GET /requests
 **Query Parameters:**
 
 - `page`, `limit`, `sortBy`, `sortOrder`
-- `status`: pending | approved | assigned | ready | completed | rejected | cancelled | expired
-- `customerId`
-- `packageId`
-
----
+- `status` (optional): pending | approved | deposit_pending | assigned | ready | expired | rejected | cancelled
+- `customerId` (optional)
+- `packageId` (optional)
 
 ### Get Request
 
@@ -912,11 +886,7 @@ GET /requests
 GET /requests/:id
 ```
 
----
-
 ### Create Request
-
-Commercial Advisor creates a loan request for a customer.
 
 ```
 POST /requests
@@ -927,25 +897,20 @@ POST /requests
 ```json
 {
   "customerId": "...",
-  "packageId": "...",
-  "requestedStartDate": "2024-02-01",
-  "requestedEndDate": "2024-02-05",
-  "deposit": {
-    "amount": 500.0,
-    "method": "credit_card",
-    "status": "pending"
-  },
+  "items": [{ "type": "package", "referenceId": "...", "quantity": 1 }],
+  "startDate": "2024-02-01",
+  "endDate": "2024-02-05",
   "notes": "Client prefers morning pickup"
 }
 ```
+
+**Optional fields:** `notes`.
 
 **Required Permission:** `requests:create`
 
 ---
 
 ### Approve Request
-
-Manager approves a pending request.
 
 ```
 POST /requests/:id/approve
@@ -954,18 +919,16 @@ POST /requests/:id/approve
 **Request Body:**
 
 ```json
-{
-  "notes": "Approved for VIP client"
-}
+{ "notes": "Approved for VIP client" }
 ```
+
+**Optional fields:** `notes`.
 
 **Required Permission:** `requests:approve`
 
 ---
 
 ### Reject Request
-
-Manager rejects a pending request.
 
 ```
 POST /requests/:id/reject
@@ -974,9 +937,7 @@ POST /requests/:id/reject
 **Request Body:**
 
 ```json
-{
-  "reason": "Customer has outstanding invoices"
-}
+{ "reason": "Customer has outstanding invoices" }
 ```
 
 **Required Permission:** `requests:approve`
@@ -984,8 +945,6 @@ POST /requests/:id/reject
 ---
 
 ### Assign Materials
-
-Warehouse Operator assigns specific material instances to an approved request.
 
 ```
 POST /requests/:id/assign
@@ -995,10 +954,7 @@ POST /requests/:id/assign
 
 ```json
 {
-  "assignments": [
-    { "materialTypeId": "...", "materialInstanceId": "..." },
-    { "materialTypeId": "...", "materialInstanceId": "..." }
-  ]
+  "assignments": [{ "materialTypeId": "...", "materialInstanceId": "..." }]
 }
 ```
 
@@ -1007,8 +963,6 @@ POST /requests/:id/assign
 ---
 
 ### Mark Ready
-
-Warehouse Operator marks request as ready for customer pickup.
 
 ```
 POST /requests/:id/ready
@@ -1039,11 +993,9 @@ GET /loans
 **Query Parameters:**
 
 - `page`, `limit`, `sortBy`, `sortOrder`
-- `status`: active | overdue | returned | completed | cancelled
-- `customerId`
-- `overdue`: true | false
-
----
+- `status` (optional): active | returned | inspected | closed | overdue
+- `customerId` (optional)
+- `overdue` (optional): true | false
 
 ### Get Overdue Loans
 
@@ -1053,27 +1005,19 @@ GET /loans/overdue
 
 Returns all overdue loans and updates status automatically.
 
----
-
 ### Get Loan
 
 ```
 GET /loans/:id
 ```
 
----
-
 ### Create Loan from Request
-
-Creates a loan when customer picks up materials from a ready request.
 
 ```
 POST /loans/from-request/:requestId
 ```
 
 **Required Permission:** `loans:create`
-
----
 
 ### Extend Loan
 
@@ -1090,13 +1034,11 @@ POST /loans/:id/extend
 }
 ```
 
+**Optional fields:** `notes`.
+
 **Required Permission:** `loans:update`
 
----
-
 ### Return Loan
-
-Initiates return process (materials pending inspection).
 
 ```
 POST /loans/:id/return
@@ -1105,18 +1047,14 @@ POST /loans/:id/return
 **Request Body:**
 
 ```json
-{
-  "notes": "All items returned in good condition"
-}
+{ "notes": "All items returned in good condition" }
 ```
+
+**Optional fields:** `notes`.
 
 **Required Permission:** `loans:update`
 
----
-
 ### Complete Loan
-
-Finalizes loan after inspection is done.
 
 ```
 POST /loans/:id/complete
@@ -1137,17 +1075,13 @@ GET /inspections
 **Query Parameters:**
 
 - `page`, `limit`
-- `loanId`
-
----
+- `loanId` (optional)
 
 ### Get Inspection
 
 ```
 GET /inspections/:id
 ```
-
----
 
 ### Get Pending Loans for Inspection
 
@@ -1157,11 +1091,7 @@ GET /inspections/pending-loans
 
 Returns loans that are returned but not yet inspected.
 
----
-
 ### Create Inspection
-
-Warehouse Operator inspects returned materials.
 
 ```
 POST /inspections
@@ -1188,6 +1118,8 @@ POST /inspections
 }
 ```
 
+**Optional fields:** `items[].notes`, `items[].damageDescription`, `items[].damageCost`, `overallNotes`.
+
 **Required Permission:** `inspections:create`
 
 **Note:** If damages are found, an invoice is automatically generated.
@@ -1205,13 +1137,11 @@ GET /invoices
 **Query Parameters:**
 
 - `page`, `limit`, `sortBy`, `sortOrder`
-- `status`: pending | partial | paid | voided | refunded
-- `type`: rental | damage | late_fee | deposit_deduction | other
-- `customerId`
-- `loanId`
-- `overdue`: true | false
-
----
+- `status` (optional): draft | pending | paid | partially_paid | overdue | cancelled | refunded
+- `type` (optional): damage | late_fee | deposit_shortfall | additional_service | penalty
+- `customerId` (optional)
+- `loanId` (optional)
+- `overdue` (optional): true | false
 
 ### Get Invoice Summary
 
@@ -1219,17 +1149,11 @@ GET /invoices
 GET /invoices/summary
 ```
 
-Returns statistics for pending, paid, and overdue invoices.
-
----
-
 ### Get Invoice
 
 ```
 GET /invoices/:id
 ```
-
----
 
 ### Create Invoice
 
@@ -1242,22 +1166,25 @@ POST /invoices
 ```json
 {
   "customerId": "...",
-  "type": "rental",
+  "loanId": "...",
+  "type": "damage",
   "items": [
     {
-      "description": "Canon EOS R5 rental (5 days)",
-      "quantity": 5,
-      "unitPrice": 150.0
+      "description": "Scratched lens",
+      "quantity": 1,
+      "unitPrice": 250.0,
+      "materialInstanceId": "..."
     }
   ],
   "taxRate": 0.19,
-  "dueDate": "2024-02-15T00:00:00Z"
+  "dueDate": "2024-02-15T00:00:00Z",
+  "notes": "Customer acknowledged damage"
 }
 ```
 
-**Required Permission:** `invoices:create`
+**Optional fields:** `loanId`, `items[].materialInstanceId`, `taxRate` (default: 0.19), `dueDate` (default: +30 days), `notes`.
 
----
+**Required Permission:** `invoices:create`
 
 ### Record Payment
 
@@ -1270,15 +1197,15 @@ POST /invoices/:id/pay
 ```json
 {
   "amount": 500.0,
-  "paymentMethodId": "...",
+  "paymentMethodId": "cash",
   "reference": "TXN-123456",
   "notes": "Partial payment"
 }
 ```
 
-**Required Permission:** `invoices:update`
+**Optional fields:** `reference`, `notes`.
 
----
+**Required Permission:** `invoices:update`
 
 ### Void Invoice
 
@@ -1289,14 +1216,10 @@ POST /invoices/:id/void
 **Request Body:**
 
 ```json
-{
-  "reason": "Duplicate invoice created in error"
-}
+{ "reason": "Duplicate invoice created in error" }
 ```
 
 **Required Permission:** `invoices:delete`
-
----
 
 ### Send Invoice
 
@@ -1304,9 +1227,78 @@ POST /invoices/:id/void
 POST /invoices/:id/send
 ```
 
-Sends invoice notification to customer email.
-
 **Required Permission:** `invoices:update`
+
+---
+
+## Subscription Types
+
+### List Active Subscription Types (Public)
+
+```
+GET /subscription-types
+```
+
+### Get Subscription Type by Plan (Public)
+
+```
+GET /subscription-types/:plan
+```
+
+### Calculate Plan Cost (Public)
+
+```
+POST /subscription-types/:plan/calculate-cost
+```
+
+**Request Body:**
+
+```json
+{ "seatCount": 5 }
+```
+
+### List All Subscription Types (Super Admin)
+
+```
+GET /subscription-types/admin/all
+```
+
+### Create Subscription Type (Super Admin)
+
+```
+POST /subscription-types
+```
+
+### Update Subscription Type (Super Admin)
+
+```
+PATCH /subscription-types/:plan
+```
+
+### Deactivate Subscription Type (Super Admin)
+
+```
+DELETE /subscription-types/:plan
+```
+
+---
+
+## Admin Analytics
+
+All admin analytics routes require the `super_admin` role.
+
+```
+GET /admin/analytics/overview
+GET /admin/analytics/organizations
+GET /admin/analytics/users
+GET /admin/analytics/revenue
+GET /admin/analytics/subscriptions
+GET /admin/analytics/health
+GET /admin/analytics/activity
+GET /admin/analytics/dashboard
+```
+
+**Optional query parameters:** `periodMonths` (number) for organizations/users/revenue. `limit` (number) for activity.
 
 ---
 
@@ -1314,53 +1306,66 @@ Sends invoice notification to customer email.
 
 ### Roles
 
-| Role                 | Description                         |
-| -------------------- | ----------------------------------- |
-| `owner`              | Organization owner with full access |
-| `manager`            | Can approve requests, manage users  |
-| `warehouse_operator` | Handles material logistics          |
-| `commercial_advisor` | Customer-facing sales role          |
+| Role                 | Description                               |
+| -------------------- | ----------------------------------------- |
+| `super_admin`        | Platform owner with full access           |
+| `owner`              | Organization owner with full access       |
+| `manager`            | Approves requests, manages catalog        |
+| `warehouse_operator` | Handles material logistics and inspection |
+| `commercial_advisor` | Customer-facing sales role                |
 
-### Permission Matrix
+### Permissions by Role
 
-| Permission               | Owner | Manager | Warehouse | Commercial |
-| ------------------------ | ----- | ------- | --------- | ---------- |
-| `users:read`             | ✓     | ✓       | ✓         | -          |
-| `users:create`           | ✓     | ✓       | -         | -          |
-| `users:update`           | ✓     | ✓       | -         | -          |
-| `users:delete`           | ✓     | -       | -         | -          |
-| `users:role:update`      | ✓     | -       | -         | -          |
-| `customers:read`         | ✓     | ✓       | ✓         | ✓          |
-| `customers:create`       | ✓     | ✓       | -         | ✓          |
-| `customers:update`       | ✓     | ✓       | -         | ✓          |
-| `customers:delete`       | ✓     | ✓       | -         | -          |
-| `materials:read`         | ✓     | ✓       | ✓         | ✓          |
-| `materials:create`       | ✓     | ✓       | ✓         | -          |
-| `materials:update`       | ✓     | ✓       | ✓         | -          |
-| `materials:delete`       | ✓     | ✓       | -         | -          |
-| `materials:state:update` | ✓     | ✓       | ✓         | -          |
-| `packages:read`          | ✓     | ✓       | ✓         | ✓          |
-| `packages:create`        | ✓     | ✓       | -         | -          |
-| `packages:update`        | ✓     | ✓       | -         | -          |
-| `packages:delete`        | ✓     | -       | -         | -          |
-| `requests:read`          | ✓     | ✓       | ✓         | ✓          |
-| `requests:create`        | ✓     | ✓       | -         | ✓          |
-| `requests:update`        | ✓     | ✓       | -         | -          |
-| `requests:approve`       | ✓     | ✓       | -         | -          |
-| `requests:assign`        | ✓     | ✓       | ✓         | -          |
-| `loans:read`             | ✓     | ✓       | ✓         | ✓          |
-| `loans:create`           | ✓     | ✓       | ✓         | -          |
-| `loans:update`           | ✓     | ✓       | ✓         | -          |
-| `inspections:read`       | ✓     | ✓       | ✓         | -          |
-| `inspections:create`     | ✓     | ✓       | ✓         | -          |
-| `invoices:read`          | ✓     | ✓       | -         | ✓          |
-| `invoices:create`        | ✓     | ✓       | -         | -          |
-| `invoices:update`        | ✓     | ✓       | -         | -          |
-| `invoices:delete`        | ✓     | -       | -         | -          |
-| `organization:read`      | ✓     | ✓       | ✓         | ✓          |
-| `organization:update`    | ✓     | -       | -         | -          |
-| `billing:read`           | ✓     | -       | -         | -          |
-| `billing:manage`         | ✓     | -       | -         | -          |
+**super_admin**
+
+- subscription_types:create, subscription_types:read, subscription_types:update, subscription_types:delete
+- platform:manage
+- All owner permissions
+
+**owner**
+
+- organization:read, organization:update, organization:delete
+- billing:manage, subscription:manage
+- users:create, users:read, users:update, users:delete
+- customers:create, customers:read, customers:update, customers:delete
+- materials:create, materials:read, materials:update, materials:delete, materials:state:update
+- packages:create, packages:read, packages:update, packages:delete
+- requests:create, requests:read, requests:update, requests:approve, requests:delete
+- loans:create, loans:read, loans:update, loans:checkout, loans:return
+- inspections:create, inspections:read, inspections:update
+- invoices:create, invoices:read, invoices:update
+- reports:read, analytics:read
+
+**manager**
+
+- organization:read
+- users:read
+- customers:read
+- materials:create, materials:read, materials:update, materials:delete
+- packages:create, packages:read, packages:update, packages:delete
+- requests:read, requests:approve
+- loans:read
+- inspections:read
+- invoices:read
+- reports:read, analytics:read
+
+**warehouse_operator**
+
+- organization:read
+- materials:read, materials:state:update
+- packages:read
+- loans:read, loans:checkout, loans:return
+- inspections:create, inspections:read, inspections:update
+
+**commercial_advisor**
+
+- organization:read
+- customers:create, customers:read, customers:update
+- materials:read
+- packages:read
+- requests:create, requests:read, requests:update
+- loans:create, loans:read
+- invoices:read
 
 ---
 
@@ -1398,7 +1403,8 @@ All errors follow this format:
 - `RESOURCE_NOT_FOUND` - Requested resource doesn't exist
 - `DUPLICATE_RESOURCE` - Resource with same identifier exists
 - `PLAN_LIMIT_EXCEEDED` - Organization has reached plan limits
-- `ORGANIZATION_INACTIVE` - Organization subscription is inactive
+- `ORGANIZATION_SUSPENDED` - Organization is suspended
+- `ORGANIZATION_CANCELLED` - Organization is cancelled
 - `RATE_LIMIT_EXCEEDED` - Too many requests
 
 ---
@@ -1409,7 +1415,6 @@ All errors follow this format:
 | ------------------ | -------------------------- |
 | Global             | 100 requests/minute per IP |
 | Authentication     | 5 requests/minute per IP   |
-| Password Reset     | 3 requests/hour per email  |
 | Payment Operations | 10 requests/minute per org |
 | Webhooks           | 1000 requests/minute       |
 
@@ -1448,19 +1453,19 @@ STRIPE_ENTERPRISE_PRICE_ID=price_...
 
 ### Complete Rental Flow
 
-1. **Create Customer** - Commercial Advisor registers new customer
-2. **Create Request** - Commercial Advisor creates loan request
-3. **Approve Request** - Manager approves the request
-4. **Assign Materials** - Warehouse Operator assigns specific items
-5. **Mark Ready** - Warehouse Operator marks request ready
-6. **Create Loan** - Customer picks up, loan is created
-7. **Return Loan** - Customer returns materials
-8. **Create Inspection** - Warehouse Operator inspects items
-9. **Complete Loan** - Loan is finalized
+1. Create Customer - Commercial Advisor registers new customer
+2. Create Request - Commercial Advisor creates loan request
+3. Approve Request - Manager approves the request
+4. Assign Materials - Warehouse Operator assigns specific items
+5. Mark Ready - Warehouse Operator marks request ready
+6. Create Loan - Customer picks up, loan is created
+7. Return Loan - Customer returns materials
+8. Create Inspection - Warehouse Operator inspects items
+9. Complete Loan - Loan is finalized
 
 ### Damage Handling
 
 1. During inspection, mark item as `damaged` with cost
 2. Invoice is automatically generated
 3. Record payment when customer pays
-4. Material status updated to `damaged` → `maintenance` → `available`
+4. Material status updated to `damaged` then `maintenance` or `available`

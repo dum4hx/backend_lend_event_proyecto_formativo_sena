@@ -3,50 +3,16 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 /* ---------- Subscription Plans ---------- */
 
-export const subscriptionPlanOptions = [
+// Default plan options for validation (actual plans are dynamic from SubscriptionType)
+export const defaultSubscriptionPlanOptions = [
   "free",
   "starter",
   "professional",
   "enterprise",
 ] as const;
 
-export type SubscriptionPlan = (typeof subscriptionPlanOptions)[number];
-
-// Plan limits configuration
-export const planLimits: Record<
-  SubscriptionPlan,
-  {
-    maxCatalogItems: number;
-    maxSeats: number;
-    basePriceMonthly: number;
-    pricePerSeat: number;
-  }
-> = {
-  free: {
-    maxCatalogItems: 10,
-    maxSeats: 1,
-    basePriceMonthly: 0,
-    pricePerSeat: 0,
-  },
-  starter: {
-    maxCatalogItems: 100,
-    maxSeats: 5,
-    basePriceMonthly: 2900,
-    pricePerSeat: 500,
-  },
-  professional: {
-    maxCatalogItems: 500,
-    maxSeats: 20,
-    basePriceMonthly: 9900,
-    pricePerSeat: 400,
-  },
-  enterprise: {
-    maxCatalogItems: -1,
-    maxSeats: -1,
-    basePriceMonthly: 29900,
-    pricePerSeat: 300,
-  }, // -1 = unlimited
-};
+// SubscriptionPlan is now a string since plans are dynamically defined
+export type SubscriptionPlan = string;
 
 /* ---------- Organization Status ---------- */
 
@@ -100,10 +66,12 @@ const organizationAddressSchema = new Schema(
 
 const subscriptionSchema = new Schema(
   {
+    // Plan identifier - references SubscriptionType.plan
     plan: {
       type: String,
-      enum: subscriptionPlanOptions,
       default: "free",
+      lowercase: true,
+      trim: true,
     },
     stripeCustomerId: { type: String, default: null },
     stripeSubscriptionId: { type: String, default: null },

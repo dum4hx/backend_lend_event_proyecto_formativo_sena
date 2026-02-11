@@ -8,7 +8,6 @@ import { z } from "zod";
 import { userService } from "../modules/user/user.service.ts";
 import { authService } from "../modules/auth/auth.service.ts";
 import {
-  UserZodSchema,
   UserUpdateZodSchema,
   userRoleOptions,
 } from "../modules/user/models/user.model.ts";

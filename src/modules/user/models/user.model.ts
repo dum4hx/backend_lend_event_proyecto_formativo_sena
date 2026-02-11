@@ -12,6 +12,7 @@ import {
 /* ---------- User Roles (RBAC) ---------- */
 
 export const userRoleOptions = [
+  "super_admin", // Software owner
   "owner",
   "manager",
   "warehouse_operator",
@@ -22,6 +23,54 @@ export type UserRole = (typeof userRoleOptions)[number];
 
 // Role permissions map
 export const rolePermissions: Record<UserRole, string[]> = {
+  super_admin: [
+    // Super admin has full platform access
+    "subscription_types:create",
+    "subscription_types:read",
+    "subscription_types:update",
+    "subscription_types:delete",
+    "platform:manage",
+    // Also includes all owner permissions
+    "organization:read",
+    "organization:update",
+    "organization:delete",
+    "billing:manage",
+    "subscription:manage",
+    "users:create",
+    "users:read",
+    "users:update",
+    "users:delete",
+    "customers:create",
+    "customers:read",
+    "customers:update",
+    "customers:delete",
+    "materials:create",
+    "materials:read",
+    "materials:update",
+    "materials:delete",
+    "materials:state:update",
+    "packages:create",
+    "packages:read",
+    "packages:update",
+    "packages:delete",
+    "requests:create",
+    "requests:read",
+    "requests:update",
+    "requests:approve",
+    "requests:delete",
+    "loans:create",
+    "loans:read",
+    "loans:update",
+    "loans:checkout",
+    "loans:return",
+    "inspections:create",
+    "inspections:read",
+    "inspections:update",
+    "invoices:create",
+    "invoices:read",
+    "invoices:update",
+    "reports:read",
+  ],
   owner: [
     // Full access
     "organization:read",
