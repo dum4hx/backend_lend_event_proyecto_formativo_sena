@@ -8,6 +8,7 @@
     "build": "tsc --project tsconfig.build.json",
     "start": "node dist/server.js",
     "generate-keys": "node --env-file=.env src/scripts/generate_keys.ts",
+    "seed:admin": "node --env-file=.env src/scripts/seed_super_admin.ts",
     "test": "npx playwright test",
     "test:all": "npx playwright test",
     "test:auth": "npx playwright test tests/api/auth",

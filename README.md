@@ -77,7 +77,31 @@ npm run generate-keys
 
 This creates key files in the `keys/` directory.
 
-### 5. Set Up Local Domains with Nginx
+### 5. Create Initial Super Admin User (Optional)
+
+Create the platform super administrator account:
+
+1. Set the admin credentials in your `.env` file:
+
+```dotenv
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PASSWORD=YourSecurePassword123!
+```
+
+2. Run the seeder:
+
+```bash
+npm run seed:admin
+```
+
+This creates:
+
+- A special "Platform Administration" organization
+- A super admin user with full platform access
+
+**Note:** This is a one-time operation. The seeder will skip if a super admin already exists with the specified email.
+
+### 6. Set Up Local Domains with Nginx
 
 The project uses custom local domains for development:
 
@@ -86,7 +110,7 @@ The project uses custom local domains for development:
 | `app.test.local` | Frontend web application   |
 | `api.test.local` | Backend API (this project) |
 
-#### 5.1 Add Hosts Entries
+#### 6.1 Add Hosts Entries
 
 Add the following to your hosts file:
 
@@ -98,7 +122,7 @@ Add the following to your hosts file:
 127.0.0.1 api.test.local
 ```
 
-#### 5.2 Generate SSL Certificates
+#### 6.2 Generate SSL Certificates
 
 Install mkcert and generate certificates:
 
@@ -127,7 +151,7 @@ Or use the provided script:
 ./scripts/generate-ssl.sh
 ```
 
-#### 5.3 Configure Nginx
+#### 6.3 Configure Nginx
 
 Copy the certificates to your Nginx SSL directory and use the provided configuration:
 
@@ -154,7 +178,7 @@ nginx -s reload
 sudo nginx -s reload
 ```
 
-### 6. Start the Development Server
+### 7. Start the Development Server
 
 ```bash
 npm run dev
@@ -165,7 +189,7 @@ The API will be available at:
 - **Direct:** `http://localhost:8080`
 - **Via Nginx:** `https://api.test.local`
 
-### 7. Verify Setup
+### 8. Verify Setup
 
 Test the health endpoint:
 
@@ -192,6 +216,7 @@ Expected response:
 | `npm run build`         | Compile TypeScript to JavaScript         |
 | `npm start`             | Run compiled production build            |
 | `npm run generate-keys` | Generate JWT RSA key pairs               |
+| `npm run seed:admin`    | Create initial super admin user          |
 | `npm test`              | Run all Playwright tests                 |
 | `npm run test:auth`     | Run authentication tests                 |
 | `npm run test:users`    | Run user management tests                |
