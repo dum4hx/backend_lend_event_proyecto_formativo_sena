@@ -9,8 +9,10 @@ import { AppError } from "../../errors/AppError.ts";
 import { generateTokenPair, type TokenPair } from "../../utils/auth/jwt.ts";
 import {
   Organization,
+  type OrganizationDocument,
   type OrganizationInput,
 } from "../organization/models/organization.model.ts";
+import { SubscriptionType } from "../subscription_type/models/subscription_type.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import type { ClientSession } from "mongoose";
@@ -45,10 +47,30 @@ export const authService = {
       const ownerId = new Types.ObjectId();
 
       // Create organization - cast to any to work around exactOptionalPropertyTypes
-      const orgDoc = new Organization({
+      const orgData: Record<string, unknown> = {
         ...organizationData,
         ownerId,
-      });
+      };
+
+      // When SKIP_SUBSCRIPTION_CHECK is enabled, assign the starter plan
+      if (process.env.SKIP_SUBSCRIPTION_CHECK === "true") {
+        const starterPlan = await SubscriptionType.findOne({
+          plan: "starter",
+          status: "active",
+        }).session(session);
+        if (!starterPlan) {
+          throw AppError.badRequest(
+            "Starter subscription plan not found or inactive",
+          );
+        }
+        orgData.subscription = {
+          plan: starterPlan.plan,
+          seatCount: starterPlan.maxSeats === -1 ? 1 : starterPlan.maxSeats,
+          catalogItemCount: 0,
+        };
+      }
+
+      const orgDoc = new Organization(orgData);
       const organization = await orgDoc.save({ session });
 
       // Create owner user
@@ -112,7 +134,7 @@ export const authService = {
     }
 
     // Check organization status
-    const org = user.organizationId as unknown as { status: string };
+    const org = user.organizationId as unknown as { _id: Types.ObjectId; status: string };
     if (org?.status === "suspended") {
       throw AppError.unauthorized(
         "Organization is suspended. Please contact the organization owner.",
@@ -130,10 +152,10 @@ export const authService = {
     // Update last login
     await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
 
-    // Generate tokens
+    // Generate tokens - extract _id from populated organizationId
     const tokens = await generateTokenPair({
       sub: user._id.toString(),
-      org: user.organizationId.toString(),
+      org: org._id.toString(),
       role: user.role as UserRole,
       email: user.email,
     });
@@ -252,6 +274,66 @@ export const authService = {
     logger.info("Invited user activated", { userId: userId.toString() });
 
     return user;
+  },
+
+  /**
+   * Checks if the user's organization is active and not suspended/cancelled.
+   * Used for protecting routes that require an active organization.
+   * Returns true if organization is active, otherwise throws an error.
+   */
+  async isActiveOrganization(userId: Types.ObjectId | string): Promise<{
+    isActive: boolean;
+    subscription: OrganizationDocument["subscription"] | null;
+    status: string;
+  }> {
+    const response = {
+      isActive: false,
+      subscription: null as OrganizationDocument["subscription"] | null,
+      status: "unknown" as string,
+    };
+
+    const { userService } = await import("../user/user.service.ts");
+
+    const user = await userService.getProfile(userId);
+
+    // Check if user is owner
+    if (user.role !== "owner") {
+      throw AppError.unauthorized(
+        "Only organization owners can check payment status",
+      );
+    }
+
+    // Get organization
+    const organization = await Organization.findById(user.organizationId)
+      .select("status subscription")
+      .lean();
+
+    if (!organization) {
+      throw AppError.notFound("Organization not found");
+    }
+
+    response.status = organization.status;
+    response.subscription = organization.subscription;
+
+    if (organization.status !== "active") {
+      return response;
+    }
+
+    // Check subscription expiration
+    if (
+      organization.subscription?.currentPeriodEnd &&
+      organization.subscription.currentPeriodEnd < new Date()
+    ) {
+      await Organization.updateOne(
+        { _id: user.organizationId },
+        { status: "suspended" },
+      );
+      response.status = "suspended";
+      return response;
+    }
+
+    response.isActive = true;
+    return response;
   },
 
   /**

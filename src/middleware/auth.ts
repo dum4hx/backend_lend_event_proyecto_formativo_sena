@@ -85,6 +85,19 @@ export const authenticate = async (
     // Verify the token
     const payload: JWTPayload = await verifyAccessToken(token);
 
+    // Validate payload structure
+    if (!payload.sub || !payload.org || !payload.role || !payload.email) {
+      throw AppError.unauthorized("Invalid token payload structure");
+    }
+
+    // Validate ObjectId formats
+    if (!Types.ObjectId.isValid(payload.sub)) {
+      throw AppError.unauthorized("Invalid user ID in token");
+    }
+    if (!Types.ObjectId.isValid(payload.org)) {
+      throw AppError.unauthorized("Invalid organization ID in token");
+    }
+
     // Attach user info to request
     req.user = {
       id: payload.sub,

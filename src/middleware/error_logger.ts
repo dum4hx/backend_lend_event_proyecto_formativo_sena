@@ -10,10 +10,13 @@ const errorLogger = (
 ) => {
   let appError: AppError;
   // Turn err into AppError if it is not already (meaning it's an unexpected error)
-  next(err);
   if (!(err instanceof AppError)) {
+    // Log the original error for debugging
+    console.error("Original error caught:", err);
     appError = AppError.internal("An unexpected error occurred", err);
     logger.error(`Unexpected Error: ${appError.message}`, {
+      originalError: err instanceof Error ? err.message : String(err),
+      originalStack: err instanceof Error ? err.stack : undefined,
       stack: appError.stack,
       details: appError.details,
     });

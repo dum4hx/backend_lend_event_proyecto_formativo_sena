@@ -27,7 +27,17 @@ export const validate = <T>(
       }
 
       // Replace the target with the parsed (and transformed) data
-      req[target] = result.data as (typeof req)[typeof target];
+      // Note: req.query is read-only, so we use Object.defineProperty for it
+      if (target === "query") {
+        Object.defineProperty(req, "query", {
+          value: result.data,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      } else {
+        req[target] = result.data as (typeof req)[typeof target];
+      }
 
       next();
     } catch (err: unknown) {

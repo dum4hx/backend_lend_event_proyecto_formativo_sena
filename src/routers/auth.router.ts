@@ -7,7 +7,10 @@ import {
 import { z } from "zod";
 import { authService } from "../modules/auth/auth.service.ts";
 import { UserZodSchema } from "../modules/user/models/user.model.ts";
-import { OrganizationZodSchema } from "../modules/organization/models/organization.model.ts";
+import {
+  OrganizationZodSchema,
+  Organization,
+} from "../modules/organization/models/organization.model.ts";
 import { validateBody } from "../middleware/validation.ts";
 import { authRateLimiter } from "../middleware/rate_limiter.ts";
 import {
@@ -235,6 +238,37 @@ authRouter.get(
       res.json({
         status: "success",
         data: { user },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/auth/payment-status
+ * Checks if the authenticated user (owner) has an active paid subscription.
+ */
+authRouter.get(
+  "/payment-status",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userService } = await import("../modules/user/user.service.ts");
+      const user = await userService.getProfile(req.user!.userId);
+
+      // Check if subscription is active and paid
+      const organizationStatusData = await authService.isActiveOrganization(
+        req.user!.userId,
+      );
+
+      res.json({
+        status: "success",
+        data: {
+          isActive: organizationStatusData.isActive,
+          plan: organizationStatusData.subscription?.plan || "free",
+          organizationStatus: organizationStatusData.status,
+        },
       });
     } catch (err) {
       next(err);

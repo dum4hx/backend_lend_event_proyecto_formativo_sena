@@ -168,6 +168,28 @@ curl -X POST https://api.test.local/api/v1/customers \
   }'
 ```
 
+#### Step 4: Check Payment Status (Owner Only)
+
+```bash
+curl -X GET https://api.test.local/api/v1/auth/payment-status \
+  -b cookies.txt
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "isActive": false,
+    "plan": "free",
+    "organizationStatus": "active"
+  }
+}
+```
+
+**Note:** New organizations start with a free plan. `isActive` will be `true` once a paid subscription is created via the billing endpoints.
+
 ---
 
 ## 3. Authentication and Authorization
@@ -386,6 +408,63 @@ Returns current authenticated user's information.
   }
 }
 ```
+
+---
+
+#### GET /auth/payment-status
+
+Checks if the authenticated user (owner) has an active paid subscription.
+
+**Authentication Required:** Yes
+
+**Permission Required:** Owner role
+
+**Response:** `200 OK` (Active Subscription)
+
+```json
+{
+  "status": "success",
+  "data": {
+    "isActive": true,
+    "plan": "professional",
+    "organizationStatus": "active"
+  }
+}
+```
+
+**Response:** `200 OK` (Inactive/Free Subscription)
+
+```json
+{
+  "status": "success",
+  "data": {
+    "isActive": false,
+    "plan": "free",
+    "organizationStatus": "active"
+  }
+}
+```
+
+**Response:** `403 Forbidden` (Non-Owner User)
+
+```json
+{
+  "status": "error",
+  "message": "Only organization owners can check payment status",
+  "code": "FORBIDDEN",
+  "data": {
+    "isActive": false
+  }
+}
+```
+
+**Notes:**
+
+- Only users with the `owner` role can access this endpoint
+- A subscription is considered active (`isActive: true`) when:
+  - Organization status is `"active"`
+  - Organization has a valid Stripe subscription ID (paid plan)
+- Free plan subscriptions will return `isActive: false`
 
 ---
 
@@ -1531,6 +1610,22 @@ async function refreshToken() {
   return response.json();
 }
 
+// Check payment status (owner only)
+async function checkPaymentStatus() {
+  const response = await fetch(`${API_BASE}/auth/payment-status`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Only owners can check payment status");
+    }
+    throw new Error("Failed to check payment status");
+  }
+
+  return response.json();
+}
+
 // List customers with pagination
 async function listCustomers(page = 1, limit = 20, search = "") {
   const params = new URLSearchParams({ page, limit });
@@ -1573,6 +1668,13 @@ async function main() {
       data: { user },
     } = await getCurrentUser();
     console.log(`Logged in as ${user.email} (${user.role})`);
+
+    // Check payment status (if owner)
+    if (user.role === "owner") {
+      const { data: paymentStatus } = await checkPaymentStatus();
+      console.log(`Subscription active: ${paymentStatus.isActive}`);
+      console.log(`Current plan: ${paymentStatus.plan}`);
+    }
 
     // Create a customer
     const newCustomer = await createCustomer({
@@ -1659,6 +1761,10 @@ class AlquiEventAPI {
     return this.request("/auth/me");
   }
 
+  paymentStatus() {
+    return this.request("/auth/payment-status");
+  }
+
   // Customers
   listCustomers(params = {}) {
     const query = new URLSearchParams(params).toString();
@@ -1733,6 +1839,17 @@ async function example() {
 
   const { data } = await api.listCustomers({ page: 1, limit: 10 });
   console.log(data.customers);
+
+  // Check payment status (for owners)
+  try {
+    const { data: paymentStatus } = await api.paymentStatus();
+    console.log(`Subscription active: ${paymentStatus.isActive}`);
+    console.log(`Plan: ${paymentStatus.plan}`);
+  } catch (error) {
+    if (error.status === 403) {
+      console.log("Payment status only available for owners");
+    }
+  }
 
   // Calculate subscription cost
   const cost = await api.calculatePlanCost("professional", 10);
