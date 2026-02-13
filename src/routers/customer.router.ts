@@ -10,6 +10,7 @@ import {
   Customer,
   CustomerZodSchema,
   CustomerUpdateZodSchema,
+  documentTypes,
 } from "../modules/customer/models/customer.model.ts";
 import {
   validateBody,
@@ -37,6 +38,27 @@ const listCustomersQuerySchema = paginationSchema.extend({
 });
 
 /* ---------- Routes ---------- */
+
+/**
+ * GET /api/v1/customers/document-types
+ * Returns all valid document types with their display names.
+ */
+customerRouter.get(
+  "/document-types",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+
+      res.json({
+        status: "success",
+        data: {
+          documentTypes,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * GET /api/v1/customers

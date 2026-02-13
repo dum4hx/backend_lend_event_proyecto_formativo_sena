@@ -4,6 +4,40 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 /* ---------- Customer Status ---------- */
 
 const customerStatusOptions = ["active", "inactive", "blacklisted"] as const;
+export const documentTypes = [
+        {
+          value: "cc",
+          displayName: "Cédula de Ciudadanía",
+          description: "Colombian National ID",
+        },
+        {
+          value: "ce",
+          displayName: "Cédula de Extranjería",
+          description: "Colombian Foreign ID",
+        },
+        {
+          value: "passport",
+          displayName: "Passport",
+          description: "International Passport",
+        },
+        {
+          value: "nit",
+          displayName: "NIT",
+          description: "Tax Identification Number",
+        },
+        {
+          value: "other",
+          displayName: "Other",
+          description: "Other identification type",
+        },
+      ];
+
+const customerDocTypes = z.enum(
+  documentTypes.map((dt) => dt.value) as [
+    (typeof documentTypes)[number]["value"],
+    ...(typeof documentTypes)[number]["value"][]
+  ]
+);
 
 /* ---------- Zod Schema for API Validation ---------- */
 
@@ -29,7 +63,7 @@ export const CustomerZodSchema = z.object({
   name: customerNameSchema,
   email: z.email("Invalid email format").lowercase().trim(),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)"),
-  documentType: z.enum(["cc", "ce", "passport", "nit", "other"]).optional(),
+  documentType: customerDocTypes.optional(),
   documentNumber: z.string().max(50).trim().optional(),
   address: customerAddressSchema.optional(),
   notes: z.string().max(1000).trim().optional(),
@@ -92,7 +126,7 @@ const customerSchema = new Schema(
     },
     documentType: {
       type: String,
-      enum: ["cc", "ce", "passport", "nit", "other"],
+      enum: customerDocTypes.options,
     },
     documentNumber: {
       type: String,

@@ -1159,6 +1159,66 @@ Gets all analytics in a single call for dashboard rendering.
 
 ### Customer Endpoints
 
+#### GET /customers/document-types
+
+Gets all valid document types with their display names.
+
+**Authentication Required:** Yes
+
+**Permission Required:** None (available to all authenticated users)
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.test.local/api/v1/customers/document-types \
+  -b cookies.txt
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "documentTypes": [
+      {
+        "value": "cc",
+        "displayName": "Cédula de Ciudadanía",
+        "description": "Colombian National ID"
+      },
+      {
+        "value": "ce",
+        "displayName": "Cédula de Extranjería",
+        "description": "Colombian Foreign ID"
+      },
+      {
+        "value": "passport",
+        "displayName": "Passport",
+        "description": "International Passport"
+      },
+      {
+        "value": "nit",
+        "displayName": "NIT",
+        "description": "Tax Identification Number"
+      },
+      {
+        "value": "other",
+        "displayName": "Other",
+        "description": "Other identification type"
+      }
+    ]
+  }
+}
+```
+
+**Notes:**
+
+- This endpoint provides reference data for customer document types
+- Use the `value` field when creating or updating customers
+- The `displayName` field should be used in user interfaces
+
+---
+
 #### GET /customers
 
 Lists all customers in the organization.
@@ -1626,6 +1686,16 @@ async function checkPaymentStatus() {
   return response.json();
 }
 
+// Get document types
+async function getDocumentTypes() {
+  const response = await fetch(`${API_BASE}/customers/document-types`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) throw new Error("Failed to fetch document types");
+  return response.json();
+}
+
 // List customers with pagination
 async function listCustomers(page = 1, limit = 20, search = "") {
   const params = new URLSearchParams({ page, limit });
@@ -1676,12 +1746,16 @@ async function main() {
       console.log(`Current plan: ${paymentStatus.plan}`);
     }
 
+    // Get available document types
+    const { data: docTypes } = await getDocumentTypes();
+    console.log("Available document types:", docTypes.documentTypes);
+
     // Create a customer
     const newCustomer = await createCustomer({
       name: { firstName: "Jane", firstSurname: "Doe" },
       email: "jane@example.com",
       phone: "+15551234567",
-      documentType: "national_id",
+      documentType: "cc",
       documentNumber: "123456789",
     });
 
@@ -1766,6 +1840,10 @@ class AlquiEventAPI {
   }
 
   // Customers
+  getDocumentTypes() {
+    return this.request("/customers/document-types");
+  }
+
   listCustomers(params = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request(`/customers?${query}`);
