@@ -1,5 +1,6 @@
 import * as argon2 from "argon2";
 import { Types, startSession } from "mongoose";
+import crypto from "node:crypto";
 import {
   User,
   type UserInput,
@@ -14,8 +15,14 @@ import {
 } from "../organization/models/organization.model.ts";
 import { SubscriptionType } from "../subscription_type/models/subscription_type.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
+import { PasswordResetToken } from "./models/password_reset_token.model.ts";
+import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
 import type { ClientSession } from "mongoose";
+
+const OTP_LENGTH = 6;
+const OTP_EXPIRY_MINUTES = 10;
+const MAX_VERIFY_ATTEMPTS = 5;
 
 /* ---------- Auth Service ---------- */
 
@@ -359,5 +366,140 @@ export const authService = {
     await user.save();
 
     logger.info("Password changed", { userId: userId.toString() });
+  },
+
+  /**
+   * Initiates a forgot-password flow.
+   * Generates a 6-digit OTP, stores it hashed, and emails it to the user.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      logger.warn("Forgot password requested for unknown email", { email });
+      return;
+    }
+
+    if (user.status === "suspended" || user.status === "inactive") {
+      logger.warn("Forgot password requested for inactive/suspended user", {
+        userId: user._id.toString(),
+      });
+      return;
+    }
+
+    // Invalidate previous tokens for this user
+    await PasswordResetToken.deleteMany({ userId: user._id });
+
+    // Generate a 6-digit numeric OTP
+    const code = crypto
+      .randomInt(0, 10 ** OTP_LENGTH)
+      .toString()
+      .padStart(OTP_LENGTH, "0");
+
+    // Store hashed code
+    const hashedCode = await argon2.hash(code);
+    await PasswordResetToken.create({
+      userId: user._id,
+      email: user.email,
+      code: hashedCode,
+      expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+    });
+
+    // Send email
+    const firstName =
+      (user.name as unknown as { firstName: string })?.firstName ?? "User";
+    await emailService.sendPasswordResetCode(user.email, code, firstName);
+
+    logger.info("Forgot password OTP sent", {
+      userId: user._id.toString(),
+    });
+  },
+
+  /**
+   * Verifies the OTP code sent to the user's email.
+   * Returns a short-lived reset token (the document _id) on success.
+   */
+  async verifyResetCode(
+    email: string,
+    code: string,
+  ): Promise<{ resetToken: string }> {
+    const record = await PasswordResetToken.findOne({
+      email: email.toLowerCase().trim(),
+    });
+
+    if (!record) {
+      throw AppError.badRequest("No password reset request found for this email");
+    }
+
+    if (record.expiresAt < new Date()) {
+      await PasswordResetToken.deleteOne({ _id: record._id });
+      throw AppError.badRequest("Verification code has expired. Please request a new one.");
+    }
+
+    if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
+      await PasswordResetToken.deleteOne({ _id: record._id });
+      throw AppError.badRequest(
+        "Too many failed attempts. Please request a new code.",
+      );
+    }
+
+    const isValid = await argon2.verify(record.code, code);
+    if (!isValid) {
+      record.attempts += 1;
+      await record.save();
+      throw AppError.badRequest("Invalid verification code");
+    }
+
+    // Mark as verified
+    record.verified = true;
+    await record.save();
+
+    logger.info("Password reset code verified", { email });
+
+    return { resetToken: record._id!.toString() };
+  },
+
+  /**
+   * Resets the user's password after successful OTP verification.
+   */
+  async resetPassword(
+    email: string,
+    resetToken: string,
+    newPassword: string,
+  ): Promise<void> {
+    const record = await PasswordResetToken.findById(resetToken);
+
+    if (
+      !record ||
+      record.email !== email.toLowerCase().trim() ||
+      !record.verified
+    ) {
+      throw AppError.badRequest(
+        "Invalid or expired reset token. Please restart the password reset process.",
+      );
+    }
+
+    if (record.expiresAt < new Date()) {
+      await PasswordResetToken.deleteOne({ _id: record._id });
+      throw AppError.badRequest("Reset token has expired. Please request a new code.");
+    }
+
+    const user = await User.findById(record.userId);
+    if (!user) {
+      throw AppError.notFound("User not found");
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    // Clean up all tokens for this user
+    await PasswordResetToken.deleteMany({ userId: user._id });
+
+    logger.info("Password reset successful", {
+      userId: user._id.toString(),
+    });
   },
 };

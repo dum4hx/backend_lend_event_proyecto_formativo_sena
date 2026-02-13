@@ -12,7 +12,10 @@ import {
   Organization,
 } from "../modules/organization/models/organization.model.ts";
 import { validateBody } from "../middleware/validation.ts";
-import { authRateLimiter } from "../middleware/rate_limiter.ts";
+import {
+  authRateLimiter,
+  passwordResetRateLimiter,
+} from "../middleware/rate_limiter.ts";
 import {
   authenticate,
   accessTokenCookieOptions,
@@ -51,6 +54,36 @@ const changePasswordSchema = z.object({
       /[^A-Za-z0-9]/,
       "Password must contain at least one special character",
     ),
+});
+
+const passwordValidation = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must not exceed 128 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one digit")
+  .regex(
+    /[^A-Za-z0-9]/,
+    "Password must contain at least one special character",
+  );
+
+const forgotPasswordSchema = z.object({
+  email: z.email("Invalid email format"),
+});
+
+const verifyResetCodeSchema = z.object({
+  email: z.email("Invalid email format"),
+  code: z
+    .string()
+    .length(6, "Verification code must be 6 digits")
+    .regex(/^\d{6}$/, "Verification code must be numeric"),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.email("Invalid email format"),
+  resetToken: z.string().min(1, "Reset token is required"),
+  newPassword: passwordValidation,
 });
 
 /* ---------- Routes ---------- */
@@ -269,6 +302,83 @@ authRouter.get(
           plan: organizationStatusData.subscription?.plan || "free",
           organizationStatus: organizationStatusData.status,
         },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Sends a 6-digit verification code to the user's email.
+ */
+authRouter.post(
+  "/forgot-password",
+  passwordResetRateLimiter,
+  validateBody(forgotPasswordSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      await authService.forgotPassword(email);
+
+      // Always return success to prevent email enumeration
+      res.json({
+        status: "success",
+        message:
+          "If an account with that email exists, a verification code has been sent.",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/verify-reset-code
+ * Verifies the OTP code and returns a reset token.
+ */
+authRouter.post(
+  "/verify-reset-code",
+  passwordResetRateLimiter,
+  validateBody(verifyResetCodeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, code } = req.body;
+
+      const result = await authService.verifyResetCode(email, code);
+
+      res.json({
+        status: "success",
+        data: {
+          resetToken: result.resetToken,
+        },
+        message: "Code verified successfully. Use the reset token to set a new password.",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Resets the password using a verified reset token.
+ */
+authRouter.post(
+  "/reset-password",
+  passwordResetRateLimiter,
+  validateBody(resetPasswordSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, resetToken, newPassword } = req.body;
+
+      await authService.resetPassword(email, resetToken, newPassword);
+
+      res.json({
+        status: "success",
+        message: "Password has been reset successfully. You can now log in with your new password.",
       });
     } catch (err) {
       next(err);

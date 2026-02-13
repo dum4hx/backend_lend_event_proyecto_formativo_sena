@@ -388,6 +388,111 @@ Changes the authenticated user's password.
 
 ---
 
+#### POST /auth/forgot-password
+
+Initiates a password reset flow by sending a 6-digit verification code to the user's email.
+
+| Parameter | Location | Type   | Required | Description            |
+| --------- | -------- | ------ | -------- | ---------------------- |
+| email     | body     | string | Yes      | Registered user email  |
+
+**Rate Limit:** 3 requests per hour per IP
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "If an account with that email exists, a verification code has been sent."
+}
+```
+
+**Notes:**
+
+- Always returns success regardless of whether the email exists (prevents email enumeration)
+- The verification code is 6 digits and expires in 10 minutes
+- Any previous unused codes for the same user are invalidated
+
+---
+
+#### POST /auth/verify-reset-code
+
+Verifies the 6-digit OTP code sent to the user's email. Returns a reset token required for the final password change.
+
+| Parameter | Location | Type   | Required | Description                        |
+| --------- | -------- | ------ | -------- | ---------------------------------- |
+| email     | body     | string | Yes      | Email used in forgot-password step |
+| code      | body     | string | Yes      | 6-digit verification code          |
+
+**Rate Limit:** 3 requests per hour per IP
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "resetToken": "507f1f77bcf86cd799439015"
+  },
+  "message": "Code verified successfully. Use the reset token to set a new password."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                   | Message                                                 |
+| ------ | --------------------------- | ------------------------------------------------------- |
+| 400    | No reset request found      | No password reset request found for this email          |
+| 400    | Code expired                | Verification code has expired. Please request a new one.|
+| 400    | Too many failed attempts    | Too many failed attempts. Please request a new code.    |
+| 400    | Wrong code                  | Invalid verification code                               |
+
+**Notes:**
+
+- Maximum 5 verification attempts per code
+- After 5 failed attempts, the code is invalidated and a new one must be requested
+
+---
+
+#### POST /auth/reset-password
+
+Resets the user's password using the verified reset token from the previous step.
+
+| Parameter   | Location | Type   | Required | Description                                                         |
+| ----------- | -------- | ------ | -------- | ------------------------------------------------------------------- |
+| email       | body     | string | Yes      | Email used in previous steps                                        |
+| resetToken  | body     | string | Yes      | Token returned by verify-reset-code                                 |
+| newPassword | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special)    |
+
+**Rate Limit:** 3 requests per hour per IP
+
+**Password Requirements:**
+
+- Minimum 8 characters, maximum 128 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one digit
+- At least one special character
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Password has been reset successfully. You can now log in with your new password."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition               | Message                                                                     |
+| ------ | ----------------------- | --------------------------------------------------------------------------- |
+| 400    | Invalid/expired token   | Invalid or expired reset token. Please restart the password reset process.  |
+| 400    | Token expired           | Reset token has expired. Please request a new code.                         |
+| 400    | Password too weak       | Password must be at least 8 characters (and other validation rules)         |
+
+---
+
 #### GET /auth/me
 
 Returns current authenticated user's information.
