@@ -31,21 +31,77 @@ const ensureStripe = (): Stripe => {
 };
 
 /**
- * Gets Stripe price IDs for a plan from the SubscriptionType.
+ * Gets or creates Stripe price IDs for a plan.
+ * If the subscription type does not have a stripePriceIdBase or
+ * stripePriceIdSeat, new recurring Stripe Prices are created and
+ * persisted back to the subscription type document.
  */
-const getStripePriceIds = async (
+const getOrCreateStripePriceIds = async (
   plan: SubscriptionPlan,
 ): Promise<{ base: string; seat: string } | null> => {
   if (plan === "free") return null;
 
+  const stripeClient = ensureStripe();
   const limits = await subscriptionTypeService.getPlanLimits(plan);
-  if (!limits.stripePriceIdBase || !limits.stripePriceIdSeat) {
-    return null;
+
+  let { stripePriceIdBase, stripePriceIdSeat } = limits;
+  let needsUpdate = false;
+
+  // Create base price in Stripe if missing
+  if (!stripePriceIdBase) {
+    logger.info(`Creating Stripe base price for plan "${plan}"...`);
+
+    const baseProduct = await stripeClient.products.create({
+      name: `${limits.displayName} – Base`,
+      metadata: { plan, type: "base" },
+    });
+
+    const basePrice = await stripeClient.prices.create({
+      product: baseProduct.id,
+      unit_amount: limits.baseCost,
+      currency: "usd",
+      recurring: { interval: "month" },
+      metadata: { plan, type: "base" },
+    });
+
+    stripePriceIdBase = basePrice.id;
+    needsUpdate = true;
+    logger.info(`Stripe base price created for plan "${plan}": ${basePrice.id}`);
+  }
+
+  // Create seat price in Stripe if missing
+  if (!stripePriceIdSeat) {
+    logger.info(`Creating Stripe seat price for plan "${plan}"...`);
+
+    const seatProduct = await stripeClient.products.create({
+      name: `${limits.displayName} – Per Seat`,
+      metadata: { plan, type: "seat" },
+    });
+
+    const seatPrice = await stripeClient.prices.create({
+      product: seatProduct.id,
+      unit_amount: limits.pricePerSeat,
+      currency: "usd",
+      recurring: { interval: "month" },
+      metadata: { plan, type: "seat" },
+    });
+
+    stripePriceIdSeat = seatPrice.id;
+    needsUpdate = true;
+    logger.info(`Stripe seat price created for plan "${plan}": ${seatPrice.id}`);
+  }
+
+  // Persist newly created IDs back to the subscription type
+  if (needsUpdate) {
+    await subscriptionTypeService.update(plan, {
+      ...(stripePriceIdBase ? { stripePriceIdBase } : {}),
+      ...(stripePriceIdSeat ? { stripePriceIdSeat } : {}),
+    });
   }
 
   return {
-    base: limits.stripePriceIdBase,
-    seat: limits.stripePriceIdSeat,
+    base: stripePriceIdBase,
+    seat: stripePriceIdSeat,
   };
 };
 
@@ -99,9 +155,9 @@ export const billingService = {
       throw AppError.badRequest("Cannot create checkout for free plan");
     }
 
-    const priceIds = await getStripePriceIds(plan);
-    if (!priceIds?.base || !priceIds?.seat) {
-      throw AppError.internal(`Price IDs not configured for plan: ${plan}`);
+    const priceIds = await getOrCreateStripePriceIds(plan);
+    if (!priceIds) {
+      throw AppError.internal(`Could not resolve Stripe prices for plan: ${plan}`);
     }
 
     const org = await Organization.findById(organizationId);
@@ -202,7 +258,7 @@ export const billingService = {
     // Validate seat limit using subscriptionTypeService
     await subscriptionTypeService.validateSeatCount(plan, newSeatCount);
 
-    const priceIds = await getStripePriceIds(plan);
+    const priceIds = await getOrCreateStripePriceIds(plan);
     if (!priceIds?.seat) {
       throw AppError.internal("Seat price not configured for this plan");
     }
