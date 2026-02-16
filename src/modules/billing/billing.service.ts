@@ -455,8 +455,7 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      logger.error("Missing organizationId in subscription metadata");
-      return;
+      throw AppError.badRequest("Missing organizationId in subscription metadata");
     }
 
     // Get billing cycle dates from the subscription items
@@ -494,8 +493,7 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      logger.error("Missing organizationId in subscription metadata");
-      return;
+      throw AppError.badRequest("Missing organizationId in subscription metadata");
     }
 
     // Downgrade to free plan - only set defined values
@@ -523,10 +521,7 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      logger.error("Organization not found for Stripe customer", {
-        customerId: invoice.customer,
-      });
-      return;
+      throw AppError.notFound("Organization not found for Stripe customer");
     }
 
     await BillingEvent.create({
@@ -558,10 +553,7 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      logger.error("Organization not found for Stripe customer", {
-        customerId: invoice.customer,
-      });
-      return;
+      throw AppError.notFound("Organization not found for Stripe customer");
     }
 
     await BillingEvent.create({

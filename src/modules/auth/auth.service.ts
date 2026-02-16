@@ -25,7 +25,7 @@ const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 5;
 const INVITE_EXPIRY_HOURS = parseInt(process.env.INVITE_EXPIRY_HOURS || "48", 10);
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://api.test.local";
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://app.test.local";
 
 /* ---------- Auth Service ---------- */
 
@@ -64,18 +64,18 @@ export const authService = {
 
       // When SKIP_SUBSCRIPTION_CHECK is enabled, assign the starter plan
       if (process.env.SKIP_SUBSCRIPTION_CHECK === "true") {
-        const starterPlan = await SubscriptionType.findOne({
+        const defaultPlan = await SubscriptionType.findOne({
           plan: "starter",
           status: "active",
         }).session(session);
-        if (!starterPlan) {
+        if (!defaultPlan) {
           throw AppError.badRequest(
             "Starter subscription plan not found or inactive",
           );
         }
         orgData.subscription = {
-          plan: starterPlan.plan,
-          seatCount: starterPlan.maxSeats === -1 ? 1 : starterPlan.maxSeats,
+          plan: defaultPlan.plan,
+          seatCount: defaultPlan.maxSeats === -1 ? 1 : defaultPlan.maxSeats,
           catalogItemCount: 0,
         };
       }
@@ -303,6 +303,8 @@ export const authService = {
     token: string,
     newPassword: string,
   ): Promise<InstanceType<typeof User>> {
+
+    // Check if user has been invited (means there should be an invite token with their email)
     const tokenHash = crypto
       .createHash("sha256")
       .update(token)
@@ -335,6 +337,7 @@ export const authService = {
       throw AppError.badRequest("This account has already been activated");
     }
 
+    // Update user password and status
     user.password = newPassword;
     user.status = "active";
     await user.save();
@@ -451,7 +454,7 @@ export const authService = {
 
     // Check subscription expiration
     if (
-      organization.subscription?.currentPeriodEnd &&
+      !organization.subscription?.currentPeriodEnd ||
       organization.subscription.currentPeriodEnd < new Date()
     ) {
       await Organization.updateOne(

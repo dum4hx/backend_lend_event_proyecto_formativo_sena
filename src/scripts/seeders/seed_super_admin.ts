@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import { User } from "../modules/user/models/user.model.ts";
-import { Organization } from "../modules/organization/models/organization.model.ts";
-import { logger } from "../utils/logger.ts";
+import { User } from "../../modules/user/models/user.model.ts";
+import { Organization } from "../../modules/organization/models/organization.model.ts";
+import { logger } from "../../utils/logger.ts";
 
 /**
  * One-time seeder to create the initial super admin user.

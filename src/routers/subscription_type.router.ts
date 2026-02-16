@@ -86,6 +86,37 @@ subscriptionTypeRouter.get(
   },
 );
 
+/**
+ * POST /api/v1/subscription-types/:plan/calculate-cost
+ * Calculates the cost for a plan with a given seat count (public utility).
+ */
+subscriptionTypeRouter.post(
+  "/:plan/calculate-cost",
+  validateBody(z.object({ seatCount: z.number().int().positive() })),
+  async (req: Request<{ plan: string }>, res: Response, next: NextFunction) => {
+    try {
+      const { plan } = req.params;
+      const { seatCount } = req.body;
+
+      const cost = await subscriptionTypeService.calculateCost(plan, seatCount);
+
+      res.json({
+        status: "success",
+        data: {
+          plan,
+          seatCount,
+          baseCost: cost.baseCost / 100,
+          seatCost: cost.seatCost / 100,
+          totalCost: cost.totalCost / 100,
+          currency: "usd",
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /* ---------- Super Admin Routes ---------- */
 
 // All routes below require super_admin role
@@ -179,35 +210,6 @@ subscriptionTypeRouter.delete(
   },
 );
 
-/**
- * POST /api/v1/subscription-types/:plan/calculate-cost
- * Calculates the cost for a plan with a given seat count (public utility).
- */
-subscriptionTypeRouter.post(
-  "/:plan/calculate-cost",
-  validateBody(z.object({ seatCount: z.number().int().positive() })),
-  async (req: Request<{ plan: string }>, res: Response, next: NextFunction) => {
-    try {
-      const { plan } = req.params;
-      const { seatCount } = req.body;
 
-      const cost = await subscriptionTypeService.calculateCost(plan, seatCount);
-
-      res.json({
-        status: "success",
-        data: {
-          plan,
-          seatCount,
-          baseCost: cost.baseCost / 100,
-          seatCost: cost.seatCost / 100,
-          totalCost: cost.totalCost / 100,
-          currency: "usd",
-        },
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
 
 export default subscriptionTypeRouter;

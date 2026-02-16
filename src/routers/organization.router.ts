@@ -49,7 +49,6 @@ organizationRouter.get(
  */
 organizationRouter.patch(
   "/",
-  // TODO: For now, only allow org updates for active orgs. In the future, we may want to allow updates for suspended orgs so they can update payment info and reactivate.
   requirePermission("organization:update"),
   validateBody(OrganizationUpdateZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
