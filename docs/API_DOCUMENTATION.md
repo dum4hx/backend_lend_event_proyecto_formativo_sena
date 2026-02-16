@@ -493,6 +493,62 @@ Resets the user's password using the verified reset token from the previous step
 
 ---
 
+#### POST /auth/accept-invite
+
+Accepts an organization invitation using the token from the invitation email. Sets the user's password and activates their account.
+
+| Parameter | Location | Type   | Required | Description                                                         |
+| --------- | -------- | ------ | -------- | ------------------------------------------------------------------- |
+| email     | body     | string | Yes      | Email address the invitation was sent to                            |
+| token     | body     | string | Yes      | Invite token from the invitation URL                                |
+| password  | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special)    |
+
+**Authentication Required:** No
+
+**Password Requirements:**
+
+- Minimum 8 characters, maximum 128 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one digit
+- At least one special character
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "user": {
+      "id": "507f1f77bcf86cd799439012",
+      "email": "jane@eventpro.com",
+      "name": { "firstName": "Jane", "firstSurname": "Doe" },
+      "role": "commercial_advisor",
+      "status": "active"
+    }
+  },
+  "message": "Account activated successfully. You can now log in with your password."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                    | Message                                                                              |
+| ------ | ---------------------------- | ------------------------------------------------------------------------------------ |
+| 400    | Invalid or expired token     | Invalid or expired invite link. Please ask your administrator to send a new invitation. |
+| 400    | Expired token (TTL)          | This invite link has expired. Please ask your administrator to send a new invitation.  |
+| 400    | Already activated            | This account has already been activated                                              |
+| 400    | Password too weak            | Password must be at least 8 characters (and other validation rules)                  |
+| 404    | User not found               | User account not found                                                               |
+
+**Notes:**
+
+- Invite links are valid for 48 hours by default (configurable via `INVITE_EXPIRY_HOURS`)
+- The frontend should extract `token` and `email` query parameters from the invite URL
+- After activation, the user can log in via `POST /auth/login`
+
+---
+
 #### GET /auth/me
 
 Returns current authenticated user's information.
@@ -621,7 +677,7 @@ Gets a specific user by ID.
 
 #### POST /users/invite
 
-Invites a new user to the organization.
+Invites a new user to the organization. Sends an invitation email with a time-limited link to accept the invite and set a password.
 
 | Parameter         | Location | Type   | Required | Description                          |
 | ----------------- | -------- | ------ | -------- | ------------------------------------ |
@@ -634,6 +690,54 @@ Invites a new user to the organization.
 **Permission Required:** `users:create`
 
 **Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "user": {
+      "id": "507f1f77bcf86cd799439012",
+      "email": "jane@eventpro.com",
+      "name": { "firstName": "Jane", "firstSurname": "Doe" },
+      "role": "commercial_advisor",
+      "status": "invited"
+    }
+  },
+  "message": "User invited successfully. An invitation email has been sent."
+}
+```
+
+**Notes:**
+
+- An invitation email is sent to the provided email address with a unique link
+- The invite link expires after 48 hours by default (configurable via `INVITE_EXPIRY_HOURS` env var)
+- The invited user must click the link and set a password to activate their account via `POST /auth/accept-invite`
+
+---
+
+#### POST /users/:id/resend-invite
+
+Resends the invitation email for a user still in `invited` status.
+
+| Parameter | Location | Type   | Required | Description           |
+| --------- | -------- | ------ | -------- | --------------------- |
+| id        | path     | string | Yes      | User MongoDB ObjectId |
+
+**Permission Required:** `users:create`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Invitation email has been resent."
+}
+```
+
+**Notes:**
+
+- Only users with `invited` status can receive resent invitations
+- Previous invite tokens are invalidated and a new one is generated
 
 ---
 
@@ -1791,6 +1895,23 @@ async function checkPaymentStatus() {
   return response.json();
 }
 
+// Accept an invite (set password from invite link)
+async function acceptInvite(email, token, password) {
+  const response = await fetch(`${API_BASE}/auth/accept-invite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, token, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message);
+  }
+
+  return response.json();
+}
+
 // Get document types
 async function getDocumentTypes() {
   const response = await fetch(`${API_BASE}/customers/document-types`, {
@@ -1942,6 +2063,13 @@ class AlquiEventAPI {
 
   paymentStatus() {
     return this.request("/auth/payment-status");
+  }
+
+  acceptInvite(email, token, password) {
+    return this.request("/auth/accept-invite", {
+      method: "POST",
+      body: { email, token, password },
+    });
   }
 
   // Customers

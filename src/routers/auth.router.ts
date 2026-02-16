@@ -86,6 +86,12 @@ const resetPasswordSchema = z.object({
   newPassword: passwordValidation,
 });
 
+const acceptInviteSchema = z.object({
+  email: z.email("Invalid email format"),
+  token: z.string().min(1, "Invite token is required"),
+  password: passwordValidation,
+});
+
 /* ---------- Routes ---------- */
 
 /**
@@ -219,8 +225,8 @@ authRouter.post(
  * Clears authentication cookies.
  */
 authRouter.post("/logout", (req: Request, res: Response) => {
-  res.clearCookie(COOKIE_NAME, { path: "/" });
-  res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/v1/auth" });
+  res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
+  res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
 
   res.json({
     status: "success",
@@ -379,6 +385,41 @@ authRouter.post(
       res.json({
         status: "success",
         message: "Password has been reset successfully. You can now log in with your new password.",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/accept-invite
+ * Accepts an organization invite using a token from the invitation email.
+ * Sets the user's password and activates the account.
+ */
+authRouter.post(
+  "/accept-invite",
+  authRateLimiter,
+  validateBody(acceptInviteSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, token, password } = req.body;
+
+      const user = await authService.acceptInvite(email, token, password);
+
+      res.json({
+        status: "success",
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            status: user.status,
+          },
+        },
+        message:
+          "Account activated successfully. You can now log in with your password.",
       });
     } catch (err) {
       next(err);

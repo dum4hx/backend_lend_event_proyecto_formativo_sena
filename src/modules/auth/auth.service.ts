@@ -16,6 +16,7 @@ import {
 import { SubscriptionType } from "../subscription_type/models/subscription_type.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { PasswordResetToken } from "./models/password_reset_token.model.ts";
+import { InviteToken } from "./models/invite_token.model.ts";
 import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
 import type { ClientSession } from "mongoose";
@@ -23,6 +24,8 @@ import type { ClientSession } from "mongoose";
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 5;
+const INVITE_EXPIRY_HOURS = parseInt(process.env.INVITE_EXPIRY_HOURS || "48", 10);
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://api.test.local";
 
 /* ---------- Auth Service ---------- */
 
@@ -201,12 +204,13 @@ export const authService = {
 
   /**
    * Invites a new user to an organization.
+   * Generates a secure invite token, sends an email with a link, and
+   * creates the user in "invited" status.
    */
   async inviteUser(
     organizationId: Types.ObjectId | string,
     invitedBy: Types.ObjectId | string,
     userData: Omit<UserInput, "organizationId" | "password">,
-    temporaryPassword: string,
   ): Promise<InstanceType<typeof User>> {
     // Check if organization can add more seats
     const canAddSeat = await organizationService.canAddSeat(organizationId);
@@ -229,10 +233,13 @@ export const authService = {
       );
     }
 
+    // Generate a placeholder password (user will set their own via invite link)
+    const placeholderPassword = crypto.randomBytes(32).toString("hex");
+
     const userDoc = new User({
       ...userData,
       organizationId,
-      password: temporaryPassword,
+      password: placeholderPassword,
       status: "invited",
       invitedAt: new Date(),
       invitedBy,
@@ -249,6 +256,36 @@ export const authService = {
       );
     }
 
+    // Generate invite token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    // Invalidate any previous invite tokens for this user
+    await InviteToken.deleteMany({ userId: user._id });
+
+    await InviteToken.create({
+      userId: user._id,
+      organizationId,
+      email: userData.email.toLowerCase(),
+      tokenHash,
+      expiresAt: new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000),
+    });
+
+    // Build invite URL and send email
+    const inviteUrl = `${FRONTEND_URL}/accept-invite?token=${rawToken}&email=${encodeURIComponent(userData.email.toLowerCase())}`;
+    const orgName = org?.name ?? "your organization";
+
+    await emailService.sendInviteEmail(
+      userData.email,
+      userData.name.firstName,
+      orgName,
+      inviteUrl,
+      INVITE_EXPIRY_HOURS,
+    );
+
     logger.info("User invited", {
       organizationId: organizationId.toString(),
       userId: user._id.toString(),
@@ -259,28 +296,114 @@ export const authService = {
   },
 
   /**
-   * Activates an invited user account.
+   * Accepts an invite by validating the token and setting the user's password.
    */
-  async activateInvitedUser(
-    userId: Types.ObjectId | string,
+  async acceptInvite(
+    email: string,
+    token: string,
     newPassword: string,
   ): Promise<InstanceType<typeof User>> {
-    const user = await User.findById(userId);
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const inviteToken = await InviteToken.findOne({
+      email: email.toLowerCase(),
+      tokenHash,
+    });
+
+    if (!inviteToken) {
+      throw AppError.badRequest(
+        "Invalid or expired invite link. Please ask your administrator to send a new invitation.",
+      );
+    }
+
+    if (inviteToken.expiresAt < new Date()) {
+      await InviteToken.deleteOne({ _id: inviteToken._id });
+      throw AppError.badRequest(
+        "This invite link has expired. Please ask your administrator to send a new invitation.",
+      );
+    }
+
+    const user = await User.findById(inviteToken.userId);
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("User account not found");
     }
 
     if (user.status !== "invited") {
-      throw AppError.badRequest("User is not in invited status");
+      throw AppError.badRequest("This account has already been activated");
     }
 
     user.password = newPassword;
     user.status = "active";
     await user.save();
 
-    logger.info("Invited user activated", { userId: userId.toString() });
+    // Clean up the invite token
+    await InviteToken.deleteMany({ userId: user._id });
+
+    logger.info("Invited user activated via link", {
+      userId: user._id.toString(),
+      organizationId: user.organizationId.toString(),
+    });
 
     return user;
+  },
+
+  /**
+   * Resends an invite email with a fresh token for an already-invited user.
+   */
+  async resendInvite(
+    organizationId: Types.ObjectId | string,
+    userId: Types.ObjectId | string,
+  ): Promise<void> {
+    const user = await User.findOne({ _id: userId, organizationId });
+    if (!user) {
+      throw AppError.notFound("User not found in this organization");
+    }
+
+    if (user.status !== "invited") {
+      throw AppError.badRequest(
+        "Only users with invited status can receive a new invite",
+      );
+    }
+
+    // Generate new token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    // Invalidate old tokens and create new one
+    await InviteToken.deleteMany({ userId: user._id });
+
+    await InviteToken.create({
+      userId: user._id,
+      organizationId,
+      email: user.email.toLowerCase(),
+      tokenHash,
+      expiresAt: new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000),
+    });
+
+    const org = await Organization.findById(organizationId);
+    const orgName = org?.name ?? "your organization";
+    const inviteUrl = `${FRONTEND_URL}/accept-invite?token=${rawToken}&email=${encodeURIComponent(user.email.toLowerCase())}`;
+
+    const firstName = user.name?.firstName ?? "there";
+
+    await emailService.sendInviteEmail(
+      user.email,
+      firstName,
+      orgName,
+      inviteUrl,
+      INVITE_EXPIRY_HOURS,
+    );
+
+    logger.info("Invite resent", {
+      userId: user._id.toString(),
+      organizationId: organizationId.toString(),
+    });
   },
 
   /**

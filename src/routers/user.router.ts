@@ -114,17 +114,12 @@ userRouter.post(
   validateBody(inviteUserSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Generate a temporary password
-      const temporaryPassword = Math.random().toString(36).slice(-12);
-
       const user = await authService.inviteUser(
         getOrgId(req),
         getUserId(req),
         req.body,
-        temporaryPassword,
       );
 
-      // In production, send invitation email with temporary password
       res.status(201).json({
         status: "success",
         data: {
@@ -135,11 +130,30 @@ userRouter.post(
             role: user.role,
             status: user.status,
           },
-          // Only return temporary password in development
-          ...(process.env.NODE_ENV !== "production" && { temporaryPassword }),
         },
         message:
           "User invited successfully. An invitation email has been sent.",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/users/:id/resend-invite
+ * Resends the invitation email for a user still in "invited" status.
+ */
+userRouter.post(
+  "/:id/resend-invite",
+  requirePermission("users:create"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.resendInvite(getOrgId(req), req.params.id as string);
+
+      res.json({
+        status: "success",
+        message: "Invitation email has been resent.",
       });
     } catch (err) {
       next(err);

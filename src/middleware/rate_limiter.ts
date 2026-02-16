@@ -125,11 +125,11 @@ export const authRateLimiter = createRateLimiter({
 
 /**
  * Password reset rate limiter.
- * 3 requests per hour per IP.
+ * 4 requests per hour per IP.
  */
 export const passwordResetRateLimiter = createRateLimiter({
   windowMs: 60 * 60_000, // 1 hour
-  maxRequests: 3,
+  maxRequests: 4,
   keyGenerator: (req) =>
     `pwd-reset:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`,
   message: "Too many password reset attempts. Please try again in an hour.",
