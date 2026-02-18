@@ -22,6 +22,7 @@ const organizationStatusOptions = ["active", "suspended", "cancelled"] as const;
 
 const addressSchema = z.object({
   country: z.string().min(1).max(50).trim(),
+  state: z.string().min(1).max(50).trim(),
   city: z.string().min(1).max(100).trim(),
   street: z.string().min(1).max(200).trim(),
   postalCode: z.string().max(20).trim().optional(),
@@ -54,7 +55,8 @@ export type OrganizationInput = z.infer<typeof OrganizationZodSchema>;
 
 const organizationAddressSchema = new Schema(
   {
-    country: { type: String, maxlength: 50, trim: true },
+    country: { type: String, maxlength: 50, trim: true, default: "Colombia" },
+    state: { type: String, maxlength: 50, trim: true,  },
     city: { type: String, maxlength: 100, trim: true },
     street: { type: String, maxlength: 200, trim: true },
     postalCode: { type: String, maxlength: 20, trim: true },
@@ -105,6 +107,7 @@ const organizationSchema = new Schema(
       maxlength: 50,
       trim: true,
       sparse: true,
+      unique: true,
     },
     email: {
       type: String,

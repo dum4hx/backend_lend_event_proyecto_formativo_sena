@@ -280,7 +280,7 @@ const userSchema = new Schema(
           `${props.value} is not a valid email!`,
       },
     },
-    phone: { type: String, required: true },
+    phone: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true, select: false },
     role: {
       type: String,

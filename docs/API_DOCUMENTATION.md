@@ -300,8 +300,18 @@ Registers a new organization with owner account.
 | organization.email      | body     | string | Yes      | Organization email (unique)               |
 | organization.taxId      | body     | string | No       | Tax identification number                 |
 | organization.phone      | body     | string | No       | Phone in E.164 format                     |
-| organization.address    | body     | object | No       | Address object                            |
+| organization.address    | body     | object | No       | Address object (see details below)        |
 | owner.name.firstName    | body     | string | Yes      | Owner's first name                        |
+
+The `organization.address` object has the following structure:
+
+| Field        | Type   | Required | Description              |
+| ------------ | ------ | -------- | ------------------------ |
+| country      | string | Yes      | Country name             |
+| state        | string | Yes      | State or department      |
+| city         | string | Yes      | City name                |
+| street       | string | Yes      | Street address           |
+| postalCode   | string | No       | Postal code              |
 | owner.name.firstSurname | body     | string | Yes      | Owner's surname                           |
 | owner.email             | body     | string | Yes      | Owner's email (unique)                    |
 | owner.password          | body     | string | Yes      | Password (min 8 chars)                    |

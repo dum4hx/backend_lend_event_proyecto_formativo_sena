@@ -26,7 +26,7 @@ import loanRouter from "./routers/loan.router.ts";
 import inspectionRouter from "./routers/inspection.router.ts";
 import invoiceRouter from "./routers/invoice.router.ts";
 import subscriptionTypeRouter from "./routers/subscription_type.router.ts";
-import { adminRouter } from "./routers/admin.router.ts";
+import { adminRouter } from "./routers/super_admin.router.ts";
 
 import { connectDB } from "./utils/db/connectDB.ts";
 import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
