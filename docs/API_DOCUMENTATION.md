@@ -293,29 +293,29 @@ Clears both authentication cookies.
 
 Registers a new organization with owner account.
 
-| Parameter               | Location | Type   | Required | Description                               |
-| ----------------------- | -------- | ------ | -------- | ----------------------------------------- |
-| organization.name       | body     | string | Yes      | Organization display name (max 200 chars) |
-| organization.legalName  | body     | string | Yes      | Legal business name (max 200 chars)       |
-| organization.email      | body     | string | Yes      | Organization email (unique)               |
-| organization.taxId      | body     | string | No       | Tax identification number                 |
-| organization.phone      | body     | string | No       | Phone in E.164 format                     |
-| organization.address    | body     | object | No       | Address object (see details below)        |
-| owner.name.firstName    | body     | string | Yes      | Owner's first name                        |
+| Parameter              | Location | Type   | Required | Description                               |
+| ---------------------- | -------- | ------ | -------- | ----------------------------------------- |
+| organization.name      | body     | string | Yes      | Organization display name (max 200 chars) |
+| organization.legalName | body     | string | Yes      | Legal business name (max 200 chars)       |
+| organization.email     | body     | string | Yes      | Organization email (unique)               |
+| organization.taxId     | body     | string | No       | Tax identification number                 |
+| organization.phone     | body     | string | No       | Phone in E.164 format                     |
+| organization.address   | body     | object | No       | Address object (see details below)        |
+| owner.name.firstName   | body     | string | Yes      | Owner's first name                        |
 
 The `organization.address` object has the following structure:
 
-| Field        | Type   | Required | Description              |
-| ------------ | ------ | -------- | ------------------------ |
-| country      | string | Yes      | Country name             |
-| state        | string | Yes      | State or department      |
-| city         | string | Yes      | City name                |
-| street       | string | Yes      | Street address           |
-| postalCode   | string | No       | Postal code              |
-| owner.name.firstSurname | body     | string | Yes      | Owner's surname                           |
-| owner.email             | body     | string | Yes      | Owner's email (unique)                    |
-| owner.password          | body     | string | Yes      | Password (min 8 chars)                    |
-| owner.phone             | body     | string | Yes      | Phone in E.164 format                     |
+| Field                   | Type   | Required | Description         |
+| ----------------------- | ------ | -------- | ------------------- | ---------------------- |
+| country                 | string | Yes      | Country name        |
+| state                   | string | Yes      | State or department |
+| city                    | string | Yes      | City name           |
+| street                  | string | Yes      | Street address      |
+| postalCode              | string | No       | Postal code         |
+| owner.name.firstSurname | body   | string   | Yes                 | Owner's surname        |
+| owner.email             | body   | string   | Yes                 | Owner's email (unique) |
+| owner.password          | body   | string   | Yes                 | Password (min 8 chars) |
+| owner.phone             | body   | string   | Yes                 | Phone in E.164 format  |
 
 **Response:** `201 Created`
 
@@ -325,6 +325,27 @@ The `organization.address` object has the following structure:
   "data": {
     "organization": { "id": "...", "name": "...", "email": "..." },
     "user": { "id": "...", "email": "...", "name": {...}, "role": "owner" }
+  }
+}
+```
+
+**Possible Error Codes (returned in `details.code`):**
+
+- `USER_EMAIL_ALREADY_EXISTS`: A user with the provided owner email already exists.
+- `TAX_ID_ALREADY_EXISTS`: An organization with the provided `taxId` already exists.
+- `ORG_EMAIL_ALREADY_EXISTS`: An organization with the provided email already exists.
+- `USER_PHONE_ALREADY_EXISTS`: A user with the provided owner phone already exists.
+- `ORG_PHONE_ALREADY_EXISTS`: An organization with the provided phone already exists.
+
+These appear in error responses using the standard error envelope, for example:
+
+```json
+{
+  "status": "error",
+  "message": "A user with this email already exists",
+  "code": "CONFLICT",
+  "details": {
+    "code": "USER_EMAIL_ALREADY_EXISTS"
   }
 }
 ```
@@ -402,9 +423,9 @@ Changes the authenticated user's password.
 
 Initiates a password reset flow by sending a 6-digit verification code to the user's email.
 
-| Parameter | Location | Type   | Required | Description            |
-| --------- | -------- | ------ | -------- | ---------------------- |
-| email     | body     | string | Yes      | Registered user email  |
+| Parameter | Location | Type   | Required | Description           |
+| --------- | -------- | ------ | -------- | --------------------- |
+| email     | body     | string | Yes      | Registered user email |
 
 **Rate Limit:** 3 requests per hour per IP
 
@@ -450,12 +471,12 @@ Verifies the 6-digit OTP code sent to the user's email. Returns a reset token re
 
 **Error Responses:**
 
-| Status | Condition                   | Message                                                 |
-| ------ | --------------------------- | ------------------------------------------------------- |
-| 400    | No reset request found      | No password reset request found for this email          |
-| 400    | Code expired                | Verification code has expired. Please request a new one.|
-| 400    | Too many failed attempts    | Too many failed attempts. Please request a new code.    |
-| 400    | Wrong code                  | Invalid verification code                               |
+| Status | Condition                | Message                                                  |
+| ------ | ------------------------ | -------------------------------------------------------- |
+| 400    | No reset request found   | No password reset request found for this email           |
+| 400    | Code expired             | Verification code has expired. Please request a new one. |
+| 400    | Too many failed attempts | Too many failed attempts. Please request a new code.     |
+| 400    | Wrong code               | Invalid verification code                                |
 
 **Notes:**
 
@@ -468,11 +489,11 @@ Verifies the 6-digit OTP code sent to the user's email. Returns a reset token re
 
 Resets the user's password using the verified reset token from the previous step.
 
-| Parameter   | Location | Type   | Required | Description                                                         |
-| ----------- | -------- | ------ | -------- | ------------------------------------------------------------------- |
-| email       | body     | string | Yes      | Email used in previous steps                                        |
-| resetToken  | body     | string | Yes      | Token returned by verify-reset-code                                 |
-| newPassword | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special)    |
+| Parameter   | Location | Type   | Required | Description                                                      |
+| ----------- | -------- | ------ | -------- | ---------------------------------------------------------------- |
+| email       | body     | string | Yes      | Email used in previous steps                                     |
+| resetToken  | body     | string | Yes      | Token returned by verify-reset-code                              |
+| newPassword | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special) |
 
 **Rate Limit:** 3 requests per hour per IP
 
@@ -495,11 +516,11 @@ Resets the user's password using the verified reset token from the previous step
 
 **Error Responses:**
 
-| Status | Condition               | Message                                                                     |
-| ------ | ----------------------- | --------------------------------------------------------------------------- |
-| 400    | Invalid/expired token   | Invalid or expired reset token. Please restart the password reset process.  |
-| 400    | Token expired           | Reset token has expired. Please request a new code.                         |
-| 400    | Password too weak       | Password must be at least 8 characters (and other validation rules)         |
+| Status | Condition             | Message                                                                    |
+| ------ | --------------------- | -------------------------------------------------------------------------- |
+| 400    | Invalid/expired token | Invalid or expired reset token. Please restart the password reset process. |
+| 400    | Token expired         | Reset token has expired. Please request a new code.                        |
+| 400    | Password too weak     | Password must be at least 8 characters (and other validation rules)        |
 
 ---
 
@@ -507,11 +528,11 @@ Resets the user's password using the verified reset token from the previous step
 
 Accepts an organization invitation using the token from the invitation email. Sets the user's password and activates their account.
 
-| Parameter | Location | Type   | Required | Description                                                         |
-| --------- | -------- | ------ | -------- | ------------------------------------------------------------------- |
-| email     | body     | string | Yes      | Email address the invitation was sent to                            |
-| token     | body     | string | Yes      | Invite token from the invitation URL                                |
-| password  | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special)    |
+| Parameter | Location | Type   | Required | Description                                                      |
+| --------- | -------- | ------ | -------- | ---------------------------------------------------------------- |
+| email     | body     | string | Yes      | Email address the invitation was sent to                         |
+| token     | body     | string | Yes      | Invite token from the invitation URL                             |
+| password  | body     | string | Yes      | New password (min 8 chars, uppercase, lowercase, digit, special) |
 
 **Authentication Required:** No
 
@@ -543,13 +564,13 @@ Accepts an organization invitation using the token from the invitation email. Se
 
 **Error Responses:**
 
-| Status | Condition                    | Message                                                                              |
-| ------ | ---------------------------- | ------------------------------------------------------------------------------------ |
-| 400    | Invalid or expired token     | Invalid or expired invite link. Please ask your administrator to send a new invitation. |
-| 400    | Expired token (TTL)          | This invite link has expired. Please ask your administrator to send a new invitation.  |
-| 400    | Already activated            | This account has already been activated                                              |
-| 400    | Password too weak            | Password must be at least 8 characters (and other validation rules)                  |
-| 404    | User not found               | User account not found                                                               |
+| Status | Condition                | Message                                                                                 |
+| ------ | ------------------------ | --------------------------------------------------------------------------------------- |
+| 400    | Invalid or expired token | Invalid or expired invite link. Please ask your administrator to send a new invitation. |
+| 400    | Expired token (TTL)      | This invite link has expired. Please ask your administrator to send a new invitation.   |
+| 400    | Already activated        | This account has already been activated                                                 |
+| 400    | Password too weak        | Password must be at least 8 characters (and other validation rules)                     |
+| 404    | User not found           | User account not found                                                                  |
 
 **Notes:**
 

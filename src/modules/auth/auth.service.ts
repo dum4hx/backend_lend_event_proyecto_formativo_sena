@@ -24,7 +24,10 @@ import type { ClientSession } from "mongoose";
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 5;
-const INVITE_EXPIRY_HOURS = parseInt(process.env.INVITE_EXPIRY_HOURS || "48", 10);
+const INVITE_EXPIRY_HOURS = parseInt(
+  process.env.INVITE_EXPIRY_HOURS || "48",
+  10,
+);
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://app.test.local";
 
 /* ---------- Auth Service ---------- */
@@ -50,7 +53,63 @@ export const authService = {
         email: ownerData.email.trim().toLowerCase(),
       }).session(session);
       if (existingUser) {
-        throw AppError.conflict("A user with this email already exists");
+        throw AppError.conflict("A user with this email already exists", {
+          code: "USER_EMAIL_ALREADY_EXISTS",
+        });
+      }
+
+      // Check if taxId is provided and already exists for another organization
+      const taxId = organizationData.taxId?.trim();
+      if (taxId) {
+        const existingOrgWithTaxId = await Organization.findOne({
+          taxId,
+        }).session(session);
+        if (existingOrgWithTaxId) {
+          throw AppError.conflict(
+            "An organization with this tax ID already exists",
+            {
+              code: "TAX_ID_ALREADY_EXISTS",
+            },
+          );
+        }
+      }
+
+      // Check if email already exists for organization
+      const existingOrgWithEmail = await Organization.findOne({
+        email: organizationData.email.trim().toLowerCase(),
+      }).session(session);
+      if (existingOrgWithEmail) {
+        throw AppError.conflict(
+          "An organization with this email already exists",
+          {
+            code: "ORG_EMAIL_ALREADY_EXISTS",
+          },
+        );
+      }
+
+      // Check if user phone already exists
+      const existingUserWithPhone = await User.findOne({
+        phone: ownerData.phone.trim(),
+      }).session(session);
+      if (existingUserWithPhone) {
+        throw AppError.conflict(
+          "A user with this phone number already exists",
+          {
+            code: "USER_PHONE_ALREADY_EXISTS",
+          },
+        );
+      }
+
+      // Check if organization phone already exists
+      const existingOrgWithPhone = await Organization.findOne({
+        phone: organizationData.phone?.trim() ?? "",
+      }).session(session);
+
+      if (existingOrgWithPhone) {
+        throw AppError.conflict(
+          "An organization with this phone number already exists",
+          { code: "ORG_PHONE_ALREADY_EXISTS" },
+        );
       }
 
       // Create a temporary ObjectId for the owner
@@ -144,7 +203,10 @@ export const authService = {
     }
 
     // Check organization status
-    const org = user.organizationId as unknown as { _id: Types.ObjectId; status: string };
+    const org = user.organizationId as unknown as {
+      _id: Types.ObjectId;
+      status: string;
+    };
     if (org?.status === "suspended") {
       throw AppError.unauthorized(
         "Organization is suspended. Please contact the organization owner.",
@@ -303,12 +365,8 @@ export const authService = {
     token: string,
     newPassword: string,
   ): Promise<InstanceType<typeof User>> {
-
     // Check if user has been invited (means there should be an invite token with their email)
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const inviteToken = await InviteToken.findOne({
       email: email.toLowerCase(),
@@ -557,12 +615,16 @@ export const authService = {
     });
 
     if (!record) {
-      throw AppError.badRequest("No password reset request found for this email");
+      throw AppError.badRequest(
+        "No password reset request found for this email",
+      );
     }
 
     if (record.expiresAt < new Date()) {
       await PasswordResetToken.deleteOne({ _id: record._id });
-      throw AppError.badRequest("Verification code has expired. Please request a new one.");
+      throw AppError.badRequest(
+        "Verification code has expired. Please request a new one.",
+      );
     }
 
     if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
@@ -610,7 +672,9 @@ export const authService = {
 
     if (record.expiresAt < new Date()) {
       await PasswordResetToken.deleteOne({ _id: record._id });
-      throw AppError.badRequest("Reset token has expired. Please request a new code.");
+      throw AppError.badRequest(
+        "Reset token has expired. Please request a new code.",
+      );
     }
 
     const user = await User.findById(record.userId);
