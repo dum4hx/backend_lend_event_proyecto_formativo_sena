@@ -65,6 +65,30 @@ adminRouter.get(
   },
 );
 
+/* ---------- Organization PII Activity ---------- */
+
+/**
+ * GET /api/v1/admin/analytics/organizations-pii
+ * Gets a paginated list of all organizations with their details.
+ */
+adminRouter.get(
+  "/analytics/organizations-pii",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const result = await adminService.getOrganizationPii(page, limit);
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /* ---------- User Activity ---------- */
 
 /**

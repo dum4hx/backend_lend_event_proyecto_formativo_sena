@@ -27,6 +27,14 @@ export interface OrganizationActivityStats {
   averageCatalogItemCount: number;
 }
 
+export interface PaginatedOrganizations {
+  organizations: any[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface UserActivityStats {
   byRole: { role: string; count: number }[];
   byStatus: { status: string; count: number }[];
@@ -175,6 +183,36 @@ export const adminService = {
       averageSeatCount: Math.round((avgStats[0]?.avgSeats ?? 1) * 10) / 10,
       averageCatalogItemCount:
         Math.round((avgStats[0]?.avgCatalogItems ?? 0) * 10) / 10,
+    };
+  },
+
+  /**
+   * Gets a paginated list of organizations with PII.
+   */
+  async getOrganizationPii(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<PaginatedOrganizations> {
+    const skip = (page - 1) * limit;
+
+    const [organizations, total] = await Promise.all([
+      Organization.find()
+        .select(
+          "name legalName email phone address subscription status createdAt",
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Organization.countDocuments(),
+    ]);
+
+    return {
+      organizations,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   },
 

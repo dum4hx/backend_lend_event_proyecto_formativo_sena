@@ -1179,6 +1179,54 @@ Gets aggregated organization activity statistics.
 
 ---
 
+#### GET /admin/analytics/organizations-pii
+
+Gets a paginated list of all organizations with their details.
+
+| Parameter | Location | Type    | Required | Description                  |
+| --------- | -------- | ------- | -------- | ---------------------------- |
+| page      | query    | integer | No       | Page number (default: 1)     |
+| limit     | query    | integer | No       | Items per page (default: 10) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "organizations": [
+      {
+        "_id": "60d5f1b4e6b3f10015f1b3a0",
+        "name": "Innovate Inc.",
+        "legalName": "Innovate Inc. LLC",
+        "email": "contact@innovate.com",
+        "phone": "+1234567890",
+        "address": {
+          "country": "USA",
+          "city": "San Francisco",
+          "street": "123 Market St",
+          "postalCode": "94103"
+        },
+        "subscription": {
+          "plan": "professional",
+          "seatCount": 10,
+          "stripeCustomerId": "cus_12345",
+          "stripeSubscriptionId": "sub_12345"
+        },
+        "status": "active",
+        "createdAt": "2023-01-15T10:30:00.000Z"
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 15
+  }
+}
+```
+
+---
+
 #### GET /admin/analytics/users
 
 Gets aggregated user activity statistics.
