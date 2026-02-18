@@ -84,6 +84,57 @@ test.describe("Super Admin - Analytics Endpoints", () => {
     expect(response.status()).toBe(401);
   });
 
+  /* ---------- Organization PII Activity ---------- */
+
+  test("GET /admin/analytics/organizations-pii - should return paginated organizations (super admin)", async () => {
+    const response = await superAdminContext.get(
+      "/admin/analytics/organizations-pii",
+    );
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.status).toBe("success");
+    expect(body.data).toBeDefined();
+
+    const data = body.data;
+    expect(Array.isArray(data.organizations)).toBeTruthy();
+    expect(typeof data.total).toBe("number");
+    expect(typeof data.page).toBe("number");
+    expect(typeof data.limit).toBe("number");
+    expect(typeof data.totalPages).toBe("number");
+
+    if (data.organizations.length > 0) {
+      const org = data.organizations[0];
+      expect(org).toHaveProperty("name");
+      expect(org).toHaveProperty("legalName");
+      expect(org).toHaveProperty("email");
+      expect(org).toHaveProperty("phone");
+      expect(org).toHaveProperty("address");
+      expect(org).toHaveProperty("subscription");
+      expect(org).toHaveProperty("status");
+      expect(org).toHaveProperty("createdAt");
+    }
+  });
+
+  test("GET /admin/analytics/organizations-pii - should handle pagination params", async () => {
+    const response = await superAdminContext.get(
+      "/admin/analytics/organizations-pii?page=2&limit=5",
+    );
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.status).toBe("success");
+    expect(body.data.page).toBe(2);
+    expect(body.data.limit).toBe(5);
+  });
+
+  test("GET /admin/analytics/organizations-pii - should deny access to regular users", async () => {
+    const response = await regularUserContext.get(
+      "/admin/analytics/organizations-pii",
+    );
+    expect(response.status()).toBe(401);
+  });
+
   /* ---------- User Activity ---------- */
 
   test("GET /admin/analytics/users - should return user stats (super admin)", async () => {
