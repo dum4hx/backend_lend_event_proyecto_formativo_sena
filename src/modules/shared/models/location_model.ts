@@ -79,6 +79,11 @@ const locationSchema = new Schema(
       trim: true,
       unique: true,
     },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+    },
     address: {
       type: locationAddressSchema,
       required: true,
