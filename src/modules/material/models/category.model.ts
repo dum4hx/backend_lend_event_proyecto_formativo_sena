@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { Schema, model, type InferSchemaType } from "mongoose";
+import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 // Zod schema for API validation
 export const CategoryZodSchema = z.object({
+  organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+    message: "Invalid Organization ID format",
+  }),
   name: z
     .string()
     .min(1, "Name is required")
@@ -20,12 +23,17 @@ export type CategoryInput = z.infer<typeof CategoryZodSchema>;
 // Category mongoose schema
 const categorySchema = new Schema(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     name: {
       type: String,
       required: true,
       maxlength: 100,
       trim: true,
-      unique: true,
     },
     description: {
       type: String,
@@ -38,6 +46,9 @@ const categorySchema = new Schema(
     timestamps: true,
   },
 );
+
+// Compound unique index: category name must be unique within an organization
+categorySchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
 export type CategoryDocument = InferSchemaType<typeof categorySchema>;
 export const Category = model<CategoryDocument>("Category", categorySchema);

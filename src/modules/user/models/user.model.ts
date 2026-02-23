@@ -162,6 +162,13 @@ export const rolePermissions: Record<UserRole, string[]> = {
   ],
 };
 
+export const defaultOrganizationRoles = {
+  owner: rolePermissions.owner,
+  manager: rolePermissions.manager,
+  warehouse_operator: rolePermissions.warehouse_operator,
+  commercial_advisor: rolePermissions.commercial_advisor,
+} as const;
+
 /* ---------- User Status ---------- */
 
 const userStatusOptions = [

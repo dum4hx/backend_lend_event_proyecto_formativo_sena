@@ -12,6 +12,9 @@ const materialStatusOptions: string[] = [
 
 // Zod schema for API validation
 export const MaterialInstanceZodSchema = z.object({
+  organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+    message: "Invalid Organization ID format",
+  }),
   modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Material Model ID format",
   }),
@@ -33,6 +36,12 @@ export type MaterialInstanceInput = z.infer<typeof MaterialInstanceZodSchema>;
 // Material Instance mongoose schema
 const materialInstanceSchema = new Schema(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     modelId: {
       type: Schema.Types.ObjectId,
       ref: "MaterialType",
@@ -43,7 +52,6 @@ const materialInstanceSchema = new Schema(
       required: true,
       maxlength: 100,
       trim: true,
-      unique: true,
     },
     status: {
       type: String,
@@ -65,6 +73,9 @@ const materialInstanceSchema = new Schema(
 materialInstanceSchema.index({ modelId: 1 });
 materialInstanceSchema.index({ locationId: 1 });
 materialInstanceSchema.index({ status: 1 });
+
+// Ensure serial numbers are unique within an organization
+materialInstanceSchema.index({ organizationId: 1, serialNumber: 1 }, { unique: true });
 
 export type MaterialInstanceDocument = InferSchemaType<
   typeof materialInstanceSchema

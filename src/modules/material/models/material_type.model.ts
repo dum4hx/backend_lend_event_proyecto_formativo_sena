@@ -3,6 +3,9 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 // Zod schema for API validation
 export const MaterialModelZodSchema = z.object({
+  organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+    message: "Invalid Organization ID format",
+  }),
   categoryId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Category ID format",
   }),
@@ -24,6 +27,12 @@ export type MaterialModelInput = z.infer<typeof MaterialModelZodSchema>;
 // Material Model mongoose schema
 const materialTypeSchema = new Schema(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     categoryId: [
       {
         type: Schema.Types.ObjectId,
@@ -56,6 +65,9 @@ const materialTypeSchema = new Schema(
 
 // Index for better query performance
 materialTypeSchema.index({ categoryId: 1 });
+
+// Ensure material model names are unique within an organization
+materialTypeSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
 export type MaterialModelDocument = InferSchemaType<typeof materialTypeSchema>;
 export const MaterialModel = model<MaterialModelDocument>(

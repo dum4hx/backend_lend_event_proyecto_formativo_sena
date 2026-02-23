@@ -1570,17 +1570,20 @@ Soft deletes a customer (sets status to inactive).
 
 Lists all material categories.
 
+**Permission Required:** `materials:read`
+
 ---
 
 #### POST /materials/categories
 
 Creates a new category.
 
-| Parameter   | Location | Type   | Required | Description        |
-| ----------- | -------- | ------ | -------- | ------------------ |
-| name        | body     | string | Yes      | Category name      |
-| description | body     | string | No       | Description        |
-| parentId    | body     | string | No       | Parent category ID |
+**Permission Required:** `materials:create`
+
+| Parameter   | Location | Type   | Required | Description   |
+| ----------- | -------- | ------ | -------- | ------------- |
+| name        | body     | string | Yes      | Category name |
+| description | body     | string | Yes      | Description   |
 
 ---
 
@@ -1588,10 +1591,22 @@ Creates a new category.
 
 Lists all material types (catalog items).
 
-| Parameter  | Location | Type   | Required | Description                   |
-| ---------- | -------- | ------ | -------- | ----------------------------- |
-| categoryId | query    | string | No       | Filter by category            |
-| search     | query    | string | No       | Search by name or description |
+**Permission Required:** `materials:read`
+
+| Parameter  | Location | Type    | Required | Description                   |
+| ---------- | -------- | ------- | -------- | ----------------------------- |
+| page       | query    | integer | No       | Page number (default: 1)      |
+| limit      | query    | integer | No       | Items per page (default: 20)  |
+| categoryId | query    | string  | No       | Filter by category            |
+| search     | query    | string  | No       | Search by name or description |
+
+---
+
+#### GET /materials/types/:id
+
+Gets a specific material type.
+
+**Permission Required:** `materials:read`
 
 ---
 
@@ -1599,13 +1614,37 @@ Lists all material types (catalog items).
 
 Creates a new material type. Validates against organization's catalog item limit.
 
-| Parameter       | Location | Type   | Required | Description          |
-| --------------- | -------- | ------ | -------- | -------------------- |
-| name            | body     | string | Yes      | Material name        |
-| description     | body     | string | No       | Description          |
-| categoryId      | body     | string | Yes      | Category ID          |
-| pricePerDay     | body     | number | Yes      | Rental price per day |
-| replacementCost | body     | number | No       | Replacement cost     |
+**Permission Required:** `materials:create`
+
+| Parameter   | Location | Type   | Required | Description          |
+| ----------- | -------- | ------ | -------- | -------------------- |
+| name        | body     | string | Yes      | Material name        |
+| description | body     | string | Yes      | Description          |
+| categoryId  | body     | string | Yes      | Category ID          |
+| pricePerDay | body     | number | Yes      | Rental price per day |
+
+---
+
+#### PATCH /materials/types/:id
+
+Updates a material type. All fields are optional.
+
+**Permission Required:** `materials:update`
+
+| Parameter   | Location | Type   | Required | Description          |
+| ----------- | -------- | ------ | -------- | -------------------- |
+| name        | body     | string | No       | Material name        |
+| description | body     | string | No       | Description          |
+| categoryId  | body     | string | No       | Category ID          |
+| pricePerDay | body     | number | No       | Rental price per day |
+
+---
+
+#### DELETE /materials/types/:id
+
+Deletes a material type. Fails if any material instances of this type exist.
+
+**Permission Required:** `materials:delete`
 
 ---
 
@@ -1613,11 +1652,23 @@ Creates a new material type. Validates against organization's catalog item limit
 
 Lists all material instances.
 
-| Parameter      | Location | Type   | Required | Description                                                                    |
-| -------------- | -------- | ------ | -------- | ------------------------------------------------------------------------------ |
-| status         | query    | string | No       | `available`, `reserved`, `loaned`, `maintenance`, `damaged`, `lost`, `retired` |
-| materialTypeId | query    | string | No       | Filter by material type                                                        |
-| search         | query    | string | No       | Search by serial number                                                        |
+**Permission Required:** `materials:read`
+
+| Parameter      | Location | Type    | Required | Description                                                                                |
+| -------------- | -------- | ------- | -------- | ------------------------------------------------------------------------------------------ |
+| page           | query    | integer | No       | Page number (default: 1)                                                                   |
+| limit          | query    | integer | No       | Items per page (default: 20)                                                               |
+| status         | query    | string  | No       | `available`, `reserved`, `loaned`, `returned`, `maintenance`, `damaged`, `lost`, `retired` |
+| materialTypeId | query    | string  | No       | Filter by material type                                                                    |
+| search         | query    | string  | No       | Search by serial number                                                                    |
+
+---
+
+#### GET /materials/instances/:id
+
+Gets a specific material instance.
+
+**Permission Required:** `materials:read`
 
 ---
 
@@ -1625,12 +1676,14 @@ Lists all material instances.
 
 Creates a new material instance.
 
-| Parameter    | Location | Type   | Required | Description          |
-| ------------ | -------- | ------ | -------- | -------------------- |
-| modelId      | body     | string | Yes      | Material type ID     |
-| serialNumber | body     | string | Yes      | Unique serial number |
-| purchaseDate | body     | string | No       | ISO 8601 date        |
-| purchaseCost | body     | number | No       | Purchase cost        |
+**Permission Required:** `materials:create`
+
+| Parameter    | Location | Type   | Required | Description                                                                       |
+| ------------ | -------- | ------ | -------- | --------------------------------------------------------------------------------- |
+| modelId      | body     | string | Yes      | Material type ID                                                                  |
+| serialNumber | body     | string | Yes      | Unique serial number (max 100 chars)                                              |
+| locationId   | body     | string | Yes      | Location ID                                                                       |
+| status       | body     | string | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`) |
 
 ---
 
@@ -1638,10 +1691,12 @@ Creates a new material instance.
 
 Updates a material instance's status (warehouse operator action).
 
-| Parameter | Location | Type   | Required | Description         |
-| --------- | -------- | ------ | -------- | ------------------- |
-| status    | body     | string | Yes      | New status          |
-| notes     | body     | string | No       | Status change notes |
+**Permission Required:** `materials:state:update`
+
+| Parameter | Location | Type   | Required | Description                                                                                            |
+| --------- | -------- | ------ | -------- | ------------------------------------------------------------------------------------------------------ |
+| status    | body     | string | Yes      | New status: `available`, `reserved`, `loaned`, `returned`, `maintenance`, `damaged`, `lost`, `retired` |
+| notes     | body     | string | No       | Status change notes (max 500 chars)                                                                    |
 
 **Valid Status Transitions:**
 
@@ -1654,6 +1709,15 @@ Updates a material instance's status (warehouse operator action).
 | maintenance | available, retired                      |
 | damaged     | maintenance, retired                    |
 | lost        | retired                                 |
+| retired     | _(none)_                                |
+
+---
+
+#### DELETE /materials/instances/:id
+
+Deletes a material instance. Only instances with `available` or `retired` status can be deleted.
+
+**Permission Required:** `materials:delete`
 
 ---
 
