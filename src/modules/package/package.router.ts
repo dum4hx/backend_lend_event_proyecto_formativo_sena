@@ -5,24 +5,21 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import {
-  Package,
-  PackageZodSchema,
-} from "../modules/package/models/package.model.ts";
-import { MaterialModel } from "../modules/material/models/material_type.model.ts";
-import { organizationService } from "../modules/organization/organization.service.ts";
+import { Package, PackageZodSchema } from "./models/package.model.ts";
+import { MaterialModel } from "../material/models/material_type.model.ts";
+import { organizationService } from "../organization/organization.service.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const packageRouter = Router();
 
@@ -298,7 +295,7 @@ packageRouter.delete(
     try {
       // Check if package is used in any requests
       const { LoanRequest } =
-        await import("../modules/request/models/request.model.ts");
+        await import("../request/models/request.model.ts");
       const activeRequests = await LoanRequest.countDocuments({
         packageId: req.params.id,
         status: { $in: ["pending", "approved", "assigned", "ready"] },

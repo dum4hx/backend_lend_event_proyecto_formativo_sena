@@ -14,21 +14,8 @@ import { errorResponder } from "./middleware/error_responder.ts";
 import { generalRateLimiter } from "./middleware/rate_limiter.ts";
 
 // Router imports
-import authRouter from "./routers/auth.router.ts";
-import userRouter from "./routers/user.router.ts";
-import organizationRouter from "./routers/organization.router.ts";
-import billingRouter from "./routers/billing.router.ts";
-import customerRouter from "./routers/customer.router.ts";
-import materialRouter from "./routers/material.router.ts";
-import packageRouter from "./routers/package.router.ts";
-import requestRouter from "./routers/request.router.ts";
-import loanRouter from "./routers/loan.router.ts";
-import inspectionRouter from "./routers/inspection.router.ts";
-import invoiceRouter from "./routers/invoice.router.ts";
-import subscriptionTypeRouter from "./routers/subscription_type.router.ts";
-import { adminRouter } from "./routers/super_admin.router.ts";
-import rolesRouter from "./modules/roles/roles.router.ts";
-
+import authRouter from "./modules/auth/auth.router.ts";
+import * as routers from "./routers/index.ts";
 import { connectDB } from "./utils/db/connectDB.ts";
 import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
 
@@ -99,42 +86,42 @@ const apiV1 = "/api/v1";
 app.use(`${apiV1}/auth`, authRouter);
 
 // User management routes
-app.use(`${apiV1}/users`, userRouter);
+app.use(`${apiV1}/users`, routers.userRouter);
 
 // Organization routes
-app.use(`${apiV1}/organizations`, organizationRouter);
+app.use(`${apiV1}/organizations`, routers.organizationRouter);
 
 // Billing routes
-app.use(`${apiV1}/billing`, billingRouter);
+app.use(`${apiV1}/billing`, routers.billingRouter);
 
 // Customer routes
-app.use(`${apiV1}/customers`, customerRouter);
+app.use(`${apiV1}/customers`, routers.customerRouter);
 
 // Material routes (catalog, instances)
-app.use(`${apiV1}/materials`, materialRouter);
+app.use(`${apiV1}/materials`, routers.materialRouter);
 
 // Package routes
-app.use(`${apiV1}/packages`, packageRouter);
+app.use(`${apiV1}/packages`, routers.packageRouter);
 
 // Request routes (loan requests)
-app.use(`${apiV1}/requests`, requestRouter);
+app.use(`${apiV1}/requests`, routers.requestRouter);
 
 // Loan routes
-app.use(`${apiV1}/loans`, loanRouter);
+app.use(`${apiV1}/loans`, routers.loanRouter);
 
 // Inspection routes
-app.use(`${apiV1}/inspections`, inspectionRouter);
+app.use(`${apiV1}/inspections`, routers.inspectionRouter);
 
 // Invoice routes
-app.use(`${apiV1}/invoices`, invoiceRouter);
+app.use(`${apiV1}/invoices`, routers.invoiceRouter);
 
 // Subscription type routes (super admin management)
-app.use(`${apiV1}/subscription-types`, subscriptionTypeRouter);
+app.use(`${apiV1}/subscription-types`, routers.subscriptionTypeRouter);
 
 // Admin routes (super admin analytics)
-app.use(`${apiV1}/admin`, adminRouter);
+app.use(`${apiV1}/admin`, routers.adminRouter);
 
-app.use(`${apiV1}/roles`, rolesRouter);
+app.use(`${apiV1}/roles`, routers.rolesRouter);
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {

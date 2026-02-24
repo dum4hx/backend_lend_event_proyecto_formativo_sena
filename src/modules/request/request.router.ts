@@ -10,23 +10,23 @@ import {
   LoanRequest,
   LoanRequestZodSchema,
   requestStatusOptions,
-} from "../modules/request/models/request.model.ts";
-import { Package } from "../modules/package/models/package.model.ts";
-import { Customer } from "../modules/customer/models/customer.model.ts";
-import { MaterialInstance } from "../modules/material/models/material_instance.model.ts";
+} from "./models/request.model.ts";
+import { Package } from "../package/models/package.model.ts";
+import { Customer } from "../customer/models/customer.model.ts";
+import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
   getAuthUser,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const requestRouter = Router();
 

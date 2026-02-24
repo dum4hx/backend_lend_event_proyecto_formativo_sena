@@ -10,22 +10,22 @@ import {
   Loan,
   LoanZodSchema,
   loanStatusOptions,
-} from "../modules/loan/models/loan.model.ts";
-import { LoanRequest } from "../modules/request/models/request.model.ts";
-import { MaterialInstance } from "../modules/material/models/material_instance.model.ts";
+} from "../loan/models/loan.model.ts";
+import { LoanRequest } from "../request/models/request.model.ts";
+import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
   getAuthUser,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const loanRouter = Router();
 
@@ -370,7 +370,7 @@ loanRouter.post(
 
       // Check if inspection exists and is completed
       const { Inspection } =
-        await import("../modules/inspection/models/inspection.model.ts");
+        await import("../inspection/models/inspection.model.ts");
       const inspection = await Inspection.findOne({
         loanId: loan._id,
       });

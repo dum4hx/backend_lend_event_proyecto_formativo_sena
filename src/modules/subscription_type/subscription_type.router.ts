@@ -8,15 +8,15 @@ import { z } from "zod";
 import {
   subscriptionTypeService,
   type PlanLimits,
-} from "../modules/subscription_type/subscription_type.service.ts";
+} from "./subscription_type.service.ts";
 import {
   SubscriptionTypeZodSchema,
   SubscriptionTypeUpdateZodSchema,
   billingModelOptions,
   subscriptionTypeStatusOptions,
-} from "../modules/subscription_type/models/subscription_type.model.ts";
-import { validateBody } from "../middleware/validation.ts";
-import { authenticate, requireRole } from "../middleware/auth.ts";
+} from "./models/subscription_type.model.ts";
+import { validateBody } from "../../middleware/validation.ts";
+import { authenticate, requireRole } from "../../middleware/auth.ts";
 
 const subscriptionTypeRouter = Router();
 
@@ -209,7 +209,5 @@ subscriptionTypeRouter.delete(
     }
   },
 );
-
-
 
 export default subscriptionTypeRouter;

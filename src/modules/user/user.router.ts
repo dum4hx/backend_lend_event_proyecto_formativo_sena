@@ -5,24 +5,21 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { userService } from "../modules/user/user.service.ts";
-import { authService } from "../modules/auth/auth.service.ts";
-import {
-  UserUpdateZodSchema,
-  userRoleOptions,
-} from "../modules/user/models/user.model.ts";
+import { userService } from "./user.service.ts";
+import { authService } from "../auth/auth.service.ts";
+import { UserUpdateZodSchema, userRoleOptions } from "./models/user.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
   getUserId,
-} from "../middleware/auth.ts";
+} from "../../middleware/auth.ts";
 
 const userRouter = Router();
 

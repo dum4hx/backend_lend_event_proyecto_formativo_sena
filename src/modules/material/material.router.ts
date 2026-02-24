@@ -8,28 +8,29 @@ import { z } from "zod";
 import {
   MaterialModel,
   MaterialModelZodSchema,
-} from "../modules/material/models/material_type.model.ts";
+} from "./models/material_type.model.ts";
 import {
   MaterialInstance,
   MaterialInstanceZodSchema,
-} from "../modules/material/models/material_instance.model.ts";
+} from "./models/material_instance.model.ts";
 import {
   Category,
   CategoryZodSchema,
-} from "../modules/material/models/category.model.ts";
-import { organizationService } from "../modules/organization/organization.service.ts";
+} from "./models/category.model.ts";
+import { organizationService } from "../organization/organization.service.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { materialService } from "./material.service.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const materialRouter = Router();
 
@@ -101,6 +102,29 @@ materialRouter.post(
       res.status(201).json({
         status: "success",
         data: { category },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /api/v1/materials/categories/:id
+ * Deletes a material category. Uses materialService to ensure no linked types.
+ */
+materialRouter.delete(
+  "/categories/:id",
+  requirePermission("materials:delete"),
+  async (req: Request<{id: string}>, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+
+      await materialService.deleteCategory(organizationId, req.params.id);
+
+      res.json({
+        status: "success",
+        message: "Category deleted successfully",
       });
     } catch (err) {
       next(err);

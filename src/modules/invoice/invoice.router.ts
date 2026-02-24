@@ -9,19 +9,19 @@ import {
   Invoice,
   invoiceStatusOptions,
   invoiceTypeOptions,
-} from "../modules/invoice/models/invoice.model.ts";
+} from "../invoice/models/invoice.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const invoiceRouter = Router();
 

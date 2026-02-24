@@ -5,20 +5,20 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { billingService } from "../modules/billing/billing.service.ts";
-import { validateBody } from "../middleware/validation.ts";
+import { billingService } from "./billing.service.ts";
+import { validateBody } from "../../middleware/validation.ts";
 import {
   paymentRateLimiter,
   webhookRateLimiter,
-} from "../middleware/rate_limiter.ts";
+} from "../../middleware/rate_limiter.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requireOwner,
   getOrgId,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
-import type { SubscriptionPlan } from "../modules/organization/models/organization.model.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
+import type { SubscriptionPlan } from "../organization/models/organization.model.ts";
 
 const billingRouter = Router();
 

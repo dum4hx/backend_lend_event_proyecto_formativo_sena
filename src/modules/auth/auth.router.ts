@@ -5,26 +5,26 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { authService } from "../modules/auth/auth.service.ts";
-import { UserZodSchema } from "../modules/user/models/user.model.ts";
+import { authService } from "./auth.service.ts";
+import { UserZodSchema } from "../user/models/user.model.ts";
 import {
   OrganizationZodSchema,
   Organization,
-} from "../modules/organization/models/organization.model.ts";
-import { validateBody } from "../middleware/validation.ts";
+} from "../organization/models/organization.model.ts";
+import { validateBody } from "../../middleware/validation.ts";
 import {
   authRateLimiter,
   passwordResetRateLimiter,
-} from "../middleware/rate_limiter.ts";
+} from "../../middleware/rate_limiter.ts";
 import {
   authenticate,
   accessTokenCookieOptions,
   refreshTokenCookieOptions,
   COOKIE_NAME,
   REFRESH_COOKIE_NAME,
-} from "../middleware/auth.ts";
-import { verifyRefreshToken } from "../utils/auth/jwt.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { verifyRefreshToken } from "../../utils/auth/jwt.ts";
+import { AppError } from "../../errors/AppError.ts";
 import { access } from "node:fs";
 
 const authRouter = Router();
@@ -271,7 +271,7 @@ authRouter.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { userService } = await import("../modules/user/user.service.ts");
+      const { userService } = await import("../user/user.service.ts");
       const user = await userService.getProfile(req.user!.userId);
 
       res.json({
@@ -293,7 +293,7 @@ authRouter.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { userService } = await import("../modules/user/user.service.ts");
+      const { userService } = await import("../user/user.service.ts");
       const user = await userService.getProfile(req.user!.userId);
 
       // Check if subscription is active and paid
@@ -360,7 +360,8 @@ authRouter.post(
         data: {
           resetToken: result.resetToken,
         },
-        message: "Code verified successfully. Use the reset token to set a new password.",
+        message:
+          "Code verified successfully. Use the reset token to set a new password.",
       });
     } catch (err) {
       next(err);
@@ -384,7 +385,8 @@ authRouter.post(
 
       res.json({
         status: "success",
-        message: "Password has been reset successfully. You can now log in with your new password.",
+        message:
+          "Password has been reset successfully. You can now log in with your new password.",
       });
     } catch (err) {
       next(err);

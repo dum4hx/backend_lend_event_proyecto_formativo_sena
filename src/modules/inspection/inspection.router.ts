@@ -6,25 +6,22 @@ import {
 } from "express";
 import { z } from "zod";
 import { Types } from "mongoose";
-import {
-  Inspection,
-  InspectionZodSchema,
-} from "../modules/inspection/models/inspection.model.ts";
-import { Loan } from "../modules/loan/models/loan.model.ts";
-import { Invoice } from "../modules/invoice/models/invoice.model.ts";
+import { Inspection, InspectionZodSchema } from "./models/inspection.model.ts";
+import { Loan } from "../loan/models/loan.model.ts";
+import { Invoice } from "../invoice/models/invoice.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
   getAuthUser,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const inspectionRouter = Router();
 

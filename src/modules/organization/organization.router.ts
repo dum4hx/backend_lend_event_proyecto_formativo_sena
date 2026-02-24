@@ -4,16 +4,16 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { organizationService } from "../modules/organization/organization.service.ts";
-import { OrganizationUpdateZodSchema } from "../modules/organization/models/organization.model.ts";
-import { subscriptionTypeService } from "../modules/subscription_type/subscription_type.service.ts";
-import { validateBody } from "../middleware/validation.ts";
+import { organizationService } from "./organization.service.ts";
+import { OrganizationUpdateZodSchema } from "./models/organization.model.ts";
+import { subscriptionTypeService } from "../subscription_type/subscription_type.service.ts";
+import { validateBody } from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
-} from "../middleware/auth.ts";
+} from "../../middleware/auth.ts";
 
 const organizationRouter = Router();
 

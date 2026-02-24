@@ -5,25 +5,25 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { Types } from "mongoose";
 import {
   Customer,
   CustomerZodSchema,
   CustomerUpdateZodSchema,
   documentTypes,
-} from "../modules/customer/models/customer.model.ts";
+} from "./models/customer.model.ts";
 import {
   validateBody,
   validateQuery,
   paginationSchema,
-} from "../middleware/validation.ts";
+} from "../../middleware/validation.ts";
 import {
   authenticate,
   requireActiveOrganization,
   requirePermission,
   getOrgId,
-} from "../middleware/auth.ts";
-import { AppError } from "../errors/AppError.ts";
+} from "../../middleware/auth.ts";
+import { Loan } from "../loan/models/loan.model.ts";
+import { AppError } from "../../errors/AppError.ts";
 
 const customerRouter = Router();
 
@@ -47,7 +47,6 @@ customerRouter.get(
   "/document-types",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-
       res.json({
         status: "success",
         data: {
@@ -259,7 +258,6 @@ customerRouter.delete(
       const customerId = req.params.id as string;
 
       // Check if customer has active loans
-      const { Loan } = await import("../modules/loan/models/loan.model.ts");
       const activeLoans = await Loan.countDocuments({
         customerId,
         status: { $in: ["active", "overdue"] },

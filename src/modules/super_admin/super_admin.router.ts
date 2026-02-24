@@ -4,8 +4,8 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { adminService } from "../modules/super_admin/super_admin.service.ts";
-import { authenticate, requireRole } from "../middleware/auth.ts";
+import { adminService } from "./super_admin.service.ts";
+import { authenticate, requireRole } from "../../middleware/auth.ts";
 
 const adminRouter = Router();
 
