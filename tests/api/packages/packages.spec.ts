@@ -22,7 +22,7 @@ test.describe("Packages Module", () => {
   });
 
   test("GET /packages - should list packages", async () => {
-    const res = await apiContext.get("/packages");
+    const res = await apiContext.get("packages");
     expect(res.status()).toBe(200);
   });
 });

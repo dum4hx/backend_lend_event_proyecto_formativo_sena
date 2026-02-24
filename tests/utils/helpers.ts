@@ -45,6 +45,7 @@ export const defaultOrgData = () => ({
     address: {
       street: "Calle 123 #45-67",
       city: "Bogotá",
+      state: "Cundinamarca",
       country: "Colombia",
       postalCode: "110111",
     },

@@ -27,6 +27,7 @@ import inspectionRouter from "./routers/inspection.router.ts";
 import invoiceRouter from "./routers/invoice.router.ts";
 import subscriptionTypeRouter from "./routers/subscription_type.router.ts";
 import { adminRouter } from "./routers/super_admin.router.ts";
+import rolesRouter from "./modules/roles/roles.router.ts";
 
 import { connectDB } from "./utils/db/connectDB.ts";
 import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
@@ -133,6 +134,7 @@ app.use(`${apiV1}/subscription-types`, subscriptionTypeRouter);
 // Admin routes (super admin analytics)
 app.use(`${apiV1}/admin`, adminRouter);
 
+app.use(`${apiV1}/roles`, rolesRouter);
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {

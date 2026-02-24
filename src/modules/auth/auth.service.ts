@@ -6,6 +6,8 @@ import {
   type UserInput,
   type UserRole,
 } from "../user/models/user.model.ts";
+import { defaultOrganizationRoles } from "../user/models/user.model.ts";
+import { Role } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { generateTokenPair, type TokenPair } from "../../utils/auth/jwt.ts";
 import {
@@ -151,6 +153,29 @@ export const authService = {
         status: "active",
       });
       const user = await userDoc.save({ session });
+
+      // Create default organization roles (owner, manager, warehouse_operator, commercial_advisor)
+      try {
+        const rolesToCreate = Object.entries(defaultOrganizationRoles).map(
+          ([name, perms]) => ({
+            organizationId: organization._id,
+            name,
+            permissions: perms,
+            description: `Default role: ${name}`,
+          }),
+        );
+        // Use insertMany within the transaction session
+        if (rolesToCreate.length > 0) {
+          await Role.insertMany(rolesToCreate as any[], { session });
+        }
+      } catch (err) {
+        // If role creation fails, abort transaction with a clear error
+        logger.error("Failed to create default roles", {
+          error: (err as Error).message,
+          organizationId: organization._id.toString(),
+        });
+        throw AppError.internal("Failed to initialize organization roles");
+      }
 
       // Generate tokens
       const tokens = await generateTokenPair({

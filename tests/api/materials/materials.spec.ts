@@ -16,7 +16,7 @@ test.describe("Materials Module", () => {
   });
 
   test("POST /materials/categories - should create category", async () => {
-    const res = await apiContext.post("/materials/categories", {
+    const res = await apiContext.post("materials/categories", {
       data: { name: `Cameras ${Date.now()}`, description: "Test Cat" },
     });
     expect(res.status()).toBe(201);
@@ -25,14 +25,14 @@ test.describe("Materials Module", () => {
   });
 
   test("GET /materials/categories - should list categories", async () => {
-    const res = await apiContext.get("/materials/categories");
+    const res = await apiContext.get("materials/categories");
     expect(res.status()).toBe(200);
   });
 
   // Dependent on category
   test("POST /materials/types - should create material type", async () => {
     if (!categoryId) test.skip();
-    const res = await apiContext.post("/materials/types", {
+    const res = await apiContext.post("materials/types", {
       data: {
         name: `Canon ${Date.now()}`,
         sku: `CAM-${Date.now()}`,
@@ -51,7 +51,7 @@ test.describe("Materials Module", () => {
   // Dependent on type
   test("POST /materials/instances - should create instance", async () => {
     if (!materialTypeId) test.skip();
-    const res = await apiContext.post("/materials/instances", {
+    const res = await apiContext.post("materials/instances", {
       data: {
         materialTypeId,
         serialNumber: `SN-${Date.now()}`,

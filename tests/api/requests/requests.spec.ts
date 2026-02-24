@@ -14,7 +14,7 @@ test.describe("Requests Module", () => {
   });
 
   test("GET /requests - should list requests", async () => {
-    const res = await apiContext.get("/requests");
+    const res = await apiContext.get("requests");
     expect(res.status()).toBe(200);
   });
 

@@ -70,6 +70,11 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "invoices:read",
     "invoices:update",
     "reports:read",
+    // Role management
+    "roles:create",
+    "roles:read",
+    "roles:update",
+    "roles:delete",
   ],
   owner: [
     // Full access
@@ -112,6 +117,11 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "invoices:read",
     "invoices:update",
     "reports:read",
+    // Role management
+    "roles:create",
+    "roles:read",
+    "roles:update",
+    "roles:delete",
     "analytics:read",
   ],
   manager: [

@@ -30,7 +30,7 @@ test.describe("Users Module", () => {
       role: "commercial_advisor",
     };
 
-    const response = await apiContext.post("/users/invite", {
+    const response = await apiContext.post("users/invite", {
       data: inviteData,
     });
 

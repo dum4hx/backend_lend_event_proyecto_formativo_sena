@@ -14,7 +14,7 @@ test.describe("Organization Module", () => {
   });
 
   test("GET /organization - should return org details", async () => {
-    const res = await apiContext.get("/organizations"); // Note: Endpoint in server.ts is plural? Checking API ref.
+    const res = await apiContext.get("organizations"); // Note: Endpoint in server.ts is plural? Checking API ref.
     // API Ref says GET /organization. Server.ts says /api/v1/organizations.
     // I will try /organizations based on server.ts route mount, but check if router handles root "/"
     // Usually routes are like: post /organizations -> create, get /organizations -> list (admin) or get /organizations/me
@@ -27,13 +27,13 @@ test.describe("Organization Module", () => {
     // The API Reference says "GET /organization". This might be a mismatch or `organizationRouter`
     // handles specific paths. For now I'll use `/organizations` based on server.ts.
 
-    const res2 = await apiContext.get("/organizations");
+    const res2 = await apiContext.get("organizations");
     // If that fails, might be /organization if mounted differently, but server.ts is source of truth.
     expect(res2.status()).toBe(200);
   });
 
   test("GET /organization/usage - should return usage", async () => {
-    const res = await apiContext.get("/organizations/usage");
+    const res = await apiContext.get("organizations/usage");
     // Again, checking path.
     expect(res.status().toString()).toMatch(/200|404/);
   });

@@ -29,13 +29,13 @@ test.describe("Customers Module", () => {
     };
 
     // Create
-    const createRes = await apiContext.post("/customers", {
+    const createRes = await apiContext.post("customers", {
       data: customerData,
     });
     expect(createRes.status()).toBe(201);
 
     // List
-    const listRes = await apiContext.get("/customers");
+    const listRes = await apiContext.get("customers");
     expect(listRes.status()).toBe(200);
     const body = await listRes.json();
     const found = body.data.customers.find((c: any) => c.idNumber === idNumber);

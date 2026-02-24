@@ -14,7 +14,7 @@ test.describe("Loans Module", () => {
   });
 
   test("GET /loans - should list active loans", async () => {
-    const res = await apiContext.get("/loans");
+    const res = await apiContext.get("loans");
     expect(res.status()).toBe(200);
   });
 });

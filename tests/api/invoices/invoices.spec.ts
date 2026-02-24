@@ -14,7 +14,7 @@ test.describe("Invoices Module", () => {
   });
 
   test("GET /invoices - should list invoices", async () => {
-    const res = await apiContext.get("/invoices");
+    const res = await apiContext.get("invoices");
     expect(res.status()).toBe(200);
   });
 });

@@ -14,7 +14,7 @@ test.describe("Inspections Module", () => {
   });
 
   test("GET /inspections - should list inspections", async () => {
-    const res = await apiContext.get("/inspections");
+    const res = await apiContext.get("inspections");
     expect(res.status()).toBe(200);
   });
 });
