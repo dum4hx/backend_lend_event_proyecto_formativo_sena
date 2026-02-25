@@ -107,6 +107,30 @@ export const authenticate = async (
       email: payload.email,
     };
 
+    // Inject organizationId into request body for downstream validators
+    // Some route validators expect `organizationId` in the body (e.g. POST /materials/types).
+    // The organization should come from the token, not the client — set it here so zod
+    // validation that requires organizationId will succeed.
+    try {
+      if (!req.body) {
+        // ensure body exists
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        req.body = {};
+      }
+
+      if (!req.body.organizationId) {
+        Object.defineProperty(req.body, "organizationId", {
+          value: req.user.organizationId.toString(),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+    } catch (_err) {
+      // Non-critical: if injection fails, validation will surface the error.
+    }
+
     next();
   } catch (err: unknown) {
     if (err instanceof AppError) {

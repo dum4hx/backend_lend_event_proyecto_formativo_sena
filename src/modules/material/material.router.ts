@@ -110,6 +110,42 @@ materialRouter.post(
 );
 
 /**
+ * PATCH /api/v1/materials/categories/:id
+ * Updates a material category.
+ */
+materialRouter.patch(
+  "/categories/:id",
+  requirePermission("materials:update"),
+  validateBody(CategoryZodSchema.partial()),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const category = await Category.findById(req.params.id);
+
+      if (!category) {
+        throw AppError.notFound("Category not found");
+      }
+
+      // Ensure the category belongs to the authenticated user's organization
+      if (category.organizationId.toString() !== getOrgId(req).toString()) {
+        throw AppError.notFound("Category not found");
+      }
+
+      // Apply partial updates
+      Object.assign(category, req.body);
+
+      await category.save();
+
+      res.json({
+        status: "success",
+        data: { category },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * DELETE /api/v1/materials/categories/:id
  * Deletes a material category. Uses materialService to ensure no linked types.
  */
