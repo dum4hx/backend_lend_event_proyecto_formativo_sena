@@ -5,6 +5,7 @@ import {
   type SubscriptionTypeDocument,
 } from "./models/subscription_type.model.ts";
 import { AppError } from "../../errors/AppError.ts";
+import { logger } from "../../utils/logger.ts";
 
 /* ---------- Plan Limits Interface ---------- */
 
@@ -342,6 +343,7 @@ export const subscriptionTypeService = {
       },
     ];
 
+    logger.info("Seeding default subscription types...");
     await SubscriptionType.insertMany(defaults);
     this.invalidateCache();
   },

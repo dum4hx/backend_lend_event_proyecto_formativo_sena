@@ -310,13 +310,13 @@ export const authService = {
 
     // Check if user already exists in org
     const existingUser = await User.findOne({
-      organizationId,
       email: userData.email.toLowerCase(),
     });
 
     if (existingUser) {
       throw AppError.conflict(
         "A user with this email already exists in this organization",
+        { code: "USER_EMAIL_ALREADY_EXISTS" },
       );
     }
 

@@ -21,15 +21,33 @@ export const userRoleOptions = [
 
 export type UserRole = (typeof userRoleOptions)[number];
 
+/**
+ * Organization-level roles — excludes `super_admin` which is a
+ * platform-only role and must never be assignable inside an organization.
+ */
+export const organizationRoleOptions = [
+  "owner",
+  "manager",
+  "warehouse_operator",
+  "commercial_advisor",
+] as const;
+
+export type OrganizationRole = (typeof organizationRoleOptions)[number];
+
+// Super admin only permissions (for platform management)
+export const super_admin_permsissions = [
+  "subscription_types:create",
+  "subscription_types:read",
+  "subscription_types:update",
+  "subscription_types:delete",
+  "platform:manage",
+] as const;
+
 // Role permissions map
 export const rolePermissions: Record<UserRole, string[]> = {
   super_admin: [
     // Super admin has full platform access
-    "subscription_types:create",
-    "subscription_types:read",
-    "subscription_types:update",
-    "subscription_types:delete",
-    "platform:manage",
+    ...super_admin_permsissions,
     // Also includes all owner permissions
     "organization:read",
     "organization:update",
@@ -172,7 +190,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
   ],
 };
 
-export const defaultOrganizationRoles = {
+export const defaultOrganizationRoles: Record<OrganizationRole, string[]> = {
   owner: rolePermissions.owner,
   manager: rolePermissions.manager,
   warehouse_operator: rolePermissions.warehouse_operator,
@@ -213,7 +231,7 @@ export const UserZodSchema = z.object({
       /[^A-Za-z0-9]/,
       "Password must contain at least one special character",
     ),
-  role: z.enum(userRoleOptions).default("commercial_advisor"),
+  role: z.enum(organizationRoleOptions).default("commercial_advisor"),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
   }),

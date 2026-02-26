@@ -143,7 +143,8 @@ const startServer = async (): Promise<void> => {
     await connectDB();
 
     // Seed default subscription types if none exist
-    await subscriptionTypeService.seedDefaults();
+    // TODO: consider using seeder
+    // await subscriptionTypeService.seedDefaults();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

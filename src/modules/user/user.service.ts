@@ -141,6 +141,13 @@ export const userService = {
       );
     }
 
+    // Cannot assign super_admin role (platform-only)
+    if (newRole === "super_admin") {
+      throw AppError.badRequest(
+        "Cannot assign the super_admin role to organization users",
+      );
+    }
+
     // Cannot promote to owner
     if (newRole === "owner") {
       throw AppError.badRequest("Cannot promote user to owner role");

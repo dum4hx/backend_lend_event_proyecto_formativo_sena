@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
 import {
-  userRoleOptions,
+  organizationRoleOptions,
   rolePermissions,
 } from "../../user/models/user.model.ts";
 
@@ -9,9 +9,13 @@ import {
 export const RoleZodSchema = z.object({
   name: z
     .string()
-    .refine((val) => (userRoleOptions as readonly string[]).includes(val), {
-      message: "Invalid role name",
-    }),
+    .refine(
+      (val) =>
+        (organizationRoleOptions as readonly string[]).includes(val),
+      {
+        message: "Invalid role name. Must be one of: " + organizationRoleOptions.join(", "),
+      },
+    ),
   permissions: z.array(z.string()).optional(),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
@@ -33,7 +37,7 @@ const roleSchema = new Schema(
     name: {
       type: String,
       required: true,
-      enum: userRoleOptions as unknown as string[],
+      enum: organizationRoleOptions as unknown as string[],
       trim: true,
     },
     permissions: {

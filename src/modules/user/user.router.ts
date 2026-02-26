@@ -7,7 +7,11 @@ import {
 import { z } from "zod";
 import { userService } from "./user.service.ts";
 import { authService } from "../auth/auth.service.ts";
-import { UserUpdateZodSchema, userRoleOptions } from "./models/user.model.ts";
+import {
+  UserUpdateZodSchema,
+  organizationRoleOptions,
+  userRoleOptions,
+} from "./models/user.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -43,11 +47,11 @@ const inviteUserSchema = z.object({
   }),
   email: z.email(),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
-  role: z.enum(userRoleOptions).default("commercial_advisor"),
+  role: z.enum(organizationRoleOptions).default("commercial_advisor"),
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(userRoleOptions),
+  role: z.enum(organizationRoleOptions),
 });
 
 /* ---------- Routes ---------- */
