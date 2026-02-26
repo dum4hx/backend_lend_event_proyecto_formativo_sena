@@ -13,10 +13,7 @@ import {
   MaterialInstance,
   MaterialInstanceZodSchema,
 } from "./models/material_instance.model.ts";
-import {
-  Category,
-  CategoryZodSchema,
-} from "./models/category.model.ts";
+import { Category, CategoryZodSchema } from "./models/category.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import {
   validateBody,
@@ -152,7 +149,7 @@ materialRouter.patch(
 materialRouter.delete(
   "/categories/:id",
   requirePermission("materials:delete"),
-  async (req: Request<{id: string}>, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
 
@@ -270,6 +267,17 @@ materialRouter.post(
       await organizationService.incrementCatalogItemCount(organizationId);
 
       try {
+        // Validate if category exists and belongs to the organization
+        if (req.body.categoryId) {
+          const category = await Category.findById(req.body.categoryId);
+          if (
+            !category ||
+            category.organizationId.toString() !== organizationId.toString()
+          ) {
+            throw AppError.notFound("Category not found");
+          }
+        }
+
         const materialType = await MaterialModel.create(req.body);
 
         res.status(201).json({
@@ -295,7 +303,7 @@ materialRouter.patch(
   "/types/:id",
   requirePermission("materials:update"),
   validateBody(MaterialModelZodSchema.partial()),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const materialType = await MaterialModel.findByIdAndUpdate(
         req.params.id,
@@ -324,7 +332,7 @@ materialRouter.patch(
 materialRouter.delete(
   "/types/:id",
   requirePermission("materials:delete"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const materialTypeId = req.params.id as string;
 

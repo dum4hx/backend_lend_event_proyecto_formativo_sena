@@ -34,9 +34,34 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    /* Setup: register + login, saves regular-user storageState */
+    {
+      name: "auth-setup",
+      testDir: "./tests/api/auth",
+      use: { storageState: undefined },
+    },
+    /* Setup: login as super_admin, saves admin storageState */
+    {
+      name: "admin-setup",
+      testDir: "./tests/setup",
+      use: { storageState: undefined },
+    },
+    /* Regular API tests — pre-loaded with regular-user cookies */
     {
       name: "api",
       testDir: "./tests/api",
+      testIgnore: ["**/auth/**", "**/super_admin/**"],
+      dependencies: ["auth-setup"],
+    },
+    /* Super-admin tests — pre-loaded with admin cookies */
+    {
+      name: "admin-api",
+      testDir: "./tests/api/super_admin",
+      testIgnore: ["**/super_admin.spec.ts"],
+      dependencies: ["auth-setup", "admin-setup"],
+      use: {
+        storageState: "tests/utils/auth/adminStorageState.json",
+      },
     },
   ],
 });

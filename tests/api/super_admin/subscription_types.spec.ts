@@ -1,29 +1,24 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { loginAsSuperAdmin, createAndLoginUser } from "../../utils/setup.ts";
+import { createRegularUserContext } from "../../utils/setup.ts";
 
 test.describe("Super Admin - Subscription Types Management", () => {
-  let superAdminContext: APIRequestContext;
   let regularUserContext: APIRequestContext;
 
   test.beforeAll(async ({ baseURL }) => {
-    // Login as super_admin
-    const superAdmin = await loginAsSuperAdmin(baseURL!);
-    superAdminContext = superAdmin.apiContext;
-
-    // Create regular user for permission tests
-    const regularUser = await createAndLoginUser(baseURL!);
-    regularUserContext = regularUser.apiContext;
+    // Create regular user context using saved storage state
+    regularUserContext = await createRegularUserContext(baseURL!);
   });
 
   test.afterAll(async () => {
-    await superAdminContext.dispose();
     await regularUserContext.dispose();
   });
 
   /* ---------- Public Endpoints ---------- */
 
-  test("GET /subscription-types - should list active subscription types (public)", async () => {
-    const response = await superAdminContext.get("/subscription-types");
+  test("GET /subscription-types - should list active subscription types (public)", async ({
+    request,
+  }) => {
+    const response = await request.get("/subscription-types");
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -38,8 +33,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(plans).toContain("starter");
   });
 
-  test("GET /subscription-types/:plan - should get specific plan", async () => {
-    const response = await superAdminContext.get("/subscription-types/starter");
+  test("GET /subscription-types/:plan - should get specific plan", async ({
+    request,
+  }) => {
+    const response = await request.get("/subscription-types/starter");
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -49,8 +46,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.data.billingModel).toMatch(/^(fixed|dynamic)$/);
   });
 
-  test("GET /subscription-types/:plan - should return 404 for non-existent plan", async () => {
-    const response = await superAdminContext.get(
+  test("GET /subscription-types/:plan - should return 404 for non-existent plan", async ({
+    request,
+  }) => {
+    const response = await request.get(
       "/subscription-types/nonexistent_plan_xyz",
     );
     expect(response.status()).toBe(404);
@@ -58,10 +57,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
 
   /* ---------- Super Admin Only Endpoints ---------- */
 
-  test("GET /subscription-types/admin/all - should list all types including inactive (super admin)", async () => {
-    const response = await superAdminContext.get(
-      "/subscription-types/admin/all",
-    );
+  test("GET /subscription-types/admin/all - should list all types including inactive (super admin)", async ({
+    request,
+  }) => {
+    const response = await request.get("/subscription-types/admin/all");
     expect(response.status()).toBe(200);
 
     const body = await response.json();
@@ -69,14 +68,18 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(Array.isArray(body.data.subscriptionTypes)).toBeTruthy();
   });
 
-  test("GET /subscription-types/admin/all - should deny access to regular users", async () => {
+  test("GET /subscription-types/admin/all - should deny access to regular users", async ({
+    request,
+  }) => {
     const response = await regularUserContext.get(
       "/subscription-types/admin/all",
     );
     expect(response.status()).toBe(401);
   });
 
-  test("POST /subscription-types - should create new subscription type (super admin)", async () => {
+  test("POST /subscription-types - should create new subscription type (super admin)", async ({
+    request,
+  }) => {
     const uniquePlan = `test_plan_${Date.now()}`;
     const newPlan = {
       plan: uniquePlan,
@@ -90,7 +93,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
       features: ["Feature 1", "Feature 2", "Feature 3"],
     };
 
-    const response = await superAdminContext.post("/subscription-types", {
+    const response = await request.post("/subscription-types", {
       data: newPlan,
     });
 
@@ -105,7 +108,9 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.data.subscriptionType.status).toBe("active");
   });
 
-  test("POST /subscription-types - should deny creation to regular users", async () => {
+  test("POST /subscription-types - should deny creation to regular users", async ({
+    request,
+  }) => {
     const response = await regularUserContext.post("/subscription-types", {
       data: {
         plan: "hacker_plan",
@@ -119,8 +124,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(response.status()).toBe(401);
   });
 
-  test("POST /subscription-types - should reject invalid plan name", async () => {
-    const response = await superAdminContext.post("/subscription-types", {
+  test("POST /subscription-types - should reject invalid plan name", async ({
+    request,
+  }) => {
+    const response = await request.post("/subscription-types", {
       data: {
         plan: "Invalid Plan Name!", // Contains spaces and special chars
         displayName: "Invalid",
@@ -133,9 +140,11 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(response.status()).toBe(400);
   });
 
-  test("POST /subscription-types - should reject duplicate plan", async () => {
+  test("POST /subscription-types - should reject duplicate plan", async ({
+    request,
+  }) => {
     // Try to create a plan that already exists
-    const response = await superAdminContext.post("/subscription-types", {
+    const response = await request.post("/subscription-types", {
       data: {
         plan: "starter", // Already exists from seeding
         displayName: "Duplicate Starter",
@@ -148,10 +157,12 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(response.status()).toBe(409); // Conflict
   });
 
-  test("PATCH /subscription-types/:plan - should update subscription type (super admin)", async () => {
+  test("PATCH /subscription-types/:plan - should update subscription type (super admin)", async ({
+    request,
+  }) => {
     // First create a plan to update
     const uniquePlan = `update_test_${Date.now()}`;
-    await superAdminContext.post("/subscription-types", {
+    await request.post("/subscription-types", {
       data: {
         plan: uniquePlan,
         displayName: "Original Name",
@@ -162,16 +173,13 @@ test.describe("Super Admin - Subscription Types Management", () => {
     });
 
     // Update the plan
-    const response = await superAdminContext.patch(
-      `/subscription-types/${uniquePlan}`,
-      {
-        data: {
-          displayName: "Updated Name",
-          baseCost: 2000,
-          features: ["New Feature"],
-        },
+    const response = await request.patch(`/subscription-types/${uniquePlan}`, {
+      data: {
+        displayName: "Updated Name",
+        baseCost: 2000,
+        features: ["New Feature"],
       },
-    );
+    });
 
     expect(response.status()).toBe(200);
 
@@ -182,7 +190,9 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.data.subscriptionType.features).toContain("New Feature");
   });
 
-  test("PATCH /subscription-types/:plan - should deny update to regular users", async () => {
+  test("PATCH /subscription-types/:plan - should deny update to regular users", async ({
+    request,
+  }) => {
     const response = await regularUserContext.patch(
       "/subscription-types/starter",
       {
@@ -193,10 +203,12 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(response.status()).toBe(401);
   });
 
-  test("DELETE /subscription-types/:plan - should deactivate subscription type (super admin)", async () => {
+  test("DELETE /subscription-types/:plan - should deactivate subscription type (super admin)", async ({
+    request,
+  }) => {
     // First create a plan to deactivate
     const uniquePlan = `delete_test_${Date.now()}`;
-    await superAdminContext.post("/subscription-types", {
+    await request.post("/subscription-types", {
       data: {
         plan: uniquePlan,
         displayName: "To Be Deleted",
@@ -207,9 +219,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
     });
 
     // Deactivate the plan
-    const response = await superAdminContext.delete(
-      `/subscription-types/${uniquePlan}`,
-    );
+    const response = await request.delete(`/subscription-types/${uniquePlan}`);
 
     expect(response.status()).toBe(200);
 
@@ -218,7 +228,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.message).toContain("deactivated");
 
     // Verify it's no longer in public list
-    const listResponse = await superAdminContext.get("/subscription-types");
+    const listResponse = await request.get("/subscription-types");
     const listBody = await listResponse.json();
     const plans = listBody.data.subscriptionTypes.map(
       (st: { plan: string }) => st.plan,
@@ -226,7 +236,9 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(plans).not.toContain(uniquePlan);
   });
 
-  test("DELETE /subscription-types/:plan - should deny deletion to regular users", async () => {
+  test("DELETE /subscription-types/:plan - should deny deletion to regular users", async ({
+    request,
+  }) => {
     const response = await regularUserContext.delete(
       "/subscription-types/starter",
     );
@@ -236,8 +248,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
 
   /* ---------- Cost Calculation (Public) ---------- */
 
-  test("POST /subscription-types/:plan/calculate-cost - should calculate cost", async () => {
-    const response = await superAdminContext.post(
+  test("POST /subscription-types/:plan/calculate-cost - should calculate cost", async ({
+    request,
+  }) => {
+    const response = await request.post(
       "/subscription-types/starter/calculate-cost",
       {
         data: { seatCount: 5 },
@@ -256,8 +270,10 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.data.currency).toBe("usd");
   });
 
-  test("POST /subscription-types/:plan/calculate-cost - should reject invalid seat count", async () => {
-    const response = await superAdminContext.post(
+  test("POST /subscription-types/:plan/calculate-cost - should reject invalid seat count", async ({
+    request,
+  }) => {
+    const response = await request.post(
       "/subscription-types/starter/calculate-cost",
       {
         data: { seatCount: -1 },

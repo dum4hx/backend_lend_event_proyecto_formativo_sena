@@ -1,20 +1,8 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
-import { createAndLoginUser } from "../../utils/setup.ts";
+import { test, expect } from "@playwright/test";
 
 test.describe("Roles Module", () => {
-  let apiContext: APIRequestContext;
-
-  test.beforeAll(async ({ baseURL }) => {
-    const setup = await createAndLoginUser(baseURL!);
-    apiContext = setup.apiContext;
-  });
-
-  test.afterAll(async () => {
-    await apiContext.dispose();
-  });
-
-  test("GET /roles - should list default roles", async () => {
-    const res = await apiContext.get("roles");
+  test("GET /roles - should list default roles", async ({ request }) => {
+    const res = await request.get("roles");
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("success");
@@ -24,14 +12,16 @@ test.describe("Roles Module", () => {
     expect(names).toContain("owner");
   });
 
-  test("POST /roles - should create a new org-level role", async () => {
+  test("POST /roles - should create a new org-level role", async ({
+    request,
+  }) => {
     const payload = {
       name: "super_admin",
       permissions: ["organization:read", "roles:read"],
       description: "Test org-level super admin",
     };
 
-    const res = await apiContext.post("roles", { data: payload });
+    const res = await request.post("roles", { data: payload });
     expect(res.status()).toBe(201);
     const body = await res.json();
     expect(body.status).toBe("success");
@@ -42,13 +32,13 @@ test.describe("Roles Module", () => {
     const createdId = body.data.role._id as string;
 
     // GET the created role
-    const getRes = await apiContext.get(`roles/${createdId}`);
+    const getRes = await request.get(`roles/${createdId}`);
     expect(getRes.status()).toBe(200);
     const getBody = await getRes.json();
     expect(getBody.data.role._id).toBe(createdId);
 
     // Update the role
-    const updateRes = await apiContext.patch(`roles/${createdId}`, {
+    const updateRes = await request.patch(`roles/${createdId}`, {
       data: { description: "Updated description" },
     });
     expect(updateRes.status()).toBe(200);
