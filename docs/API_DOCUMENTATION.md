@@ -816,6 +816,155 @@ Permanently deletes a user.
 
 ---
 
+---
+
+### Roles Endpoints
+
+The roles API manages organization-scoped roles and permissions. All routes require an authenticated user and an active organization.
+
+#### GET /roles
+
+List roles for the current organization. Supports pagination and sorting (see pagination parameters above).
+
+**Permission Required:** `roles:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "_id": "507f1f77bcf86cd799439012",
+        "name": "owner",
+        "permissions": ["organization:read"],
+        "description": "Organization owner"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20
+  }
+}
+```
+
+---
+
+#### GET /roles/:id
+
+Get details for a single role within the organization.
+
+| Parameter | Location | Type   | Required | Description           |
+| --------- | -------- | ------ | -------- | --------------------- |
+| id        | path     | string | Yes      | Role MongoDB ObjectId |
+
+**Permission Required:** `roles:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "role": {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "owner",
+      "permissions": ["organization:read"],
+      "description": "Organization owner"
+    }
+  }
+}
+```
+
+---
+
+#### POST /roles
+
+Create a new role for the current organization.
+
+| Parameter   | Location | Type     | Required | Description                          |
+| ----------- | -------- | -------- | -------- | ------------------------------------ |
+| name        | body     | string   | Yes      | Role identifier (e.g. `manager`)     |
+| permissions | body     | string[] | Yes      | Array of permission strings          |
+| description | body     | string   | No       | Human readable description (max 500) |
+
+**Permission Required:** `roles:create`
+
+**Notes:**
+
+- The platform `super_admin` permissions set is restricted and cannot be assigned to organization roles.
+
+**Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "role": {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "manager",
+      "permissions": ["materials:read", "requests:approve"],
+      "description": "Operations manager"
+    }
+  }
+}
+```
+
+---
+
+#### PATCH /roles/:id
+
+Update an existing role. Only provided fields are updated.
+
+| Parameter   | Location | Type     | Required | Description                                |
+| ----------- | -------- | -------- | -------- | ------------------------------------------ |
+| id          | path     | string   | Yes      | Role MongoDB ObjectId                      |
+| name        | body     | string   | No       | New role name (cannot be `super_admin`)    |
+| permissions | body     | string[] | No       | Updated permissions (no super_admin perms) |
+| description | body     | string   | No       | Updated description                        |
+
+**Permission Required:** `roles:update`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "role": {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "manager",
+      "permissions": ["materials:read"],
+      "description": "Updated"
+    }
+  }
+}
+```
+
+---
+
+#### DELETE /roles/:id
+
+Delete a role belonging to the current organization.
+
+| Parameter | Location | Type   | Required | Description           |
+| --------- | -------- | ------ | -------- | --------------------- |
+| id        | path     | string | Yes      | Role MongoDB ObjectId |
+
+**Permission Required:** `roles:delete`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Role deleted successfully"
+}
+```
+
+---
+
 ### Organization Endpoints
 
 #### GET /organizations
