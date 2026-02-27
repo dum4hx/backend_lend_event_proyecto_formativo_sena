@@ -1712,6 +1712,274 @@ Blacklists a customer.
 Soft deletes a customer (sets status to inactive).
 
 ---
+## Location Endpoints
+
+Manage physical locations such as warehouses, offices, and operation points within an organization.
+
+### GET /locations
+
+Retrieves a paginated list of all locations in the organization.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:read`
+
+#### Query Parameters
+
+| Parameter | Type    | Required | Default | Description                                    |
+| --------- | ------- | -------- | ------- | ---------------------------------------------- |
+| page      | integer | No       | 1       | Page number for pagination                     |
+| limit     | integer | No       | 20      | Number of items per page (max: 100)           |
+| search    | string  | No       | -       | Search by location name, street, or city       |
+| city      | string  | No       | -       | Filter by exact city name (case-insensitive)   |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Locations fetched successfully",
+  "data": {
+    "items": [
+      {
+        "_id": "507f1f77bcf86cd799439011",
+        "name": "Bodega Principal",
+        "organizationId": "507f1f77bcf86cd799439012",
+        "address": {
+          "country": "CO",
+          "state": "Cundinamarca",
+          "city": "Bogotá",
+          "street": "Calle 10",
+          "propertyNumber": "45-20",
+          "additionalInfo": "Piso 2"
+        },
+        "createdAt": "2026-02-20T10:30:00.000Z",
+        "updatedAt": "2026-02-20T10:30:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 15,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+---
+
+### GET /locations/:id
+
+Retrieves a single location by its ID.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:read`
+
+#### Path Parameters
+
+| Parameter | Type   | Required | Description               |
+| --------- | ------ | -------- | ------------------------- |
+| id        | string | Yes      | Location MongoDB ObjectId |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Location fetched successfully",
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Bodega Principal",
+    "organizationId": "507f1f77bcf86cd799439012",
+    "address": {
+      "country": "CO",
+      "state": "Cundinamarca",
+      "city": "Bogotá",
+      "street": "Calle 10",
+      "propertyNumber": "45-20",
+      "additionalInfo": "Piso 2"
+    },
+    "createdAt": "2026-02-20T10:30:00.000Z",
+    "updatedAt": "2026-02-20T10:30:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+- **400 Bad Request** – Invalid location ID format
+- **404 Not Found** – Location does not exist
+
+---
+
+### POST /locations
+
+Creates a new location in the organization.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:create`
+
+#### Request Body
+
+| Field                  | Type   | Required | Constraints           | Description                        |
+| ---------------------- | ------ | -------- | --------------------- | ---------------------------------- |
+| name                   | string | Yes      | 1-100 characters      | Location name                      |
+| address.country        | string | Yes      | 1-50 characters       | Country code or name               |
+| address.state          | string | No       | Max 100 characters    | State or region                    |
+| address.city           | string | Yes      | 1-100 characters      | City name                          |
+| address.street         | string | Yes      | 1-100 characters      | Street name                        |
+| address.propertyNumber | string | Yes      | 1-50 characters       | Building/property number           |
+| address.additionalInfo | string | No       | Max 200 characters    | Floor, suite, additional details   |
+
+#### Example Request
+
+```json
+{
+  "name": "Bodega Norte",
+  "address": {
+    "country": "Colombia",
+    "state": "Antioquia",
+    "city": "Medellín",
+    "street": "Carrera 50",
+    "propertyNumber": "32-10",
+    "additionalInfo": "Bodega 3, entrada por el costado"
+  }
+}
+```
+
+#### Success Response (201 Created)
+
+```json
+{
+  "status": "success",
+  "message": "Location created successfully",
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "name": "Bodega Norte",
+    "organizationId": "507f1f77bcf86cd799439012",
+    "address": {
+      "country": "Colombia",
+      "state": "Antioquia",
+      "city": "Medellín",
+      "street": "Carrera 50",
+      "propertyNumber": "32-10",
+      "additionalInfo": "Bodega 3, entrada por el costado"
+    },
+    "createdAt": "2026-02-27T15:45:00.000Z",
+    "updatedAt": "2026-02-27T15:45:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+- **400 Bad Request** – Validation errors (missing required fields, invalid format)
+- **409 Conflict** – Location with the same name already exists in the organization
+
+---
+
+### PATCH /locations/:id
+
+Updates an existing location (partial update).
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:update`
+
+#### Path Parameters
+
+| Parameter | Type   | Required | Description               |
+| --------- | ------ | -------- | ------------------------- |
+| id        | string | Yes      | Location MongoDB ObjectId |
+
+#### Request Body
+
+Same fields as POST, but all are optional. Only provided fields will be updated.
+
+#### Example Request
+
+```json
+{
+  "address": {
+    "state": "Cundinamarca",
+    "additionalInfo": "Piso 3, oficina 301"
+  }
+}
+```
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Location updated successfully",
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Bodega Principal",
+    "organizationId": "507f1f77bcf86cd799439012",
+    "address": {
+      "country": "CO",
+      "state": "Cundinamarca",
+      "city": "Bogotá",
+      "street": "Calle 10",
+      "propertyNumber": "45-20",
+      "additionalInfo": "Piso 3, oficina 301"
+    },
+    "createdAt": "2026-02-20T10:30:00.000Z",
+    "updatedAt": "2026-02-27T16:00:00.000Z"
+  }
+}
+```
+
+#### Error Responses
+
+- **400 Bad Request** – Invalid location ID or validation errors
+- **404 Not Found** – Location does not exist
+
+---
+
+### DELETE /locations/:id
+
+Deletes a location from the organization.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:delete`
+
+#### Path Parameters
+
+| Parameter | Type   | Required | Description               |
+| --------- | ------ | -------- | ------------------------- |
+| id        | string | Yes      | Location MongoDB ObjectId |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Location deleted successfully",
+  "data": null
+}
+```
+
+#### Error Responses
+
+- **400 Bad Request** – Invalid location ID format
+- **404 Not Found** – Location does not exist
+- **409 Conflict** – Location is assigned to material instances and cannot be deleted
+
+---
+
+### Location Permissions by Role
+
+| Role                 | locations:read | locations:create | locations:update | locations:delete |
+| -------------------- | -------------- | ---------------- | ---------------- | ---------------- |
+| super_admin          | Yes            | Yes              | Yes              | Yes              |
+| owner                | Yes            | Yes              | Yes              | Yes              |
+| manager              | Yes            | Yes              | Yes              | Yes              |
+| warehouse_operator   | Yes            | No               | No               | No               |
+| commercial_advisor   | Yes            | No               | No               | No               |
+
+---
+
 
 ### Material Endpoints
 

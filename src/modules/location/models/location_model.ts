@@ -8,6 +8,17 @@ const addressSchema = z.object({
     .min(1, "Country is required")
     .max(50, "Maximum 50 characters")
     .trim(),
+  state: z
+    .string()
+    .max(100, "Maximum 100 characters")
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  city: z
+    .string()
+    .min(1, "City is required")
+    .max(100, "Maximum 100 characters")
+    .trim(),
   street: z
     .string()
     .min(1, "Street is required")
@@ -46,6 +57,17 @@ const locationAddressSchema = new Schema(
       maxlength: 50,
       trim: true,
     },
+    state: {
+      type: String,
+      maxlength: 100,
+      trim: true,
+    },
+    city: {
+      type: String,
+      required: true,
+      maxlength: 100,
+      trim: true,
+    },
     street: {
       type: String,
       required: true,
@@ -77,7 +99,6 @@ const locationSchema = new Schema(
       required: true,
       maxlength: 100,
       trim: true,
-      unique: true,
     },
     organizationId: {
       type: Schema.Types.ObjectId,
@@ -93,6 +114,8 @@ const locationSchema = new Schema(
     timestamps: true,
   },
 );
+
+locationSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
 export type LocationDocument = InferSchemaType<typeof locationSchema>;
 export const Location = model<LocationDocument>("Location", locationSchema);
