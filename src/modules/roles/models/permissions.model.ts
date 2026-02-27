@@ -20,6 +20,7 @@ export const permissionCategories = [
   "Roles",
   "Subscription_types",
   "Subscription",
+  "Permissions",
 ] as const;
 
 export type PermissionCategory = (typeof permissionCategories)[number];
@@ -66,6 +67,14 @@ const permissionSchema = new Schema(
       enum: permissionCategories,
       required: true,
       index: true,
+    },
+    /**
+     * Indicates if this is a platform-level permission that should only be assignable to system roles, or an organization-level permission that can be assigned to custom roles. This allows us to enforce that certain critical permissions are only granted to system-defined roles and not accidentally assigned to custom roles.
+     */
+    isPlatformPermission: {
+      type: Boolean,
+      default: false,
+      required: true,
     },
     /**
      * Allows to "soft-disable" a feature across the app

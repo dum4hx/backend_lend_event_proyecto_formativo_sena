@@ -33,6 +33,10 @@ export const super_admin_permsissions = [
   "subscription_types:update",
   "subscription_types:delete",
   "platform:manage",
+  "permissions:create",
+  "permissions:read",
+  "permissions:update",
+  "permissions:delete",
 ] as const;
 
 // Role permissions map
@@ -87,7 +91,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "roles:delete",
   ],
   owner: [
-    // Full access
+    // Full organization access except platform management
     "organization:read",
     "organization:update",
     "organization:delete",
@@ -132,6 +136,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "roles:read",
     "roles:update",
     "roles:delete",
+    "permissions:read",
     "analytics:read",
   ],
   manager: [
