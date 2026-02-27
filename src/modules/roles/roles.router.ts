@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 import rolesService from "./roles.service.ts";
 import { RoleZodSchema } from "./models/role.model.ts";
-import { super_admin_permsissions } from "../user/models/user.model.ts";
+import { super_admin_permsissions } from "./models/role.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -43,8 +43,7 @@ const createRoleSchema = RoleZodSchema.pick({
   permissions: true,
   description: true,
 }).refine(
-  (data) =>
-    !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
+  (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
   {
     message:
       "One or more permissions are restricted to the platform super-admin",
@@ -64,8 +63,7 @@ const updateRoleSchema = z
     path: ["name"],
   })
   .refine(
-    (data) =>
-      !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
+    (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
     {
       message:
         "One or more permissions are restricted to the platform super-admin",

@@ -12,6 +12,7 @@ import rolesRouter from "../modules/roles/roles.router.ts";
 import subscriptionTypeRouter from "../modules/subscription_type/subscription_type.router.ts";
 import userRouter from "../modules/user/user.router.ts";
 import { adminRouter } from "../modules/super_admin/super_admin.router.ts";
+import permissionsRouter from "../modules/permissions/permission.router.ts";
 
 export {
   authRouter,
@@ -28,4 +29,5 @@ export {
   subscriptionTypeRouter,
   userRouter,
   adminRouter,
+  permissionsRouter,
 };

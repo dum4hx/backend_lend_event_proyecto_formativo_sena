@@ -121,7 +121,12 @@ app.use(`${apiV1}/subscription-types`, routers.subscriptionTypeRouter);
 // Admin routes (super admin analytics)
 app.use(`${apiV1}/admin`, routers.adminRouter);
 
+// Role management routes
 app.use(`${apiV1}/roles`, routers.rolesRouter);
+
+// Permission management routes
+app.use(`${apiV1}/permissions`, routers.permissionsRouter);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {
