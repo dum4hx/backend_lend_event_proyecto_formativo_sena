@@ -8,194 +8,7 @@ import {
   Types,
   type ValidatorProps,
 } from "mongoose";
-
-/* ---------- User Roles (RBAC) ---------- */
-
-export const userRoleOptions = [
-  "super_admin", // Software owner
-  "owner",
-  "manager",
-  "warehouse_operator",
-  "commercial_advisor",
-] as const;
-
-export type UserRole = (typeof userRoleOptions)[number];
-
-/**
- * Organization-level roles — excludes `super_admin` which is a
- * platform-only role and must never be assignable inside an organization.
- */
-export const organizationRoleOptions = [
-  "owner",
-  "manager",
-  "warehouse_operator",
-  "commercial_advisor",
-] as const;
-
-export type OrganizationRole = (typeof organizationRoleOptions)[number];
-
-// Super admin only permissions (for platform management)
-export const super_admin_permsissions = [
-  "subscription_types:create",
-  "subscription_types:read",
-  "subscription_types:update",
-  "subscription_types:delete",
-  "platform:manage",
-] as const;
-
-// Role permissions map
-export const rolePermissions: Record<UserRole, string[]> = {
-  super_admin: [
-    // Super admin has full platform access
-    ...super_admin_permsissions,
-    // Also includes all owner permissions
-    "organization:read",
-    "organization:update",
-    "organization:delete",
-    "billing:manage",
-    "subscription:manage",
-    "users:create",
-    "users:read",
-    "users:update",
-    "users:delete",
-    "customers:create",
-    "customers:read",
-    "customers:update",
-    "customers:delete",
-    "materials:create",
-    "materials:read",
-    "materials:update",
-    "materials:delete",
-    "materials:state:update",
-    "packages:create",
-    "packages:read",
-    "packages:update",
-    "packages:delete",
-    "requests:create",
-    "requests:read",
-    "requests:update",
-    "requests:approve",
-    "requests:delete",
-    "loans:create",
-    "loans:read",
-    "loans:update",
-    "loans:checkout",
-    "loans:return",
-    "inspections:create",
-    "inspections:read",
-    "inspections:update",
-    "invoices:create",
-    "invoices:read",
-    "invoices:update",
-    "reports:read",
-    // Role management
-    "roles:create",
-    "roles:read",
-    "roles:update",
-    "roles:delete",
-  ],
-  owner: [
-    // Full access
-    "organization:read",
-    "organization:update",
-    "organization:delete",
-    "billing:manage",
-    "subscription:manage",
-    "users:create",
-    "users:read",
-    "users:update",
-    "users:delete",
-    "customers:create",
-    "customers:read",
-    "customers:update",
-    "customers:delete",
-    "materials:create",
-    "materials:read",
-    "materials:update",
-    "materials:delete",
-    "materials:state:update",
-    "packages:create",
-    "packages:read",
-    "packages:update",
-    "packages:delete",
-    "requests:create",
-    "requests:read",
-    "requests:update",
-    "requests:approve",
-    "requests:delete",
-    "loans:create",
-    "loans:read",
-    "loans:update",
-    "loans:checkout",
-    "loans:return",
-    "inspections:create",
-    "inspections:read",
-    "inspections:update",
-    "invoices:create",
-    "invoices:read",
-    "invoices:update",
-    "reports:read",
-    // Role management
-    "roles:create",
-    "roles:read",
-    "roles:update",
-    "roles:delete",
-    "analytics:read",
-  ],
-  manager: [
-    "organization:read",
-    "users:read",
-    "customers:read",
-    "materials:create",
-    "materials:read",
-    "materials:update",
-    "materials:delete",
-    "packages:create",
-    "packages:read",
-    "packages:update",
-    "packages:delete",
-    "requests:read",
-    "requests:approve",
-    "loans:read",
-    "inspections:read",
-    "invoices:read",
-    "reports:read",
-    "analytics:read",
-  ],
-  warehouse_operator: [
-    "organization:read",
-    "materials:read",
-    "materials:state:update",
-    "packages:read",
-    "loans:read",
-    "loans:checkout",
-    "loans:return",
-    "inspections:create",
-    "inspections:read",
-    "inspections:update",
-  ],
-  commercial_advisor: [
-    "organization:read",
-    "customers:create",
-    "customers:read",
-    "customers:update",
-    "materials:read",
-    "packages:read",
-    "requests:create",
-    "requests:read",
-    "requests:update",
-    "loans:create",
-    "loans:read",
-    "invoices:read",
-  ],
-};
-
-export const defaultOrganizationRoles: Record<OrganizationRole, string[]> = {
-  owner: rolePermissions.owner,
-  manager: rolePermissions.manager,
-  warehouse_operator: rolePermissions.warehouse_operator,
-  commercial_advisor: rolePermissions.commercial_advisor,
-} as const;
+import { Role, rolePermissions } from "../../roles/models/role.model.ts";
 
 /* ---------- User Status ---------- */
 
@@ -231,7 +44,7 @@ export const UserZodSchema = z.object({
       /[^A-Za-z0-9]/,
       "Password must contain at least one special character",
     ),
-  role: z.enum(organizationRoleOptions).default("commercial_advisor"),
+  roleId: z.string(),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
   }),
@@ -317,10 +130,10 @@ const userSchema = new Schema(
     },
     phone: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true, select: false },
-    role: {
+    roleId: {
       type: String,
-      enum: userRoleOptions,
-      default: "commercial_advisor",
+      ref: "Role",
+      required: true,
     },
     status: {
       type: String,
@@ -340,7 +153,7 @@ const userSchema = new Schema(
 
 // Compound unique index: email unique per organization
 userSchema.index({ organizationId: 1, email: 1 }, { unique: true });
-userSchema.index({ organizationId: 1, role: 1 });
+userSchema.index({ organizationId: 1, roleId: 1 });
 userSchema.index({ organizationId: 1, status: 1 });
 
 /* ---------- Pre-save Middleware ---------- */
@@ -372,8 +185,14 @@ userSchema.methods.verifyPassword = async function (
   }
 };
 
-userSchema.methods.hasPermission = function (permission: string): boolean {
-  const permissions = rolePermissions[this.role as UserRole] ?? [];
+userSchema.methods.hasPermission = async function (
+  permission: string,
+): Promise<boolean> {
+  const role = await Role.findById(this.roleId)
+    .select("permissions")
+    .lean()
+    .exec();
+  const permissions = role?.permissions ?? [];
   return permissions.includes(permission);
 };
 
@@ -381,7 +200,7 @@ userSchema.methods.hasPermission = function (permission: string): boolean {
 
 export type UserDocument = InferSchemaType<typeof userSchema> & {
   verifyPassword(password: string): Promise<boolean>;
-  hasPermission(permission: string): boolean;
+  hasPermission(permission: string): Promise<boolean>;
 };
 
 export const User = model<UserDocument>("User", userSchema);
