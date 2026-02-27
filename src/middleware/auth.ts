@@ -235,6 +235,7 @@ export const requirePermission = (...permissions: string[]) => {
 
 /**
  * Creates middleware that checks if user has one of the specified roles.
+ * @deprecated Use requirePermission instead for more flexible permission-based access control. Role-based checks require an extra DB query to get the user's role and are less flexible than permission-based checks.
  */
 export const requireRole = (...roleIds: String[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -242,7 +243,8 @@ export const requireRole = (...roleIds: String[]) => {
       if (!req.user) {
         throw AppError.unauthorized("Authentication required");
       }
-
+      // TODO: Remove ID based role checks in favor of permission-based checks. This is less flexible and requires an extra DB query to get the user's role ID.
+      // Get role name for comparison
       if (!roleIds.includes(req.user.roleId.toString())) {
         throw AppError.unauthorized(
           "You do not have the required role to perform this action",
