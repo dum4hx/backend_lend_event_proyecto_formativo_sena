@@ -965,6 +965,48 @@ Delete a role belonging to the current organization.
 
 ---
 
+---
+
+### Permissions
+
+The permissions reference exposes all available permission strings used across the platform. This is useful for UI role editors and administrators when assigning permissions to organization roles.
+
+#### GET /permissions
+
+Returns the list of all permission identifiers.
+
+**Authentication Required:** Yes (any authenticated user)
+
+**Permission Required:** None (read-only list)
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "permissions": [
+      "organization:read",
+      "organization:update",
+      "users:read",
+      "users:create",
+      "users:update",
+      "users:delete",
+      "roles:read",
+      "roles:create",
+      "roles:update",
+      "roles:delete",
+      "materials:read",
+      "materials:create",
+      "materials:update",
+      "materials:delete"
+    ]
+  }
+}
+```
+
+---
+
 ### Organization Endpoints
 
 #### GET /organizations

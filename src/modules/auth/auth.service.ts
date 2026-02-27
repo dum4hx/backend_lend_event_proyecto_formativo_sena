@@ -1,13 +1,9 @@
 import * as argon2 from "argon2";
 import { Types, startSession } from "mongoose";
 import crypto from "node:crypto";
-import {
-  User,
-  type UserInput,
-  type UserRole,
-} from "../user/models/user.model.ts";
+import { User, type UserInput } from "../user/models/user.model.ts";
 import { defaultOrganizationRoles } from "../user/models/user.model.ts";
-import { Role } from "../roles/models/role.model.ts";
+import { Role, type UserRole } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { generateTokenPair, type TokenPair } from "../../utils/auth/jwt.ts";
 import {
