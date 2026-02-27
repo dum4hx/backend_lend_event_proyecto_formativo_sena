@@ -11,7 +11,7 @@ const adminRouter = Router();
 
 /* ---------- Apply super_admin authentication to all routes ---------- */
 adminRouter.use(authenticate);
-adminRouter.use(requireRole("super_admin"));
+adminRouter.use(requireSuperAdmin);
 
 /* ---------- Platform Overview ---------- */
 

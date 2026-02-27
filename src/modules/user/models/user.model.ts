@@ -185,22 +185,22 @@ userSchema.methods.verifyPassword = async function (
   }
 };
 
-userSchema.methods.hasPermission = async function (
-  permission: string,
+userSchema.methods.hasPermissions = async function (
+  permissionsToMatch: string[],
 ): Promise<boolean> {
   const role = await Role.findById(this.roleId)
     .select("permissions")
     .lean()
     .exec();
   const permissions = role?.permissions ?? [];
-  return permissions.includes(permission);
+  return permissionsToMatch.every((perm) => permissions.includes(perm));
 };
 
 /* ---------- Export ---------- */
 
 export type UserDocument = InferSchemaType<typeof userSchema> & {
   verifyPassword(password: string): Promise<boolean>;
-  hasPermission(permission: string): Promise<boolean>;
+  hasPermissions(permissionsToMatch: string[]): Promise<boolean>;
 };
 
 export const User = model<UserDocument>("User", userSchema);

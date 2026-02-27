@@ -3,10 +3,12 @@ import { Types } from "mongoose";
 import { verifyAccessToken, type JWTPayload } from "../utils/auth/jwt.ts";
 import { AppError } from "../errors/AppError.ts";
 import {
+  Role,
   rolePermissions,
   type UserRole,
-} from "../modules/user/models/user.model.ts";
+} from "../modules/roles/models/role.model.ts";
 import { Organization } from "../modules/organization/models/organization.model.ts";
+import { User } from "../modules/user/models/user.model.ts";
 
 /* ---------- Extend Express Request ---------- */
 
@@ -22,7 +24,7 @@ export interface AuthenticatedUser {
   id: string;
   userId: Types.ObjectId;
   organizationId: Types.ObjectId;
-  role: UserRole;
+  roleId: Types.ObjectId;
   email: string;
 }
 
@@ -103,7 +105,7 @@ export const authenticate = async (
       id: payload.sub,
       userId: new Types.ObjectId(payload.sub),
       organizationId: new Types.ObjectId(payload.org),
-      role: payload.role,
+      roleId: new Types.ObjectId(payload.role),
       email: payload.email,
     };
 
@@ -188,20 +190,35 @@ export const requireActiveOrganization = async (
 /* ---------- Authorization Middleware ---------- */
 
 /**
+ * Helper function to check if user has required permissions.
+ * Used by requirePermission middleware.
+ */
+export const hasPermissions = async (
+  user: AuthenticatedUser,
+  permissions: string[],
+): Promise<boolean> => {
+  const userDoc = await User.findById(user.userId).select("roleId");
+  if (!userDoc) {
+    return false;
+  }
+  return userDoc.hasPermissions(permissions);
+};
+
+/**
  * Creates middleware that checks if user has required permission.
  */
 export const requirePermission = (...permissions: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       if (!req.user) {
         throw AppError.unauthorized("Authentication required");
       }
 
-      const userPermissions = rolePermissions[req.user.role] ?? [];
-      const hasPermission = permissions.some((perm) =>
-        userPermissions.includes(perm),
-      );
-
+      const hasPermission = await hasPermissions(req.user, permissions);
       if (!hasPermission) {
         throw AppError.unauthorized(
           "You do not have permission to perform this action",
@@ -219,17 +236,17 @@ export const requirePermission = (...permissions: string[]) => {
 /**
  * Creates middleware that checks if user has one of the specified roles.
  */
-export const requireRole = (...roles: UserRole[]) => {
+export const requireRole = (...roleIds: String[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
         throw AppError.unauthorized("Authentication required");
       }
 
-      if (!roles.includes(req.user.role)) {
+      if (!roleIds.includes(req.user.roleId.toString())) {
         throw AppError.unauthorized(
           "You do not have the required role to perform this action",
-          { code: "FORBIDDEN", requiredRoles: roles },
+          { code: "FORBIDDEN", requiredRoles: roleIds },
         );
       }
 
@@ -246,9 +263,9 @@ export const requireRole = (...roles: UserRole[]) => {
 export const requireOwner = requireRole("owner");
 
 /**
- * Middleware that restricts access to managers and above.
+ * Middleware that restricts access to super admins only.
  */
-export const requireManager = requireRole("owner", "manager");
+export const requireSuperAdmin = requireRole("super_admin");
 
 /* ---------- Resource Ownership Middleware ---------- */
 

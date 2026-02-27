@@ -120,7 +120,7 @@ subscriptionTypeRouter.post(
 /* ---------- Super Admin Routes ---------- */
 
 // All routes below require super_admin role
-subscriptionTypeRouter.use(authenticate, requireRole("super_admin"));
+subscriptionTypeRouter.use(authenticate, requireSuperAdmin);
 
 /**
  * GET /api/v1/subscription-types/admin/all
