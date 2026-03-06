@@ -3,12 +3,12 @@ import type { Request } from "express";
 import { getOrgId } from "../../middleware/auth.ts";
 import { Role } from "./models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
-import { super_admin_permsissions } from "./models/role.model.ts";
+import { super_admin_only_permsissions } from "./models/role.model.ts";
 
 /* ---------- Shared Validation ---------- */
 
 /** Set of permissions exclusive to the platform super-admin role. */
-const SUPER_ADMIN_PERMISSIONS = new Set<string>(super_admin_permsissions);
+const SUPER_ADMIN_PERMISSIONS = new Set<string>(super_admin_only_permsissions);
 
 /**
  * Reusable guard that rejects any attempt to use the `super_admin` role

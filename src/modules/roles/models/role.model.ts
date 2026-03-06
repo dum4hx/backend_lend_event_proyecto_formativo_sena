@@ -27,14 +27,13 @@ export const organizationRoleOptions = [
 export type DefaultOrganizationRole = (typeof organizationRoleOptions)[number];
 
 // Super admin only permissions (for platform management)
-export const super_admin_permsissions = [
+export const super_admin_only_permsissions = [
   "subscription_types:create",
   "subscription_types:read",
   "subscription_types:update",
   "subscription_types:delete",
   "platform:manage",
   "permissions:create",
-  "permissions:read",
   "permissions:update",
   "permissions:delete",
 ] as const;
@@ -43,7 +42,7 @@ export const super_admin_permsissions = [
 export const rolePermissions: Record<UserRole, string[]> = {
   super_admin: [
     // Super admin has full platform access
-    ...super_admin_permsissions,
+    ...super_admin_only_permsissions,
     // Also includes all owner permissions
     "organization:read",
     "organization:update",
@@ -89,6 +88,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "roles:read",
     "roles:update",
     "roles:delete",
+    "permissions:read",
+    "analytics:read",
   ],
   owner: [
     // Full organization access except platform management
