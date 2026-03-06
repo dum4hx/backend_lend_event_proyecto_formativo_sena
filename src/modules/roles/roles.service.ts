@@ -3,12 +3,12 @@ import type { Request } from "express";
 import { getOrgId } from "../../middleware/auth.ts";
 import { Role } from "./models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
-import { super_admin_permsissions } from "../user/models/user.model.ts";
+import { super_admin_only_permsissions } from "./models/role.model.ts";
 
 /* ---------- Shared Validation ---------- */
 
 /** Set of permissions exclusive to the platform super-admin role. */
-const SUPER_ADMIN_PERMISSIONS = new Set<string>(super_admin_permsissions);
+const SUPER_ADMIN_PERMISSIONS = new Set<string>(super_admin_only_permsissions);
 
 /**
  * Reusable guard that rejects any attempt to use the `super_admin` role
@@ -37,6 +37,28 @@ function assertNotSuperAdmin(data: {
         `The following permissions are restricted to the platform super-admin and cannot be used: ${forbidden.join(", ")}`,
       );
     }
+  }
+}
+
+/**
+ * Guard that blocks any mutation or deletion of a read-only (system) role.
+ *
+ * The `owner` role is seeded as `isReadOnly: true` during organization
+ * registration, ensuring every organization always retains its owner role.
+ * This guard must be called **after** the role document is fetched from the DB.
+ *
+ * @throws {AppError} 403 when the role has `isReadOnly: true`.
+ */
+function assertNotReadOnly(role: {
+  isReadOnly?: boolean;
+  name?: string;
+}): void {
+  if (role.isReadOnly) {
+    throw AppError.forbidden(
+      `The '${
+        role.name ?? "owner"
+      }' role is a system role and cannot be modified or deleted`,
+    );
   }
 }
 
@@ -145,6 +167,8 @@ export const rolesService = {
         throw AppError.notFound("Role not found");
       }
 
+      // Prevent modifying system roles (e.g. owner) and super_admin names/perms
+      assertNotReadOnly(role);
       assertNotSuperAdmin(updateData);
 
       if (updateData.name !== undefined) role.name = updateData.name;
@@ -178,6 +202,10 @@ export const rolesService = {
       if (!role) {
         throw AppError.notFound("Role not found");
       }
+
+      // Prevent deleting system roles (e.g. owner) — every organization
+      // must retain at least one owner role at all times.
+      assertNotReadOnly(role);
 
       await Role.deleteOne({ _id: id, organizationId }).session(session);
       return true;
@@ -227,6 +255,36 @@ export const rolesService = {
      */
     const orgId = getOrgId(req);
     return await rolesService.delete(req.params.id as string, orgId);
+  },
+
+  async getRolePermissions(
+    roleId: string,
+    organizationId: Types.ObjectId | string,
+  ) {
+    /**
+     * Retrieve the permissions for a given role within an organization.
+     */
+    const role = await Role.findOne({
+      _id: roleId,
+      organizationId: organizationId,
+    });
+    if (!role) {
+      throw AppError.notFound("Role not found");
+    }
+    return role.permissions;
+  },
+
+  /**
+   * Retrieve the name for a given role id. Used to embed human-readable
+   * role names in JWTs at token-mint time, avoiding a DB round-trip on
+   * every authenticated request.
+   */
+  async getRoleName(roleId: string) {
+    const role = await Role.findById(roleId).select("name");
+    if (!role) {
+      throw AppError.notFound("Role not found");
+    }
+    return role.name;
   },
 };
 

@@ -5,13 +5,17 @@ import {
   type NextFunction,
 } from "express";
 import { adminService } from "./super_admin.service.ts";
-import { authenticate, requireRole } from "../../middleware/auth.ts";
+import {
+  authenticate,
+  requireRole,
+  requireSuperAdmin,
+} from "../../middleware/auth.ts";
 
 const adminRouter = Router();
 
 /* ---------- Apply super_admin authentication to all routes ---------- */
 adminRouter.use(authenticate);
-adminRouter.use(requireRole("super_admin"));
+adminRouter.use(requireSuperAdmin);
 
 /* ---------- Platform Overview ---------- */
 

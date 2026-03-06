@@ -41,9 +41,14 @@ test.describe("Super Admin - Subscription Types Management", () => {
 
     const body = await response.json();
     expect(body.status).toBe("success");
-    expect(body.data.plan).toBe("starter");
-    expect(body.data.displayName).toBeDefined();
-    expect(body.data.billingModel).toMatch(/^(fixed|dynamic)$/);
+    expect(body.data.subscriptionType.plan).toBe("starter");
+    expect(body.data.subscriptionType.displayName).toBeDefined();
+    expect(body.data.subscriptionType.billingModel).toMatch(
+      /^(fixed|dynamic)$/,
+    );
+    expect(typeof body.data.subscriptionType.durationDays).toBe("number");
+    expect(body.data.subscriptionType.durationDays).toBeGreaterThan(0);
+    expect(body.data.subscriptionType.durationDays).toBeLessThanOrEqual(365);
   });
 
   test("GET /subscription-types/:plan - should return 404 for non-existent plan", async ({
@@ -90,6 +95,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
       pricePerSeat: 499, // $4.99 in cents
       maxSeats: 10,
       maxCatalogItems: 50,
+      durationDays: 30,
       features: ["Feature 1", "Feature 2", "Feature 3"],
     };
 
@@ -105,6 +111,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
     expect(body.data.subscriptionType.displayName).toBe("Test Plan");
     expect(body.data.subscriptionType.billingModel).toBe("dynamic");
     expect(body.data.subscriptionType.baseCost).toBe(1999);
+    expect(body.data.subscriptionType.durationDays).toBe(30);
     expect(body.data.subscriptionType.status).toBe("active");
   });
 
@@ -143,7 +150,6 @@ test.describe("Super Admin - Subscription Types Management", () => {
   test("POST /subscription-types - should reject duplicate plan", async ({
     request,
   }) => {
-    // Try to create a plan that already exists
     const response = await request.post("/subscription-types", {
       data: {
         plan: "starter", // Already exists from seeding
@@ -151,10 +157,85 @@ test.describe("Super Admin - Subscription Types Management", () => {
         billingModel: "fixed",
         baseCost: 100,
         pricePerSeat: 0,
+        durationDays: 30,
       },
     });
 
     expect(response.status()).toBe(409); // Conflict
+  });
+
+  test("POST /subscription-types - should reject missing durationDays", async ({
+    request,
+  }) => {
+    const uniquePlan = `no_duration_${Date.now()}`;
+    const response = await request.post("/subscription-types", {
+      data: {
+        plan: uniquePlan,
+        displayName: "No Duration Plan",
+        billingModel: "fixed",
+        baseCost: 0,
+        pricePerSeat: 0,
+        // durationDays intentionally omitted
+      },
+    });
+
+    expect(response.status()).toBe(400);
+  });
+
+  test("POST /subscription-types - should reject durationDays = 0", async ({
+    request,
+  }) => {
+    const uniquePlan = `zero_duration_${Date.now()}`;
+    const response = await request.post("/subscription-types", {
+      data: {
+        plan: uniquePlan,
+        displayName: "Zero Duration Plan",
+        billingModel: "fixed",
+        baseCost: 0,
+        pricePerSeat: 0,
+        durationDays: 0,
+      },
+    });
+
+    expect(response.status()).toBe(400);
+  });
+
+  test("POST /subscription-types - should reject durationDays > 365 (over one year)", async ({
+    request,
+  }) => {
+    const uniquePlan = `long_duration_${Date.now()}`;
+    const response = await request.post("/subscription-types", {
+      data: {
+        plan: uniquePlan,
+        displayName: "Too Long Plan",
+        billingModel: "fixed",
+        baseCost: 0,
+        pricePerSeat: 0,
+        durationDays: 366,
+      },
+    });
+
+    expect(response.status()).toBe(400);
+  });
+
+  test("POST /subscription-types - should accept durationDays = 365 (exactly one year)", async ({
+    request,
+  }) => {
+    const uniquePlan = `yearly_${Date.now()}`;
+    const response = await request.post("/subscription-types", {
+      data: {
+        plan: uniquePlan,
+        displayName: "Yearly Plan",
+        billingModel: "fixed",
+        baseCost: 99900,
+        pricePerSeat: 0,
+        durationDays: 365,
+      },
+    });
+
+    expect(response.status()).toBe(201);
+    const body = await response.json();
+    expect(body.data.subscriptionType.durationDays).toBe(365);
   });
 
   test("PATCH /subscription-types/:plan - should update subscription type (super admin)", async ({
@@ -169,6 +250,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
         billingModel: "fixed",
         baseCost: 1000,
         pricePerSeat: 0,
+        durationDays: 30,
       },
     });
 
@@ -215,6 +297,7 @@ test.describe("Super Admin - Subscription Types Management", () => {
         billingModel: "fixed",
         baseCost: 100,
         pricePerSeat: 0,
+        durationDays: 30,
       },
     });
 

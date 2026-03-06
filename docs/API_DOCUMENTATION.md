@@ -822,6 +822,21 @@ Permanently deletes a user.
 
 The roles API manages organization-scoped roles and permissions. All routes require an authenticated user and an active organization.
 
+**System roles vs. custom roles**
+
+When an organization is registered, four default roles are seeded automatically:
+
+| Role                 | Type     | Read-only | Notes                                 |
+| -------------------- | -------- | --------- | ------------------------------------- |
+| `owner`              | `SYSTEM` | Yes       | Cannot be renamed, edited, or deleted |
+| `manager`            | `CUSTOM` | No        | Editable default role                 |
+| `warehouse_operator` | `CUSTOM` | No        | Editable default role                 |
+| `commercial_advisor` | `CUSTOM` | No        | Editable default role                 |
+
+Roles with `isReadOnly: true` (`type: "SYSTEM"`) are protected at the API level — any attempt to `PATCH` or `DELETE` them returns `403 Forbidden`.
+
+---
+
 #### GET /roles
 
 List roles for the current organization. Supports pagination and sorting (see pagination parameters above).
@@ -838,11 +853,21 @@ List roles for the current organization. Supports pagination and sorting (see pa
       {
         "_id": "507f1f77bcf86cd799439012",
         "name": "owner",
-        "permissions": ["organization:read"],
-        "description": "Organization owner"
+        "permissions": ["organization:read", "users:create"],
+        "description": "Organization owner — full access. System role, non-editable and non-deletable.",
+        "isReadOnly": true,
+        "type": "SYSTEM"
+      },
+      {
+        "_id": "507f1f77bcf86cd799439013",
+        "name": "manager",
+        "permissions": ["materials:read", "requests:approve"],
+        "description": "Default manager role — can be customized by the owner.",
+        "isReadOnly": false,
+        "type": "CUSTOM"
       }
     ],
-    "total": 1,
+    "total": 4,
     "page": 1,
     "limit": 20
   }
@@ -870,8 +895,10 @@ Get details for a single role within the organization.
     "role": {
       "_id": "507f1f77bcf86cd799439012",
       "name": "owner",
-      "permissions": ["organization:read"],
-      "description": "Organization owner"
+      "permissions": ["organization:read", "users:create"],
+      "description": "Organization owner — full access. System role, non-editable and non-deletable.",
+      "isReadOnly": true,
+      "type": "SYSTEM"
     }
   }
 }
@@ -881,19 +908,21 @@ Get details for a single role within the organization.
 
 #### POST /roles
 
-Create a new role for the current organization.
+Create a new custom role for the current organization.
 
-| Parameter   | Location | Type     | Required | Description                          |
-| ----------- | -------- | -------- | -------- | ------------------------------------ |
-| name        | body     | string   | Yes      | Role identifier (e.g. `manager`)     |
-| permissions | body     | string[] | Yes      | Array of permission strings          |
-| description | body     | string   | No       | Human readable description (max 500) |
+| Parameter   | Location | Type     | Required | Description                                                              |
+| ----------- | -------- | -------- | -------- | ------------------------------------------------------------------------ |
+| name        | body     | string   | Yes      | Role name (3–50 chars, any value except `super_admin`)                   |
+| permissions | body     | string[] | Yes      | Array of permission strings (use `GET /permissions` to get valid values) |
+| description | body     | string   | No       | Human-readable description (max 500)                                     |
 
 **Permission Required:** `roles:create`
 
 **Notes:**
 
-- The platform `super_admin` permissions set is restricted and cannot be assigned to organization roles.
+- The name `super_admin` is reserved and will be rejected.
+- Permissions belonging to the platform `super_admin` role are restricted and cannot be assigned to organization roles.
+- Use `GET /permissions` to retrieve the full list of valid, assignable permission identifiers.
 
 **Response:** `201 Created`
 
@@ -902,10 +931,12 @@ Create a new role for the current organization.
   "status": "success",
   "data": {
     "role": {
-      "_id": "507f1f77bcf86cd799439013",
-      "name": "manager",
-      "permissions": ["materials:read", "requests:approve"],
-      "description": "Operations manager"
+      "_id": "507f1f77bcf86cd799439014",
+      "name": "auditor",
+      "permissions": ["materials:read", "reports:read"],
+      "description": "Read-only auditor role",
+      "isReadOnly": false,
+      "type": "CUSTOM"
     }
   }
 }
@@ -915,16 +946,28 @@ Create a new role for the current organization.
 
 #### PATCH /roles/:id
 
-Update an existing role. Only provided fields are updated.
+Update an existing custom role. Only provided fields are updated.
 
-| Parameter   | Location | Type     | Required | Description                                |
-| ----------- | -------- | -------- | -------- | ------------------------------------------ |
-| id          | path     | string   | Yes      | Role MongoDB ObjectId                      |
-| name        | body     | string   | No       | New role name (cannot be `super_admin`)    |
-| permissions | body     | string[] | No       | Updated permissions (no super_admin perms) |
-| description | body     | string   | No       | Updated description                        |
+| Parameter   | Location | Type     | Required | Description                                     |
+| ----------- | -------- | -------- | -------- | ----------------------------------------------- |
+| id          | path     | string   | Yes      | Role MongoDB ObjectId                           |
+| name        | body     | string   | No       | New role name (cannot be `super_admin`)         |
+| permissions | body     | string[] | No       | Updated permissions (no super_admin-only perms) |
+| description | body     | string   | No       | Updated description                             |
 
 **Permission Required:** `roles:update`
+
+**Notes:**
+
+- System roles (`isReadOnly: true`) cannot be modified. Attempting to do so returns `403 Forbidden`.
+
+**Error Responses:**
+
+| Status | Condition                                  | Message                                                               |
+| ------ | ------------------------------------------ | --------------------------------------------------------------------- |
+| 403    | Role is a system role (`isReadOnly: true`) | `The 'owner' role is a system role and cannot be modified or deleted` |
+| 404    | Role not found in organization             | `Role not found`                                                      |
+| 409    | Name already taken in organization         | `Role with that name already exists`                                  |
 
 **Response:** `200 OK`
 
@@ -933,10 +976,12 @@ Update an existing role. Only provided fields are updated.
   "status": "success",
   "data": {
     "role": {
-      "_id": "507f1f77bcf86cd799439013",
-      "name": "manager",
+      "_id": "507f1f77bcf86cd799439014",
+      "name": "auditor",
       "permissions": ["materials:read"],
-      "description": "Updated"
+      "description": "Updated",
+      "isReadOnly": false,
+      "type": "CUSTOM"
     }
   }
 }
@@ -946,13 +991,24 @@ Update an existing role. Only provided fields are updated.
 
 #### DELETE /roles/:id
 
-Delete a role belonging to the current organization.
+Delete a custom role belonging to the current organization.
 
 | Parameter | Location | Type   | Required | Description           |
 | --------- | -------- | ------ | -------- | --------------------- |
 | id        | path     | string | Yes      | Role MongoDB ObjectId |
 
 **Permission Required:** `roles:delete`
+
+**Notes:**
+
+- System roles (`isReadOnly: true`) — including the seeded `owner` role — cannot be deleted. Attempting to do so returns `403 Forbidden`. This ensures every organization always retains at least one owner role.
+
+**Error Responses:**
+
+| Status | Condition                                  | Message                                                               |
+| ------ | ------------------------------------------ | --------------------------------------------------------------------- |
+| 403    | Role is a system role (`isReadOnly: true`) | `The 'owner' role is a system role and cannot be modified or deleted` |
+| 404    | Role not found in organization             | `Role not found`                                                      |
 
 **Response:** `200 OK`
 
@@ -962,6 +1018,70 @@ Delete a role belonging to the current organization.
   "message": "Role deleted successfully"
 }
 ```
+
+---
+
+---
+
+### Permissions
+
+The permissions endpoint exposes all active, organization-assignable permissions from the database. It is intended for UI role editors so users can build a labelled, categorised permission picker without hard-coding permission strings on the client.
+
+**Super-admin-only permissions are excluded** — only permissions that can legally be assigned to an organization role are returned.
+
+#### GET /permissions
+
+Returns all active permissions that can be assigned to organization roles, sorted by category then identifier.
+
+**Authentication Required:** Yes
+
+**Active Organization Required:** Yes
+
+**Permission Required:** `permissions:read`
+
+**Filters applied server-side:**
+
+- `isPlatformPermission: false` — excludes super-admin-only capabilities (e.g. `platform:manage`, `subscription_types:*`)
+- `isActive: true` — excludes soft-disabled permissions
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "permissions": [
+      {
+        "_id": "customers:create",
+        "displayName": "Create Customers",
+        "description": "Allows creating new customer records",
+        "category": "Customers"
+      },
+      {
+        "_id": "materials:read",
+        "displayName": "Read Materials",
+        "description": "Allows viewing material types and instances",
+        "category": "Materials"
+      },
+      {
+        "_id": "roles:read",
+        "displayName": "Read Roles",
+        "description": "Allows listing and viewing organization roles",
+        "category": "Roles"
+      }
+    ]
+  }
+}
+```
+
+**Response fields per permission object:**
+
+| Field         | Type   | Description                                             |
+| ------------- | ------ | ------------------------------------------------------- |
+| `_id`         | string | Permission identifier in `resource:action` format       |
+| `displayName` | string | Human-readable label for UI display                     |
+| `description` | string | Short description of what granting this permission does |
+| `category`    | string | Grouping category (e.g. `Materials`, `Roles`, `Users`)  |
 
 ---
 
@@ -1093,6 +1213,7 @@ Lists all active subscription types (public).
         "billingModel": "dynamic",
         "maxCatalogItems": 100,
         "maxSeats": 5,
+        "durationDays": 30,
         "features": ["Up to 5 team members", "100 catalog items"],
         "basePriceMonthly": 29,
         "pricePerSeat": 5
@@ -1112,6 +1233,27 @@ Gets a specific subscription type by plan name.
 | --------- | -------- | ------ | -------- | ------------------------------------------------- |
 | plan      | path     | string | Yes      | Plan identifier (e.g., `starter`, `professional`) |
 
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptionType": {
+      "plan": "starter",
+      "displayName": "Starter",
+      "billingModel": "dynamic",
+      "maxCatalogItems": 100,
+      "maxSeats": 5,
+      "durationDays": 30,
+      "features": ["Up to 5 team members", "100 catalog items"],
+      "basePriceMonthly": 29,
+      "pricePerSeat": 5
+    }
+  }
+}
+```
+
 ---
 
 #### POST /subscription-types
@@ -1128,6 +1270,7 @@ Creates a new subscription type (super admin only).
 | pricePerSeat      | body     | integer  | Yes      | Price per seat in cents                            |
 | maxSeats          | body     | integer  | No       | Max seats (-1 = unlimited, default: -1)            |
 | maxCatalogItems   | body     | integer  | No       | Max items (-1 = unlimited, default: -1)            |
+| durationDays      | body     | integer  | Yes      | Subscription period in days (min: 1, max: 365)     |
 | features          | body     | string[] | No       | List of feature descriptions                       |
 | sortOrder         | body     | integer  | No       | Display order (default: 0)                         |
 | stripePriceIdBase | body     | string   | No       | Stripe price ID for base                           |
@@ -1151,6 +1294,7 @@ Creates a new subscription type (super admin only).
       "pricePerSeat": 200,
       "maxSeats": -1,
       "maxCatalogItems": -1,
+      "durationDays": 365,
       "features": ["Unlimited everything", "24/7 support"],
       "status": "active"
     }
@@ -1164,7 +1308,7 @@ Creates a new subscription type (super admin only).
 
 Updates a subscription type (super admin only).
 
-**Note:** The `plan` field cannot be changed after creation.
+**Note:** The `plan` field cannot be changed after creation. `durationDays` can be updated but must remain within 1–365.
 
 **Permission Required:** `subscription_types:update`
 

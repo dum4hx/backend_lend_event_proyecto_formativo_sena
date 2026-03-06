@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 import rolesService from "./roles.service.ts";
 import { RoleZodSchema } from "./models/role.model.ts";
-import { super_admin_permsissions } from "../user/models/user.model.ts";
+import { super_admin_only_permsissions } from "./models/role.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -36,15 +36,19 @@ router.use(authenticate, requireActiveOrganization);
 /* ---------- Validation Schemas ---------- */
 const listQuerySchema = paginationSchema.extend({});
 
-const SUPER_ADMIN_PERMS_SET = new Set<string>(super_admin_permsissions);
+const SUPER_ADMIN_PERMS_SET = new Set<string>(super_admin_only_permsissions);
 
 const createRoleSchema = RoleZodSchema.pick({
   name: true,
   permissions: true,
   description: true,
-}).refine(
-  (data) =>
-    !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
+})
+  .extend({
+    // Normalize to lowercase so "Owner" and "OWNER" are treated as the same name
+    name: z.string().min(3).max(50).trim().transform((v) => v.toLowerCase()),
+  })
+  .refine(
+  (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
   {
     message:
       "One or more permissions are restricted to the platform super-admin",
@@ -54,7 +58,14 @@ const createRoleSchema = RoleZodSchema.pick({
 
 const updateRoleSchema = z
   .object({
-    name: z.string().optional(),
+    // Normalize to lowercase so case variants of the same name are rejected as duplicates
+    name: z
+      .string()
+      .min(3)
+      .max(50)
+      .trim()
+      .transform((v) => v.toLowerCase())
+      .optional(),
     permissions: z.array(z.string()).optional(),
     description: z.string().max(500).trim().optional(),
   })
@@ -64,8 +75,7 @@ const updateRoleSchema = z
     path: ["name"],
   })
   .refine(
-    (data) =>
-      !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
+    (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
     {
       message:
         "One or more permissions are restricted to the platform super-admin",

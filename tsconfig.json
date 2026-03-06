@@ -12,6 +12,7 @@
       "node"
     ],
     "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     // Other Outputs
     "sourceMap": true,

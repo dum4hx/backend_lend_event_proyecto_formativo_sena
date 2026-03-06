@@ -12,11 +12,9 @@ import {
 import {
   SubscriptionTypeZodSchema,
   SubscriptionTypeUpdateZodSchema,
-  billingModelOptions,
-  subscriptionTypeStatusOptions,
 } from "./models/subscription_type.model.ts";
 import { validateBody } from "../../middleware/validation.ts";
-import { authenticate, requireRole } from "../../middleware/auth.ts";
+import { authenticate, requireSuperAdmin } from "../../middleware/auth.ts";
 
 const subscriptionTypeRouter = Router();
 
@@ -41,6 +39,7 @@ subscriptionTypeRouter.get(
             billingModel: plan.billingModel,
             maxCatalogItems: plan.maxCatalogItems,
             maxSeats: plan.maxSeats,
+            durationDays: plan.durationDays,
             features: plan.features,
             // Convert cents to dollars for display
             basePriceMonthly: plan.baseCost / 100,
@@ -74,6 +73,7 @@ subscriptionTypeRouter.get(
             billingModel: limits.billingModel,
             maxCatalogItems: limits.maxCatalogItems,
             maxSeats: limits.maxSeats,
+            durationDays: limits.durationDays,
             features: limits.features,
             basePriceMonthly: limits.baseCost / 100,
             pricePerSeat: limits.pricePerSeat / 100,
@@ -120,7 +120,7 @@ subscriptionTypeRouter.post(
 /* ---------- Super Admin Routes ---------- */
 
 // All routes below require super_admin role
-subscriptionTypeRouter.use(authenticate, requireRole("super_admin"));
+subscriptionTypeRouter.use(authenticate, requireSuperAdmin);
 
 /**
  * GET /api/v1/subscription-types/admin/all

@@ -8,10 +8,10 @@ import { z } from "zod";
 import { userService } from "./user.service.ts";
 import { authService } from "../auth/auth.service.ts";
 import {
-  UserUpdateZodSchema,
   organizationRoleOptions,
   userRoleOptions,
-} from "./models/user.model.ts";
+} from "../roles/models/role.model.ts";
+import { UserUpdateZodSchema } from "./models/user.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -128,7 +128,7 @@ userRouter.post(
             id: user._id,
             email: user.email,
             name: user.name,
-            role: user.role,
+            role: await user.getRoleName(),
             status: user.status,
           },
         },

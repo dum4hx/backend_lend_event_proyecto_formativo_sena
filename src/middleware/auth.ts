@@ -3,10 +3,12 @@ import { Types } from "mongoose";
 import { verifyAccessToken, type JWTPayload } from "../utils/auth/jwt.ts";
 import { AppError } from "../errors/AppError.ts";
 import {
+  Role,
   rolePermissions,
   type UserRole,
-} from "../modules/user/models/user.model.ts";
+} from "../modules/roles/models/role.model.ts";
 import { Organization } from "../modules/organization/models/organization.model.ts";
+import { User } from "../modules/user/models/user.model.ts";
 
 /* ---------- Extend Express Request ---------- */
 
@@ -22,7 +24,9 @@ export interface AuthenticatedUser {
   id: string;
   userId: Types.ObjectId;
   organizationId: Types.ObjectId;
-  role: UserRole;
+  roleId: Types.ObjectId;
+  /** Role name as embedded in the JWT at mint-time — no extra DB query needed. */
+  roleName: string;
   email: string;
 }
 
@@ -85,8 +89,8 @@ export const authenticate = async (
     // Verify the token
     const payload: JWTPayload = await verifyAccessToken(token);
 
-    // Validate payload structure
-    if (!payload.sub || !payload.org || !payload.role || !payload.email) {
+    // Validate payload structure — `roleId` is the JWT claim name (matches JWTPayload interface)
+    if (!payload.sub || !payload.org || !payload.roleId || !payload.email) {
       throw AppError.unauthorized("Invalid token payload structure");
     }
 
@@ -97,13 +101,17 @@ export const authenticate = async (
     if (!Types.ObjectId.isValid(payload.org)) {
       throw AppError.unauthorized("Invalid organization ID in token");
     }
+    if (!Types.ObjectId.isValid(payload.roleId)) {
+      throw AppError.unauthorized("Invalid role ID in token");
+    }
 
-    // Attach user info to request
+    // Attach user info to request — roleName comes for free from the token payload
     req.user = {
       id: payload.sub,
       userId: new Types.ObjectId(payload.sub),
       organizationId: new Types.ObjectId(payload.org),
-      role: payload.role,
+      roleId: new Types.ObjectId(payload.roleId),
+      roleName: payload.roleName ?? "",
       email: payload.email,
     };
 
@@ -188,20 +196,35 @@ export const requireActiveOrganization = async (
 /* ---------- Authorization Middleware ---------- */
 
 /**
+ * Helper function to check if user has required permissions.
+ * Used by requirePermission middleware.
+ */
+export const hasPermissions = async (
+  user: AuthenticatedUser,
+  permissions: string[],
+): Promise<boolean> => {
+  const userDoc = await User.findById(user.userId).select("roleId");
+  if (!userDoc) {
+    return false;
+  }
+  return userDoc.hasPermissions(permissions);
+};
+
+/**
  * Creates middleware that checks if user has required permission.
  */
 export const requirePermission = (...permissions: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       if (!req.user) {
         throw AppError.unauthorized("Authentication required");
       }
 
-      const userPermissions = rolePermissions[req.user.role] ?? [];
-      const hasPermission = permissions.some((perm) =>
-        userPermissions.includes(perm),
-      );
-
+      const hasPermission = await hasPermissions(req.user, permissions);
       if (!hasPermission) {
         throw AppError.unauthorized(
           "You do not have permission to perform this action",
@@ -218,18 +241,20 @@ export const requirePermission = (...permissions: string[]) => {
 
 /**
  * Creates middleware that checks if user has one of the specified roles.
+ * @deprecated Use requirePermission instead for more flexible permission-based access control. Role-based checks require an extra DB query to get the user's role and are less flexible than permission-based checks.
  */
-export const requireRole = (...roles: UserRole[]) => {
+export const requireRole = (...roleIds: String[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
         throw AppError.unauthorized("Authentication required");
       }
-
-      if (!roles.includes(req.user.role)) {
+      // TODO: Remove ID based role checks in favor of permission-based checks. This is less flexible and requires an extra DB query to get the user's role ID.
+      // Get role name for comparison
+      if (!roleIds.includes(req.user.roleId.toString())) {
         throw AppError.unauthorized(
           "You do not have the required role to perform this action",
-          { code: "FORBIDDEN", requiredRoles: roles },
+          { code: "FORBIDDEN", requiredRoles: roleIds },
         );
       }
 
@@ -246,9 +271,33 @@ export const requireRole = (...roles: UserRole[]) => {
 export const requireOwner = requireRole("owner");
 
 /**
- * Middleware that restricts access to managers and above.
+ * Middleware that restricts access to super admins only.
+ *
+ * Checks `roleName` from the JWT payload instead of `roleId`, because the
+ * super admin's roleId is a real MongoDB ObjectId (pointing to the
+ * super_admin Role document seeded for the platform organisation) — not the
+ * literal string "super_admin".
  */
-export const requireManager = requireRole("owner", "manager");
+export const requireSuperAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized("Authentication required");
+    }
+    if (req.user.roleName !== "super_admin") {
+      throw AppError.unauthorized(
+        "You do not have the required role to perform this action",
+        { code: "FORBIDDEN", requiredRoles: ["super_admin"] },
+      );
+    }
+    next();
+  } catch (err: unknown) {
+    next(err);
+  }
+};
 
 /* ---------- Resource Ownership Middleware ---------- */
 

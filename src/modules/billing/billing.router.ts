@@ -14,8 +14,8 @@ import {
 import {
   authenticate,
   requireActiveOrganization,
-  requireOwner,
   getOrgId,
+  requirePermission,
 } from "../../middleware/auth.ts";
 import { AppError } from "../../errors/AppError.ts";
 import type { SubscriptionPlan } from "../organization/models/organization.model.ts";
@@ -52,7 +52,7 @@ const createPortalSchema = z.object({
 billingRouter.post(
   "/checkout",
   authenticate,
-  requireOwner,
+  requirePermission("billing:manage"),
   paymentRateLimiter,
   validateBody(createCheckoutSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -84,7 +84,7 @@ billingRouter.post(
 billingRouter.post(
   "/portal",
   authenticate,
-  requireOwner,
+  requirePermission("billing:manage"),
   validateBody(createPortalSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -113,7 +113,7 @@ billingRouter.patch(
   "/seats",
   authenticate,
   requireActiveOrganization,
-  requireOwner,
+  requirePermission("billing:manage"),
   paymentRateLimiter,
   validateBody(updateSeatsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -140,7 +140,7 @@ billingRouter.patch(
 billingRouter.post(
   "/cancel",
   authenticate,
-  requireOwner,
+  requirePermission("billing:manage"),
   validateBody(cancelSubscriptionSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -168,7 +168,7 @@ billingRouter.post(
 billingRouter.get(
   "/history",
   authenticate,
-  requireOwner,
+  requirePermission("billing:manage"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;

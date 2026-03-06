@@ -17,6 +17,8 @@ export interface PlanLimits {
   pricePerSeat: number;
   maxSeats: number;
   maxCatalogItems: number;
+  /** Duration of one subscription period in days (1–365). */
+  durationDays: number;
   features: string[];
   stripePriceIdBase?: string | undefined;
   stripePriceIdSeat?: string | undefined;
@@ -170,6 +172,7 @@ export const subscriptionTypeService = {
         pricePerSeat: st.pricePerSeat,
         maxSeats: st.maxSeats,
         maxCatalogItems: st.maxCatalogItems,
+        durationDays: st.durationDays,
         features: st.features ?? [],
         stripePriceIdBase: st.stripePriceIdBase ?? undefined,
         stripePriceIdSeat: st.stripePriceIdSeat ?? undefined,
@@ -283,6 +286,7 @@ export const subscriptionTypeService = {
         pricePerSeat: 0,
         maxSeats: 1,
         maxCatalogItems: 10,
+        durationDays: 30,
         features: ["Basic catalog management", "Single user"],
         sortOrder: 0,
         status: "active",
@@ -296,6 +300,7 @@ export const subscriptionTypeService = {
         pricePerSeat: 500, // $5.00 per seat
         maxSeats: 5,
         maxCatalogItems: 100,
+        durationDays: 30,
         features: [
           "Up to 5 team members",
           "100 catalog items",
@@ -313,6 +318,7 @@ export const subscriptionTypeService = {
         pricePerSeat: 400, // $4.00 per seat
         maxSeats: 20,
         maxCatalogItems: 500,
+        durationDays: 30,
         features: [
           "Up to 20 team members",
           "500 catalog items",
@@ -331,6 +337,7 @@ export const subscriptionTypeService = {
         pricePerSeat: 300, // $3.00 per seat
         maxSeats: -1, // unlimited
         maxCatalogItems: -1, // unlimited
+        durationDays: 365,
         features: [
           "Unlimited team members",
           "Unlimited catalog items",

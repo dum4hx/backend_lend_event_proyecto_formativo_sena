@@ -33,7 +33,7 @@ const authRouter = Router();
 
 const registerSchema = z.object({
   organization: OrganizationZodSchema.omit({ ownerId: true }),
-  owner: UserZodSchema.omit({ organizationId: true, role: true }),
+  owner: UserZodSchema.omit({ organizationId: true, roleId: true }),
 });
 
 const loginSchema = z.object({
@@ -132,7 +132,8 @@ authRouter.post(
             id: result.user._id,
             email: result.user.email,
             name: result.user.name,
-            role: result.user.role,
+            roleId: result.user.roleId,
+            roleName: result.roleName,
           },
         },
       });
@@ -175,7 +176,8 @@ authRouter.post(
             id: result.user._id,
             email: result.user.email,
             name: result.user.name,
-            role: result.user.role,
+            roleId: result.user.roleId,
+            roleName: result.roleName,
           },
         },
       });
@@ -276,7 +278,12 @@ authRouter.get(
 
       res.json({
         status: "success",
-        data: { user },
+        data: {
+          user: {
+            ...user.toObject(),
+            roleName: req.user!.roleName,
+          },
+        },
       });
     } catch (err) {
       next(err);
@@ -416,7 +423,7 @@ authRouter.post(
             id: user._id,
             email: user.email,
             name: user.name,
-            role: user.role,
+            roleId: user.roleId,
             status: user.status,
           },
         },
