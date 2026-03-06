@@ -25,7 +25,7 @@ const billingRouter = Router();
 /* ---------- Validation Schemas ---------- */
 
 const createCheckoutSchema = z.object({
-  plan: z.enum(["starter", "professional", "enterprise"]),
+  plan: z.string(),
   seatCount: z.number().int().positive().default(1),
   successUrl: z.url(),
   cancelUrl: z.url(),
