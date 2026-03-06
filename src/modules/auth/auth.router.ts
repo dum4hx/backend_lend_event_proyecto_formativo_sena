@@ -278,7 +278,12 @@ authRouter.get(
 
       res.json({
         status: "success",
-        data: { user },
+        data: {
+          user: {
+            ...user.toObject(),
+            roleName: req.user!.roleName,
+          },
+        },
       });
     } catch (err) {
       next(err);
