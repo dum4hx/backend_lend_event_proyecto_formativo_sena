@@ -2,8 +2,12 @@ import * as argon2 from "argon2";
 import { Types, startSession } from "mongoose";
 import crypto from "node:crypto";
 import { User, type UserInput } from "../user/models/user.model.ts";
-import { defaultOrganizationRoleDefs } from "../roles/models/role.model.ts";
-import { Role, type UserRole } from "../roles/models/role.model.ts";
+import {
+  defaultOrganizationRoleDefs,
+  OWNER_ROLE_NAME,
+  Role,
+  type UserRole,
+} from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { generateTokenPair, type TokenPair } from "../../utils/auth/jwt.ts";
 import {
@@ -42,6 +46,7 @@ export const authService = {
     organization: InstanceType<typeof Organization>;
     user: InstanceType<typeof User>;
     tokens: TokenPair;
+    roleName: string;
   }> {
     const session = await startSession();
 
@@ -140,67 +145,40 @@ export const authService = {
       const orgDoc = new Organization(orgData);
       const organization = await orgDoc.save({ session });
 
-      // Create owner user (roleId will be assigned after creating roles)
-      const userDoc = new User({
+      // Seed all default organization roles first so the owner role _id is
+      // available before the user document is created. insertMany returns the
+      // inserted documents, letting us pluck the owner _id without a round-trip.
+      const insertedRoles = await Role.insertMany(
+        defaultOrganizationRoleDefs.map((def) => ({
+          organizationId: organization._id,
+          ...def, // name, permissions, isReadOnly, type, description
+        })) as any[],
+        { session },
+      );
+
+      const ownerRole = insertedRoles.find((r) => r.name === OWNER_ROLE_NAME);
+      if (!ownerRole) {
+        logger.error("Owner role not found after insert", {
+          organizationId: organization._id.toString(),
+        });
+        throw AppError.internal("Failed to initialize owner role");
+      }
+
+      // Create the owner user with roleId already set — no second save needed.
+      const user = await new User({
         _id: ownerId,
         ...ownerData,
         organizationId: organization._id,
+        roleId: ownerRole._id.toString(),
         status: "active",
-      });
-      const user = await userDoc.save({ session });
-
-      // Seed all default organization roles.
-      // Each definition in `defaultOrganizationRoleDefs` carries the correct
-      // `isReadOnly` and `type` flags so the `owner` role is created as a
-      // non-editable SYSTEM role from the very first insertion.
-      try {
-        const rolesToCreate = defaultOrganizationRoleDefs.map((def) => ({
-          organizationId: organization._id,
-          ...def, // spreads: name, permissions, isReadOnly, type, description
-        }));
-
-        // Use insertMany within the transaction session
-        if (rolesToCreate.length > 0) {
-          await Role.insertMany(rolesToCreate as any[], { session });
-        }
-
-        // Get id of newly inserted owner role and assign to user.roleId
-        let ownerRoleId: string | null = null;
-        if (rolesToCreate.length > 0) {
-          const inserted = await Role.findOne({
-            organizationId: organization._id,
-            name: "owner",
-          }).session(session);
-          if (inserted) {
-            ownerRoleId = inserted._id.toString();
-          }
-        }
-
-        if (!ownerRoleId) {
-          logger.error("Owner role not found after insert", {
-            organizationId: organization._id.toString(),
-          });
-          throw AppError.internal("Failed to initialize owner role");
-        }
-
-        // Assign roleId to the owner user and save
-        user.roleId = ownerRoleId;
-        await user.save({ session });
-      } catch (err) {
-        // If role creation fails, abort transaction with a clear error
-        logger.error("Failed to create default roles", {
-          error: (err as Error).message,
-          organizationId: organization._id.toString(),
-        });
-        throw AppError.internal("Failed to initialize organization roles");
-      }
+      }).save({ session });
 
       // Generate tokens
       const tokens = await generateTokenPair({
         sub: user._id.toString(),
         org: organization._id.toString(),
         roleId: user.roleId,
-        roleName: await roleService.getRoleName(user.roleId),
+        roleName: OWNER_ROLE_NAME,
         email: user.email,
       });
 
@@ -211,7 +189,12 @@ export const authService = {
         ownerId: user._id.toString(),
       });
 
-      return Promise.resolve({ organization, user, tokens });
+      return Promise.resolve({
+        organization,
+        user,
+        tokens,
+        roleName: OWNER_ROLE_NAME,
+      });
     });
   },
 
@@ -221,7 +204,11 @@ export const authService = {
   async login(
     email: string,
     password: string,
-  ): Promise<{ user: InstanceType<typeof User>; tokens: TokenPair }> {
+  ): Promise<{
+    user: InstanceType<typeof User>;
+    tokens: TokenPair;
+    roleName: string;
+  }> {
     // Find user with password field
     const user = await User.findOne({ email: email.toLowerCase().trim() })
       .select("+password")
@@ -283,7 +270,7 @@ export const authService = {
     // Remove password from response
     user.password = undefined as unknown as string;
 
-    return { user, tokens };
+    return { user, tokens, roleName };
   },
 
   /**

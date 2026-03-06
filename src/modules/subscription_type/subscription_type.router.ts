@@ -16,7 +16,11 @@ import {
   subscriptionTypeStatusOptions,
 } from "./models/subscription_type.model.ts";
 import { validateBody } from "../../middleware/validation.ts";
-import { authenticate, requireRole } from "../../middleware/auth.ts";
+import {
+  authenticate,
+  requireRole,
+  requireSuperAdmin,
+} from "../../middleware/auth.ts";
 
 const subscriptionTypeRouter = Router();
 

@@ -185,6 +185,11 @@ userSchema.methods.verifyPassword = async function (
   }
 };
 
+userSchema.methods.getRoleName = async function (): Promise<string | null> {
+  const role = await Role.findById(this.roleId).select("name").lean().exec();
+  return role?.name ?? null;
+};
+
 userSchema.methods.hasPermissions = async function (
   permissionsToMatch: string[],
 ): Promise<boolean> {
@@ -201,6 +206,9 @@ userSchema.methods.hasPermissions = async function (
 export type UserDocument = InferSchemaType<typeof userSchema> & {
   verifyPassword(password: string): Promise<boolean>;
   hasPermissions(permissionsToMatch: string[]): Promise<boolean>;
+  getRoleName(): Promise<string | null>;
 };
+
+/* ---------- Export ---------- */
 
 export const User = model<UserDocument>("User", userSchema);

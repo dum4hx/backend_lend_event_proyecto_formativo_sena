@@ -133,6 +133,7 @@ authRouter.post(
             email: result.user.email,
             name: result.user.name,
             roleId: result.user.roleId,
+            roleName: result.roleName,
           },
         },
       });
@@ -176,7 +177,7 @@ authRouter.post(
             email: result.user.email,
             name: result.user.name,
             roleId: result.user.roleId,
-            roleName: result.user.roleName,
+            roleName: result.roleName,
           },
         },
       });
