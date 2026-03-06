@@ -41,6 +41,15 @@ export const SubscriptionTypeZodSchema = z.object({
     .min(0, "Price per seat cannot be negative"),
   maxSeats: z.number().int().min(-1).default(-1), // -1 = unlimited
   maxCatalogItems: z.number().int().min(-1).default(-1), // -1 = unlimited
+  /**
+   * Duration of one subscription period in days.
+   * Must be between 1 and 365 (one year maximum).
+   */
+  durationDays: z
+    .number()
+    .int("Duration must be a whole number of days")
+    .min(1, "Duration must be at least 1 day")
+    .max(365, "Duration cannot exceed 365 days (one year)"),
   features: z.array(z.string()).optional(),
   sortOrder: z.number().int().min(0).default(0),
   stripePriceIdBase: z.string().optional(),
@@ -108,6 +117,13 @@ const subscriptionTypeSchema = new Schema(
       type: Number,
       min: -1,
       default: -1,
+    },
+    // Duration of one subscription period in days (1–365)
+    durationDays: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 365,
     },
     // Feature flags/list for the plan
     features: {

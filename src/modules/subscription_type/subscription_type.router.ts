@@ -12,15 +12,9 @@ import {
 import {
   SubscriptionTypeZodSchema,
   SubscriptionTypeUpdateZodSchema,
-  billingModelOptions,
-  subscriptionTypeStatusOptions,
 } from "./models/subscription_type.model.ts";
 import { validateBody } from "../../middleware/validation.ts";
-import {
-  authenticate,
-  requireRole,
-  requireSuperAdmin,
-} from "../../middleware/auth.ts";
+import { authenticate, requireSuperAdmin } from "../../middleware/auth.ts";
 
 const subscriptionTypeRouter = Router();
 
@@ -45,6 +39,7 @@ subscriptionTypeRouter.get(
             billingModel: plan.billingModel,
             maxCatalogItems: plan.maxCatalogItems,
             maxSeats: plan.maxSeats,
+            durationDays: plan.durationDays,
             features: plan.features,
             // Convert cents to dollars for display
             basePriceMonthly: plan.baseCost / 100,
@@ -78,6 +73,7 @@ subscriptionTypeRouter.get(
             billingModel: limits.billingModel,
             maxCatalogItems: limits.maxCatalogItems,
             maxSeats: limits.maxSeats,
+            durationDays: limits.durationDays,
             features: limits.features,
             basePriceMonthly: limits.baseCost / 100,
             pricePerSeat: limits.pricePerSeat / 100,
