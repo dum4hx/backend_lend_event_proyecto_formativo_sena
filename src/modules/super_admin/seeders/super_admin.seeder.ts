@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { User } from "../../user/models/user.model.ts";
 import { Organization } from "../../organization/models/organization.model.ts";
+import { Role, rolePermissions } from "../../roles/models/role.model.ts";
 import { logger } from "../../../utils/logger.ts";
 
 /**
@@ -28,10 +29,10 @@ async function seedSuperAdmin() {
     await mongoose.connect(DB_URI);
     logger.info("Connected to MongoDB");
 
-    // Check if super admin already exists
+    // Check if super admin already exists (match by email only — roleId is now
+    // a real ObjectId referencing the super_admin Role document).
     const existingAdmin = await User.findOne({
       email: ADMIN_EMAIL.toLowerCase().trim(),
-      role: "super_admin",
     });
 
     if (existingAdmin) {
@@ -64,50 +65,54 @@ async function seedSuperAdmin() {
 
       platformOrg = await orgDoc.save();
       logger.info(`Created platform organization with ID: ${platformOrg._id}`);
-
-      // Create the super admin user
-      const superAdminUser = new User({
-        _id: platformAdminId,
-        organizationId: platformOrg._id,
-        name: {
-          firstName: "Super",
-          secondName: "",
-          firstSurname: "Admin",
-          secondSurname: "",
-        },
-        email: ADMIN_EMAIL.toLowerCase().trim(),
-        phone: "+10000000000",
-        password: ADMIN_PASSWORD,
-        role: "super_admin",
-        status: "active",
-      });
-
-      await superAdminUser.save();
-      logger.info(
-        `Super admin user created successfully with email: ${ADMIN_EMAIL}`,
-      );
-    } else {
-      // Platform org exists, just create the user
-      const superAdminUser = new User({
-        organizationId: platformOrg._id,
-        name: {
-          firstName: "Super",
-          secondName: "",
-          firstSurname: "Admin",
-          secondSurname: "",
-        },
-        email: ADMIN_EMAIL.toLowerCase().trim(),
-        phone: "+10000000000",
-        password: ADMIN_PASSWORD,
-        role: "super_admin",
-        status: "active",
-      });
-
-      await superAdminUser.save();
-      logger.info(
-        `Super admin user created successfully with email: ${ADMIN_EMAIL}`,
-      );
     }
+
+    // Ensure the platform super_admin Role document exists (upsert by org + name).
+    // This mirrors how register() seeds org roles via Role.insertMany() before
+    // creating the user, ensuring roleId always points to a real Role document.
+    let superAdminRole = await Role.findOne({
+      organizationId: platformOrg._id,
+      name: "super_admin",
+    });
+
+    if (!superAdminRole) {
+      superAdminRole = await Role.create({
+        organizationId: platformOrg._id,
+        name: "super_admin",
+        permissions: rolePermissions.super_admin,
+        isReadOnly: true,
+        type: "SYSTEM",
+        description:
+          "Platform super admin — full access. System role, non-editable and non-deletable.",
+      });
+      logger.info(`Created super_admin role with ID: ${superAdminRole._id}`);
+    }
+
+    const platformAdminId =
+      (platformOrg as any).ownerId ?? new mongoose.Types.ObjectId();
+
+    // Create the super admin user using the real Role _id, matching the pattern
+    // used by register() which sets roleId: ownerRole._id.toString().
+    const superAdminUser = new User({
+      _id: platformAdminId,
+      organizationId: platformOrg._id,
+      name: {
+        firstName: "Super",
+        secondName: "",
+        firstSurname: "Admin",
+        secondSurname: "",
+      },
+      email: ADMIN_EMAIL.toLowerCase().trim(),
+      phone: "+10000000000",
+      password: ADMIN_PASSWORD,
+      roleId: superAdminRole._id.toString(),
+      status: "active",
+    });
+
+    await superAdminUser.save();
+    logger.info(
+      `Super admin user created successfully with email: ${ADMIN_EMAIL}`,
+    );
   } catch (error) {
     logger.error("Error seeding super admin:", error);
     process.exit(1);

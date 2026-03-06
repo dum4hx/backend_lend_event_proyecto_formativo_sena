@@ -272,8 +272,32 @@ export const requireOwner = requireRole("owner");
 
 /**
  * Middleware that restricts access to super admins only.
+ *
+ * Checks `roleName` from the JWT payload instead of `roleId`, because the
+ * super admin's roleId is a real MongoDB ObjectId (pointing to the
+ * super_admin Role document seeded for the platform organisation) — not the
+ * literal string "super_admin".
  */
-export const requireSuperAdmin = requireRole("super_admin");
+export const requireSuperAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void => {
+  try {
+    if (!req.user) {
+      throw AppError.unauthorized("Authentication required");
+    }
+    if (req.user.roleName !== "super_admin") {
+      throw AppError.unauthorized(
+        "You do not have the required role to perform this action",
+        { code: "FORBIDDEN", requiredRoles: ["super_admin"] },
+      );
+    }
+    next();
+  } catch (err: unknown) {
+    next(err);
+  }
+};
 
 /* ---------- Resource Ownership Middleware ---------- */
 
