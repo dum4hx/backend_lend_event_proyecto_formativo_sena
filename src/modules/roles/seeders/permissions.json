@@ -1,0 +1,373 @@
+[
+  {
+    "_id": "subscription_types:create",
+    "displayName": "Create Subscription Types",
+    "description": "Allows the creation of new subscription plan levels and pricing structures.",
+    "category": "Subscription_types",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "subscription_types:read",
+    "displayName": "View Subscription Types",
+    "description": "Allows viewing the available subscription plans and their configurations.",
+    "category": "Subscription_types",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "subscription_types:update",
+    "displayName": "Update Subscription Types",
+    "description": "Allows modifying existing subscription plan details and limits.",
+    "category": "Subscription_types",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "subscription_types:delete",
+    "displayName": "Delete Subscription Types",
+    "description": "Allows removing subscription plan definitions from the platform.",
+    "category": "Subscription_types",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "platform:manage",
+    "displayName": "Manage Platform",
+    "description": "Grant full administrative access to global platform settings and configurations.",
+    "category": "Platform",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "permissions:create",
+    "displayName": "Create Permissions",
+    "description": "Allows defining new granular permissions within the system.",
+    "category": "Permissions",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "permissions:read",
+    "displayName": "View Permissions",
+    "description": "Allows browsing the list of available system permissions.",
+    "category": "Permissions",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "permissions:update",
+    "displayName": "Update Permissions",
+    "description": "Allows editing the metadata or status of existing permissions.",
+    "category": "Permissions",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "permissions:delete",
+    "displayName": "Delete Permissions",
+    "description": "Allows removing permission definitions from the system.",
+    "category": "Permissions",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "organization:read",
+    "displayName": "View Organization",
+    "description": "Allows viewing organization profile and basic settings.",
+    "category": "Organization",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "organization:update",
+    "displayName": "Update Organization",
+    "description": "Allows editing organization details, branding, and contact info.",
+    "category": "Organization",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "organization:delete",
+    "displayName": "Delete Organization",
+    "description": "Allows the permanent removal of an organization and its data.",
+    "category": "Organization",
+    "isPlatformPermission": true
+  },
+  {
+    "_id": "billing:manage",
+    "displayName": "Manage Billing",
+    "description": "Allows management of payment methods and viewing billing history.",
+    "category": "Billing",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "subscription:manage",
+    "displayName": "Manage Subscription",
+    "description": "Allows upgrading, downgrading, or canceling the organization's plan.",
+    "category": "Subscription",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "users:create",
+    "displayName": "Create Users",
+    "description": "Allows inviting and creating new user accounts within the organization.",
+    "category": "Users",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "users:read",
+    "displayName": "View Users",
+    "description": "Allows viewing the list and profiles of organization members.",
+    "category": "Users",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "users:update",
+    "displayName": "Update Users",
+    "description": "Allows editing user roles, profiles, and account status.",
+    "category": "Users",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "users:delete",
+    "displayName": "Delete Users",
+    "description": "Allows removing users from the organization.",
+    "category": "Users",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "customers:create",
+    "displayName": "Create Customers",
+    "description": "Allows registering new customers/clients in the system.",
+    "category": "Customers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "customers:read",
+    "displayName": "View Customers",
+    "description": "Allows viewing customer directories and history.",
+    "category": "Customers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "customers:update",
+    "displayName": "Update Customers",
+    "description": "Allows editing customer contact information and details.",
+    "category": "Customers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "customers:delete",
+    "displayName": "Delete Customers",
+    "description": "Allows removing customer records from the system.",
+    "category": "Customers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "materials:create",
+    "displayName": "Create Materials",
+    "description": "Allows adding new materials or inventory items.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "materials:read",
+    "displayName": "View Materials",
+    "description": "Allows browsing the inventory and material catalog.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "materials:update",
+    "displayName": "Update Materials",
+    "description": "Allows editing material specifications and details.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "materials:delete",
+    "displayName": "Delete Materials",
+    "description": "Allows removing materials from the catalog.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "materials:state:update",
+    "displayName": "Update Material State",
+    "description": "Allows changing the status (e.g., Available, In Use, Maintenance) of materials.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "packages:create",
+    "displayName": "Create Packages",
+    "description": "Allows creating new material bundles or packages.",
+    "category": "Packages",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "packages:read",
+    "displayName": "View Packages",
+    "description": "Allows viewing existing packages and their contents.",
+    "category": "Packages",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "packages:update",
+    "displayName": "Update Packages",
+    "description": "Allows modifying package compositions and details.",
+    "category": "Packages",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "packages:delete",
+    "displayName": "Delete Packages",
+    "description": "Allows removing package definitions.",
+    "category": "Packages",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "requests:create",
+    "displayName": "Create Requests",
+    "description": "Allows submitting new material or service requests.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "requests:read",
+    "displayName": "View Requests",
+    "description": "Allows viewing and tracking the status of requests.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "requests:update",
+    "displayName": "Update Requests",
+    "description": "Allows editing pending request details.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "requests:approve",
+    "displayName": "Approve Requests",
+    "description": "Allows authorizing or rejecting submitted requests.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "requests:delete",
+    "displayName": "Delete Requests",
+    "description": "Allows canceling or removing request records.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "loans:create",
+    "displayName": "Create Loans",
+    "description": "Allows initiating new material loan records.",
+    "category": "Loans",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "loans:read",
+    "displayName": "View Loans",
+    "description": "Allows viewing active and historical loan records.",
+    "category": "Loans",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "loans:update",
+    "displayName": "Update Loans",
+    "description": "Allows editing loan terms and information.",
+    "category": "Loans",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "loans:checkout",
+    "displayName": "Checkout Loans",
+    "description": "Allows processing the physical checkout of loaned items.",
+    "category": "Loans",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "loans:return",
+    "displayName": "Return Loans",
+    "description": "Allows processing the return and check-in of loaned items.",
+    "category": "Loans",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "inspections:create",
+    "displayName": "Create Inspections",
+    "description": "Allows performing and recording item inspections.",
+    "category": "Inspections",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "inspections:read",
+    "displayName": "View Inspections",
+    "description": "Allows viewing inspection logs and results.",
+    "category": "Inspections",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "inspections:update",
+    "displayName": "Update Inspections",
+    "description": "Allows editing existing inspection reports.",
+    "category": "Inspections",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "invoices:create",
+    "displayName": "Create Invoices",
+    "description": "Allows generating new invoices for customers.",
+    "category": "Invoices",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "invoices:read",
+    "displayName": "View Invoices",
+    "description": "Allows viewing invoice history and payment status.",
+    "category": "Invoices",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "invoices:update",
+    "displayName": "Update Invoices",
+    "description": "Allows modifying draft or existing invoices.",
+    "category": "Invoices",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "reports:read",
+    "displayName": "View Reports",
+    "description": "Allows access to generated business and operational reports.",
+    "category": "Reports",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "roles:create",
+    "displayName": "Create Roles",
+    "description": "Allows defining custom roles and permission sets.",
+    "category": "Roles",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "roles:read",
+    "displayName": "View Roles",
+    "description": "Allows viewing defined system and organization roles.",
+    "category": "Roles",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "roles:update",
+    "displayName": "Update Roles",
+    "description": "Allows editing role names and assigned permissions.",
+    "category": "Roles",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "roles:delete",
+    "displayName": "Delete Roles",
+    "description": "Allows removing custom roles from the organization.",
+    "category": "Roles",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "analytics:read",
+    "displayName": "View Analytics",
+    "description": "Allows access to data dashboards and performance metrics.",
+    "category": "Analytics",
+    "isPlatformPermission": false
+  }
+]

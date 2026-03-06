@@ -1,29 +1,39 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
-import { createRegularUserContext } from "../../utils/setup.ts";
+import { test, expect, request as baseRequest } from "@playwright/test";
+import { STORAGE_STATE_PATH } from "../../utils/setup.ts";
 
 test.describe("Permissions Module", () => {
-  let regularUserContext: APIRequestContext;
-
-  test.beforeAll(async ({ baseURL }) => {
-    regularUserContext = await createRegularUserContext(baseURL!);
-  });
-
-  test.afterAll(async () => {
-    await regularUserContext.dispose();
-  });
-
   test("GET /permissions - should require authentication", async ({
-    request,
+    baseURL,
   }) => {
-    const response = await request.get("/permissions");
-    expect(response.status()).toBe(401);
+    // Create a context with no cookies to simulate an unauthenticated request.
+    // Cannot use the default `request` fixture here because the global
+    // storageState in playwright.config.ts pre-authenticates every request.
+    const unauthCtx = await baseRequest.newContext({
+      baseURL: baseURL || "",
+      ignoreHTTPSErrors: true,
+    });
 
+    const response = await unauthCtx.get("/permissions");
+    await unauthCtx.dispose();
+
+    expect(response.status()).toBe(401);
     const body = await response.json();
     expect(body.code).toBe("UNAUTHORIZED");
   });
 
-  test("GET /permissions - should list permissions for authenticated user", async () => {
-    const response = await regularUserContext.get("/permissions");
+  test("GET /permissions - should list permissions for authenticated user", async ({
+    baseURL,
+  }) => {
+    // Explicitly load from saved storageState — no login needed.
+    const authCtx = await baseRequest.newContext({
+      baseURL: baseURL || "",
+      storageState: STORAGE_STATE_PATH,
+      ignoreHTTPSErrors: true,
+    });
+
+    const response = await authCtx.get("/permissions");
+    await authCtx.dispose();
+
     expect(response.status()).toBe(200);
 
     const body = await response.json();
