@@ -2,7 +2,7 @@ import * as argon2 from "argon2";
 import { Types, startSession } from "mongoose";
 import crypto from "node:crypto";
 import { User, type UserInput } from "../user/models/user.model.ts";
-import { defaultOrganizationRoles } from "../user/models/user.model.ts";
+import { defaultOrganizationRoleDefs } from "../roles/models/role.model.ts";
 import { Role, type UserRole } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { generateTokenPair, type TokenPair } from "../../utils/auth/jwt.ts";
@@ -17,7 +17,7 @@ import { PasswordResetToken } from "./models/password_reset_token.model.ts";
 import { InviteToken } from "./models/invite_token.model.ts";
 import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
-import type { ClientSession } from "mongoose";
+import roleService from "../roles/roles.service.ts";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
@@ -37,7 +37,7 @@ export const authService = {
    */
   async register(
     organizationData: Omit<OrganizationInput, "ownerId">,
-    ownerData: Omit<UserInput, "organizationId" | "role">,
+    ownerData: Omit<UserInput, "organizationId" | "roleId">,
   ): Promise<{
     organization: InstanceType<typeof Organization>;
     user: InstanceType<typeof User>;
@@ -140,30 +140,52 @@ export const authService = {
       const orgDoc = new Organization(orgData);
       const organization = await orgDoc.save({ session });
 
-      // Create owner user
+      // Create owner user (roleId will be assigned after creating roles)
       const userDoc = new User({
         _id: ownerId,
         ...ownerData,
         organizationId: organization._id,
-        role: "owner" as UserRole,
         status: "active",
       });
       const user = await userDoc.save({ session });
 
-      // Create default organization roles (owner, manager, warehouse_operator, commercial_advisor)
+      // Seed all default organization roles.
+      // Each definition in `defaultOrganizationRoleDefs` carries the correct
+      // `isReadOnly` and `type` flags so the `owner` role is created as a
+      // non-editable SYSTEM role from the very first insertion.
       try {
-        const rolesToCreate = Object.entries(defaultOrganizationRoles).map(
-          ([name, perms]) => ({
-            organizationId: organization._id,
-            name,
-            permissions: perms,
-            description: `Default role: ${name}`,
-          }),
-        );
+        const rolesToCreate = defaultOrganizationRoleDefs.map((def) => ({
+          organizationId: organization._id,
+          ...def, // spreads: name, permissions, isReadOnly, type, description
+        }));
+
         // Use insertMany within the transaction session
         if (rolesToCreate.length > 0) {
           await Role.insertMany(rolesToCreate as any[], { session });
         }
+
+        // Get id of newly inserted owner role and assign to user.roleId
+        let ownerRoleId: string | null = null;
+        if (rolesToCreate.length > 0) {
+          const inserted = await Role.findOne({
+            organizationId: organization._id,
+            name: "owner",
+          }).session(session);
+          if (inserted) {
+            ownerRoleId = inserted._id.toString();
+          }
+        }
+
+        if (!ownerRoleId) {
+          logger.error("Owner role not found after insert", {
+            organizationId: organization._id.toString(),
+          });
+          throw AppError.internal("Failed to initialize owner role");
+        }
+
+        // Assign roleId to the owner user and save
+        user.roleId = ownerRoleId;
+        await user.save({ session });
       } catch (err) {
         // If role creation fails, abort transaction with a clear error
         logger.error("Failed to create default roles", {
@@ -177,7 +199,8 @@ export const authService = {
       const tokens = await generateTokenPair({
         sub: user._id.toString(),
         org: organization._id.toString(),
-        role: "owner",
+        roleId: user.roleId,
+        roleName: await roleService.getRoleName(user.roleId),
         email: user.email,
       });
 
@@ -209,7 +232,7 @@ export const authService = {
     }
 
     // Verify password
-    const isValidPassword = await argon2.verify(user.password, password);
+    const isValidPassword = await user.verifyPassword(password);
     if (!isValidPassword) {
       throw AppError.unauthorized("Invalid email or password");
     }
@@ -246,10 +269,12 @@ export const authService = {
     await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
 
     // Generate tokens - extract _id from populated organizationId
+    const roleName = await roleService.getRoleName(user.roleId);
     const tokens = await generateTokenPair({
       sub: user._id.toString(),
       org: org._id.toString(),
-      role: user.role as UserRole,
+      roleId: user.roleId,
+      roleName: roleName,
       email: user.email,
     });
 
@@ -280,7 +305,8 @@ export const authService = {
     return generateTokenPair({
       sub: user._id.toString(),
       org: organizationId,
-      role: user.role as UserRole,
+      roleId: user.roleId,
+      roleName: await roleService.getRoleName(user.roleId),
       email: user.email,
     });
   },
@@ -509,7 +535,12 @@ export const authService = {
     const user = await userService.getProfile(userId);
 
     // Check if user is owner
-    if (user.role !== "owner") {
+    const rolePermissions = await roleService.getRolePermissions(
+      user.roleId,
+      user.organizationId,
+    );
+    // TODO: Validate owner permissions from roleservice instead of hardcoding "owner"
+    if (rolePermissions.includes("owner")) {
       throw AppError.unauthorized(
         "Only organization owners can check payment status",
       );

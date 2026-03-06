@@ -4,7 +4,6 @@ import type { CryptoKey, KeyObject } from "jose";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { AppError } from "../../errors/AppError.ts";
-import type { UserRole } from "../../modules/user/models/user.model.ts";
 import { logger } from "../logger.ts";
 
 // Define KeyLike as the union type (jose 6.x uses CryptoKey | KeyObject)
@@ -26,7 +25,13 @@ const JWT_AUDIENCE = process.env.JWT_AUDIENCE ?? "lend-event-client";
 export interface JWTPayload {
   sub: string; // userId
   org: string; // organizationId
-  role: UserRole;
+  roleId: string; // role document _id
+  /**
+   * Human-readable role name embedded at token-mint time.
+   * Avoids a DB round-trip on every authenticated request.
+   * Note: staleness window equals the access-token TTL (default 15 min).
+   */
+  roleName: string;
   email: string;
   type: "access" | "refresh";
 }

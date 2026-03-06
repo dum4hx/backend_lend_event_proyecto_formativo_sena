@@ -25,6 +25,8 @@ export interface AuthenticatedUser {
   userId: Types.ObjectId;
   organizationId: Types.ObjectId;
   roleId: Types.ObjectId;
+  /** Role name as embedded in the JWT at mint-time — no extra DB query needed. */
+  roleName: string;
   email: string;
 }
 
@@ -87,8 +89,8 @@ export const authenticate = async (
     // Verify the token
     const payload: JWTPayload = await verifyAccessToken(token);
 
-    // Validate payload structure
-    if (!payload.sub || !payload.org || !payload.role || !payload.email) {
+    // Validate payload structure — `roleId` is the JWT claim name (matches JWTPayload interface)
+    if (!payload.sub || !payload.org || !payload.roleId || !payload.email) {
       throw AppError.unauthorized("Invalid token payload structure");
     }
 
@@ -99,13 +101,17 @@ export const authenticate = async (
     if (!Types.ObjectId.isValid(payload.org)) {
       throw AppError.unauthorized("Invalid organization ID in token");
     }
+    if (!Types.ObjectId.isValid(payload.roleId)) {
+      throw AppError.unauthorized("Invalid role ID in token");
+    }
 
-    // Attach user info to request
+    // Attach user info to request — roleName comes for free from the token payload
     req.user = {
       id: payload.sub,
       userId: new Types.ObjectId(payload.sub),
       organizationId: new Types.ObjectId(payload.org),
-      roleId: new Types.ObjectId(payload.role),
+      roleId: new Types.ObjectId(payload.roleId),
+      roleName: payload.roleName ?? "",
       email: payload.email,
     };
 

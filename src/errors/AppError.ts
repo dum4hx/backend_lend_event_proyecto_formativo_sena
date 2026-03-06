@@ -63,6 +63,15 @@ export class AppError extends Error {
     });
   }
 
+  static forbidden(message = "Forbidden", details?: unknown): AppError {
+    return new AppError({
+      message,
+      statusCode: 403,
+      code: "FORBIDDEN",
+      details,
+    });
+  }
+
   static notFound(message = "Not Found", details?: unknown): AppError {
     return new AppError({
       message,

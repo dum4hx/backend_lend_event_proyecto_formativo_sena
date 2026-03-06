@@ -197,6 +197,78 @@ export const defaultOrganizationRoles: Record<
   commercial_advisor: rolePermissions.commercial_advisor,
 } as const;
 
+/**
+ * String literal for the owner role name — use this constant instead of
+ * the bare string `"owner"` to keep rename-refactors safe.
+ */
+export const OWNER_ROLE_NAME = "owner" as const;
+
+/**
+ * Full per-role definitions used when seeding a newly registered organization.
+ *
+ * Each entry extends the permission list with `isReadOnly` and `type` so the
+ * auth service can persist correct metadata in a single pass.
+ *
+ * - `owner`  → `isReadOnly: true` / `type: "SYSTEM"`: non-editable covenant
+ *   that an organization always has at least one super-role.  It is copied
+ *   verbatim and assigned to the registering user.
+ * - All other defaults → `isReadOnly: false` / `type: "CUSTOM"`: seeded for
+ *   convenience but fully editable by the organization owner.
+ */
+export const defaultOrganizationRoleDefs: Array<{
+  name: DefaultOrganizationRole;
+  permissions: string[];
+  isReadOnly: boolean;
+  type: "SYSTEM" | "CUSTOM";
+  description: string;
+}> = [
+  {
+    name: "owner",
+    permissions: rolePermissions.owner,
+    isReadOnly: true,
+    type: "SYSTEM",
+    description:
+      "Organization owner — full access. System role, non-editable and non-deletable.",
+  },
+  {
+    name: "manager",
+    permissions: rolePermissions.manager,
+    isReadOnly: false,
+    type: "CUSTOM",
+    description: "Default manager role — can be customized by the owner.",
+  },
+  {
+    name: "warehouse_operator",
+    permissions: rolePermissions.warehouse_operator,
+    isReadOnly: false,
+    type: "CUSTOM",
+    description:
+      "Default warehouse operator role — can be customized by the owner.",
+  },
+  {
+    name: "commercial_advisor",
+    permissions: rolePermissions.commercial_advisor,
+    isReadOnly: false,
+    type: "CUSTOM",
+    description:
+      "Default commercial advisor role — can be customized by the owner.",
+  },
+];
+
+/**
+ * Flat, sorted, deduplicated list of every permission that can appear on an
+ * organization role — i.e. the union of all org-scoped default roles.
+ *
+ * **Super-admin-only permissions are intentionally excluded** here because
+ * they cannot be assigned to, or replicated within, an organization context.
+ * Use this constant in the permissions endpoint so the client always receives
+ * an up-to-date catalogue without having to know which permissions are
+ * platform-only.
+ */
+export const organizationAvailablePermissions: readonly string[] = [
+  ...new Set(organizationRoleOptions.flatMap((role) => rolePermissions[role])),
+].sort();
+
 // Types of roles enum
 const roleTypes = ["SYSTEM", "CUSTOM"] as const;
 
@@ -234,7 +306,8 @@ const roleSchema = new Schema(
     name: {
       type: String,
       required: true,
-      enum: organizationRoleOptions as unknown as string[],
+      // NOTE: No `enum` restriction here — custom roles may use any name.
+      // The `super_admin` name is blocked at the service layer via assertNotSuperAdmin.
       trim: true,
     },
     permissions: {
