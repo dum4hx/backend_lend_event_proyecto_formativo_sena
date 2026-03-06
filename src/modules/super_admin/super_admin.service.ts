@@ -225,9 +225,28 @@ export const adminService = {
     startDate.setMonth(startDate.getMonth() - periodMonths);
 
     const [byRole, byStatus, growthTrend, avgUsersPerOrg] = await Promise.all([
-      // User count by role
+      // User count by role — join Role collection to resolve roleId → name.
+      // roleId is stored as a string so it must be cast to ObjectId before lookup.
       User.aggregate([
-        { $group: { _id: "$role", count: { $sum: 1 } } },
+        {
+          $addFields: {
+            roleObjectId: { $toObjectId: "$roleId" },
+          },
+        },
+        {
+          $lookup: {
+            from: "roles",
+            localField: "roleObjectId",
+            foreignField: "_id",
+            as: "roleDoc",
+          },
+        },
+        {
+          $group: {
+            _id: { $ifNull: [{ $arrayElemAt: ["$roleDoc.name", 0] }, "unknown"] },
+            count: { $sum: 1 },
+          },
+        },
         { $project: { role: "$_id", count: 1, _id: 0 } },
         { $sort: { count: -1 } },
       ]),
