@@ -1213,6 +1213,7 @@ Lists all active subscription types (public).
         "billingModel": "dynamic",
         "maxCatalogItems": 100,
         "maxSeats": 5,
+        "durationDays": 30,
         "features": ["Up to 5 team members", "100 catalog items"],
         "basePriceMonthly": 29,
         "pricePerSeat": 5
@@ -1232,6 +1233,27 @@ Gets a specific subscription type by plan name.
 | --------- | -------- | ------ | -------- | ------------------------------------------------- |
 | plan      | path     | string | Yes      | Plan identifier (e.g., `starter`, `professional`) |
 
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptionType": {
+      "plan": "starter",
+      "displayName": "Starter",
+      "billingModel": "dynamic",
+      "maxCatalogItems": 100,
+      "maxSeats": 5,
+      "durationDays": 30,
+      "features": ["Up to 5 team members", "100 catalog items"],
+      "basePriceMonthly": 29,
+      "pricePerSeat": 5
+    }
+  }
+}
+```
+
 ---
 
 #### POST /subscription-types
@@ -1248,6 +1270,7 @@ Creates a new subscription type (super admin only).
 | pricePerSeat      | body     | integer  | Yes      | Price per seat in cents                            |
 | maxSeats          | body     | integer  | No       | Max seats (-1 = unlimited, default: -1)            |
 | maxCatalogItems   | body     | integer  | No       | Max items (-1 = unlimited, default: -1)            |
+| durationDays      | body     | integer  | Yes      | Subscription period in days (min: 1, max: 365)     |
 | features          | body     | string[] | No       | List of feature descriptions                       |
 | sortOrder         | body     | integer  | No       | Display order (default: 0)                         |
 | stripePriceIdBase | body     | string   | No       | Stripe price ID for base                           |
@@ -1271,6 +1294,7 @@ Creates a new subscription type (super admin only).
       "pricePerSeat": 200,
       "maxSeats": -1,
       "maxCatalogItems": -1,
+      "durationDays": 365,
       "features": ["Unlimited everything", "24/7 support"],
       "status": "active"
     }
@@ -1284,7 +1308,7 @@ Creates a new subscription type (super admin only).
 
 Updates a subscription type (super admin only).
 
-**Note:** The `plan` field cannot be changed after creation.
+**Note:** The `plan` field cannot be changed after creation. `durationDays` can be updated but must remain within 1–365.
 
 **Permission Required:** `subscription_types:update`
 
