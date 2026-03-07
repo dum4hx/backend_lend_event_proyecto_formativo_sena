@@ -47,11 +47,11 @@ const inviteUserSchema = z.object({
   }),
   email: z.email(),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
-  role: z.enum(organizationRoleOptions).default("commercial_advisor"),
+  roleId: z.string(),
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(organizationRoleOptions),
+  roleId: z.string(),
 });
 
 /* ---------- Routes ---------- */
