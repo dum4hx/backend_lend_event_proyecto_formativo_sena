@@ -52,13 +52,13 @@ test.describe("Auth Module", () => {
   test("GET /auth/me - should return current user details", async ({
     request,
   }) => {
-    // Login to get session
-    const loginRes = await request.post("auth/login", {
-      data: {
-        email: createdUserEmail,
-        password: createdUserPassword,
-      },
-    });
+    // // Login to get session
+    // const loginRes = await request.post("auth/login", {
+    //   data: {
+    //     email: createdUserEmail,
+    //     password: createdUserPassword,
+    //   },
+    // });
 
     // request context should store cookies automatically from the login response
     const response = await request.get("auth/me");

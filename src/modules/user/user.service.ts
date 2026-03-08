@@ -1,4 +1,4 @@
-import type { Types, ClientSession } from "mongoose";
+import { Types, type ClientSession } from "mongoose";
 import { User, type UserInput } from "./models/user.model.ts";
 import { type UserRole } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
@@ -85,8 +85,20 @@ export const userService = {
       User.countDocuments(query),
     ]);
 
+    // Map each user to include roleName instead of roleId
+    const usersWithRoleNames = await Promise.all(
+      users.map(async (user) => {
+        const roleName = await rolesService.getRoleName(user.roleId);
+        const userObj = user.toObject();
+        return {
+          ...userObj,
+          roleName,
+        };
+      }),
+    );
+
     return {
-      users,
+      users: usersWithRoleNames as any,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -306,9 +318,15 @@ export const userService = {
       throw AppError.notFound("User not found");
     }
 
+    // Since organizationId is populated, it's an object. We need the ID string.
+    const orgId =
+      user.organizationId instanceof Types.ObjectId
+        ? user.organizationId.toString()
+        : (user.organizationId as any)._id.toString();
+
     const permissions = await rolesService.getRolePermissions(
       user.roleId,
-      user.organizationId.toString(),
+      orgId,
     );
 
     return { user, permissions };

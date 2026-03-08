@@ -119,8 +119,11 @@ curl -X POST https://api.test.local/api/v1/auth/register \
       "id": "507f1f77bcf86cd799439012",
       "email": "john@eventpro.com",
       "name": { "firstName": "John", "firstSurname": "Doe" },
-      "role": "owner"
-    }
+      "roleId": "65f0a1b2c3d4e5f607182930",
+      "roleName": "owner",
+      "permissions": ["organization:read", "users:create", "users:read"]
+    },
+    "permissions": ["organization:read", "users:create", "users:read"]
   }
 }
 ```
@@ -144,8 +147,11 @@ curl -X GET https://api.test.local/api/v1/auth/me \
       "id": "507f1f77bcf86cd799439012",
       "email": "john@eventpro.com",
       "name": { "firstName": "John", "firstSurname": "Doe" },
-      "role": "owner"
-    }
+      "roleId": "65f0a1b2c3d4e5f607182930",
+      "roleName": "owner",
+      "permissions": ["organization:read", "users:create", "users:read"]
+    },
+    "permissions": ["organization:read", "users:create", "users:read"]
   }
 }
 ```
@@ -324,7 +330,15 @@ The `organization.address` object has the following structure:
   "status": "success",
   "data": {
     "organization": { "id": "...", "name": "...", "email": "..." },
-    "user": { "id": "...", "email": "...", "name": {...}, "role": "owner" }
+    "user": {
+      "id": "...",
+      "email": "...",
+      "name": { ... },
+      "roleId": "...",
+      "roleName": "owner",
+      "permissions": ["organization:read", "users:create", "users:read"]
+    },
+    "permissions": ["organization:read", "users:create", "users:read"]
   }
 }
 ```
@@ -367,7 +381,15 @@ Authenticates user and sets JWT cookies.
 {
   "status": "success",
   "data": {
-    "user": { "id": "...", "email": "...", "name": {...}, "role": "..." }
+    "user": {
+      "id": "...",
+      "email": "...",
+      "name": { ... },
+      "roleId": "...",
+      "roleName": "...",
+      "permissions": ["organization:read", "users:create", "users:read"]
+    },
+    "permissions": ["organization:read", "users:create", "users:read"]
   }
 }
 ```
@@ -594,9 +616,12 @@ Returns current authenticated user's information.
       "id": "507f1f77bcf86cd799439012",
       "email": "john@example.com",
       "name": { "firstName": "John", "firstSurname": "Doe" },
-      "role": "owner",
-      "status": "active"
-    }
+      "roleId": "65f0a1b2c3d4e5f607182930",
+      "roleName": "owner",
+      "status": "active",
+      "permissions": ["organization:read", "users:create", "users:read"]
+    },
+    "permissions": ["organization:read", "users:create", "users:read"]
   }
 }
 ```
@@ -673,7 +698,7 @@ Lists all users in the organization.
 | page      | query    | integer | No       | Page number (default: 1)                                       |
 | limit     | query    | integer | No       | Items per page (default: 20, max: 100)                         |
 | status    | query    | string  | No       | Filter by status: `active`, `inactive`, `invited`, `suspended` |
-| role      | query    | string  | No       | Filter by role                                                 |
+| roleId    | query    | string  | No       | Filter by role ID                                              |
 | search    | query    | string  | No       | Search by name or email                                        |
 
 **Permission Required:** `users:read`
@@ -684,7 +709,18 @@ Lists all users in the organization.
 {
   "status": "success",
   "data": {
-    "users": [...],
+    "users": [
+      {
+        "_id": "60d5ec42f3b14a2c98a5e1a1",
+        "name": {
+          "firstName": "John",
+          "firstSurname": "Doe"
+        },
+        "email": "john.doe@example.com",
+        "roleName": "manager",
+        "status": "active"
+      }
+    ],
     "total": 45,
     "page": 1,
     "totalPages": 3
@@ -1856,6 +1892,7 @@ Blacklists a customer.
 Soft deletes a customer (sets status to inactive).
 
 ---
+
 ## Location Endpoints
 
 Manage physical locations such as warehouses, offices, and operation points within an organization.
@@ -1869,12 +1906,12 @@ Retrieves a paginated list of all locations in the organization.
 
 #### Query Parameters
 
-| Parameter | Type    | Required | Default | Description                                    |
-| --------- | ------- | -------- | ------- | ---------------------------------------------- |
-| page      | integer | No       | 1       | Page number for pagination                     |
-| limit     | integer | No       | 20      | Number of items per page (max: 100)           |
-| search    | string  | No       | -       | Search by location name, street, or city       |
-| city      | string  | No       | -       | Filter by exact city name (case-insensitive)   |
+| Parameter | Type    | Required | Default | Description                                  |
+| --------- | ------- | -------- | ------- | -------------------------------------------- |
+| page      | integer | No       | 1       | Page number for pagination                   |
+| limit     | integer | No       | 20      | Number of items per page (max: 100)          |
+| search    | string  | No       | -       | Search by location name, street, or city     |
+| city      | string  | No       | -       | Filter by exact city name (case-insensitive) |
 
 #### Success Response (200 OK)
 
@@ -1965,15 +2002,15 @@ Creates a new location in the organization.
 
 #### Request Body
 
-| Field                  | Type   | Required | Constraints           | Description                        |
-| ---------------------- | ------ | -------- | --------------------- | ---------------------------------- |
-| name                   | string | Yes      | 1-100 characters      | Location name                      |
-| address.country        | string | Yes      | 1-50 characters       | Country code or name               |
-| address.state          | string | No       | Max 100 characters    | State or region                    |
-| address.city           | string | Yes      | 1-100 characters      | City name                          |
-| address.street         | string | Yes      | 1-100 characters      | Street name                        |
-| address.propertyNumber | string | Yes      | 1-50 characters       | Building/property number           |
-| address.additionalInfo | string | No       | Max 200 characters    | Floor, suite, additional details   |
+| Field                  | Type   | Required | Constraints        | Description                      |
+| ---------------------- | ------ | -------- | ------------------ | -------------------------------- |
+| name                   | string | Yes      | 1-100 characters   | Location name                    |
+| address.country        | string | Yes      | 1-50 characters    | Country code or name             |
+| address.state          | string | No       | Max 100 characters | State or region                  |
+| address.city           | string | Yes      | 1-100 characters   | City name                        |
+| address.street         | string | Yes      | 1-100 characters   | Street name                      |
+| address.propertyNumber | string | Yes      | 1-50 characters    | Building/property number         |
+| address.additionalInfo | string | No       | Max 200 characters | Floor, suite, additional details |
 
 #### Example Request
 
@@ -2114,16 +2151,15 @@ Deletes a location from the organization.
 
 ### Location Permissions by Role
 
-| Role                 | locations:read | locations:create | locations:update | locations:delete |
-| -------------------- | -------------- | ---------------- | ---------------- | ---------------- |
-| super_admin          | Yes            | Yes              | Yes              | Yes              |
-| owner                | Yes            | Yes              | Yes              | Yes              |
-| manager              | Yes            | Yes              | Yes              | Yes              |
-| warehouse_operator   | Yes            | No               | No               | No               |
-| commercial_advisor   | Yes            | No               | No               | No               |
+| Role               | locations:read | locations:create | locations:update | locations:delete |
+| ------------------ | -------------- | ---------------- | ---------------- | ---------------- |
+| super_admin        | Yes            | Yes              | Yes              | Yes              |
+| owner              | Yes            | Yes              | Yes              | Yes              |
+| manager            | Yes            | Yes              | Yes              | Yes              |
+| warehouse_operator | Yes            | No               | No               | No               |
+| commercial_advisor | Yes            | No               | No               | No               |
 
 ---
-
 
 ### Material Endpoints
 
