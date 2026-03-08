@@ -201,7 +201,7 @@ userRouter.patch(
       const user = await userService.updateRole(
         req.params.id as string,
         getOrgId(req),
-        req.body.role,
+        req.body.roleId,
         getUserId(req),
       );
 

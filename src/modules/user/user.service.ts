@@ -1,8 +1,10 @@
 import type { Types, ClientSession } from "mongoose";
-import { User, type UserInput, type UserRole } from "./models/user.model.ts";
+import { User, type UserInput } from "./models/user.model.ts";
+import { type UserRole } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
+import rolesService from "../roles/roles.service.ts";
 
 /* ---------- User Service ---------- */
 
@@ -48,7 +50,7 @@ export const userService = {
       page?: number;
       limit?: number;
       status?: string;
-      role?: UserRole;
+      roleId?: string;
       search?: string;
     } = {},
   ): Promise<{
@@ -57,7 +59,7 @@ export const userService = {
     page: number;
     totalPages: number;
   }> {
-    const { page = 1, limit = 20, status, role, search } = options;
+    const { page = 1, limit = 20, status, roleId, search } = options;
     const skip = (page - 1) * limit;
 
     const query: Record<string, unknown> = { organizationId };
@@ -66,8 +68,8 @@ export const userService = {
       query.status = status;
     }
 
-    if (role) {
-      query.role = role;
+    if (roleId) {
+      query.roleId = roleId;
     }
 
     if (search) {
@@ -121,7 +123,7 @@ export const userService = {
   async updateRole(
     userId: Types.ObjectId | string,
     organizationId: Types.ObjectId | string,
-    newRole: UserRole,
+    newRoleId: string,
     requestingUserId: Types.ObjectId | string,
   ): Promise<InstanceType<typeof User>> {
     const user = await User.findOne({ _id: userId, organizationId });
@@ -135,30 +137,35 @@ export const userService = {
     }
 
     // Cannot demote the owner
-    if (user.role === "owner") {
+    if ((await user.getRoleName()) === "owner") {
       throw AppError.badRequest(
         "Cannot change the role of the organization owner",
       );
     }
 
-    // Cannot assign super_admin role (platform-only)
-    if (newRole === "super_admin") {
+    // Cannot promote a role that does not belong to current organization
+    const org = await organizationService.findById(organizationId);
+    const orgRoles = await org.getOrgRoles();
+    if (!orgRoles.some((role) => role._id.toString() === newRoleId)) {
       throw AppError.badRequest(
-        "Cannot assign the super_admin role to organization users",
+        "Invalid roleId: Role does not belong to organization",
       );
     }
 
     // Cannot promote to owner
-    if (newRole === "owner") {
+    const newRoleName = orgRoles.find(
+      (role) => role._id.toString() === newRoleId,
+    )?.name;
+    if (newRoleName === "owner") {
       throw AppError.badRequest("Cannot promote user to owner role");
     }
 
-    user.role = newRole;
+    user.roleId = newRoleId;
     await user.save();
 
     logger.info("User role updated", {
       userId: userId.toString(),
-      newRole,
+      newRoleId,
       updatedBy: requestingUserId.toString(),
     });
 
@@ -184,7 +191,7 @@ export const userService = {
     }
 
     // Cannot deactivate owner
-    if (user.role === "owner") {
+    if ((await user.getRoleName()) === "owner") {
       throw AppError.badRequest("Cannot deactivate the organization owner");
     }
 
@@ -260,7 +267,7 @@ export const userService = {
     }
 
     // Cannot delete owner
-    if (user.role === "owner") {
+    if ((await user.getRoleName()) === "owner") {
       throw AppError.badRequest("Cannot delete the organization owner");
     }
 
@@ -289,7 +296,7 @@ export const userService = {
    */
   async getProfile(
     userId: Types.ObjectId | string,
-  ): Promise<InstanceType<typeof User>> {
+  ): Promise<{ user: InstanceType<typeof User>; permissions: string[] }> {
     const user = await User.findById(userId).populate(
       "organizationId",
       "name legalName subscription.plan status",
@@ -299,6 +306,11 @@ export const userService = {
       throw AppError.notFound("User not found");
     }
 
-    return user;
+    const permissions = await rolesService.getRolePermissions(
+      user.roleId,
+      user.organizationId.toString(),
+    );
+
+    return { user, permissions };
   },
 };

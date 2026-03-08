@@ -47,6 +47,7 @@ export const authService = {
     user: InstanceType<typeof User>;
     tokens: TokenPair;
     roleName: string;
+    permissions: string[];
   }> {
     const session = await startSession();
 
@@ -194,6 +195,7 @@ export const authService = {
         user,
         tokens,
         roleName: OWNER_ROLE_NAME,
+        permissions: ownerRole.permissions,
       });
     });
   },
@@ -208,6 +210,7 @@ export const authService = {
     user: InstanceType<typeof User>;
     tokens: TokenPair;
     roleName: string;
+    permissions: string[];
   }> {
     // Find user with password field
     const user = await User.findOne({ email: email.toLowerCase().trim() })
@@ -265,12 +268,17 @@ export const authService = {
       email: user.email,
     });
 
+    // Get role permissions for logging (not included in token to save space)
+    const permissions = await roleService.getRolePermissions(
+      user.roleId,
+      org._id.toString(),
+    );
     logger.info("User logged in", { userId: user._id.toString() });
 
     // Remove password from response
     user.password = undefined as unknown as string;
 
-    return { user, tokens, roleName };
+    return { user, tokens, roleName, permissions };
   },
 
   /**
@@ -519,12 +527,12 @@ export const authService = {
 
     const { userService } = await import("../user/user.service.ts");
 
-    const user = await userService.getProfile(userId);
+    const profile = await userService.getProfile(userId);
 
     // Check if user is owner
     const rolePermissions = await roleService.getRolePermissions(
-      user.roleId,
-      user.organizationId,
+      profile.user.roleId,
+      profile.user.organizationId,
     );
     // TODO: Validate owner permissions from roleservice instead of hardcoding "owner"
     if (rolePermissions.includes("owner")) {
@@ -534,7 +542,9 @@ export const authService = {
     }
 
     // Get organization
-    const organization = await Organization.findById(user.organizationId)
+    const organization = await Organization.findById(
+      profile.user.organizationId,
+    )
       .select("status subscription")
       .lean();
 
@@ -555,7 +565,7 @@ export const authService = {
       organization.subscription.currentPeriodEnd < new Date()
     ) {
       await Organization.updateOne(
-        { _id: user.organizationId },
+        { _id: profile.user.organizationId },
         { status: "suspended" },
       );
       response.status = "suspended";

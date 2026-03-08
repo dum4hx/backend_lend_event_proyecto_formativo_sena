@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
+import { Role } from "../../roles/models/role.model.ts";
 
 /* ---------- Subscription Plans ---------- */
 
@@ -56,7 +57,7 @@ export type OrganizationInput = z.infer<typeof OrganizationZodSchema>;
 const organizationAddressSchema = new Schema(
   {
     country: { type: String, maxlength: 50, trim: true, default: "Colombia" },
-    state: { type: String, maxlength: 50, trim: true,  },
+    state: { type: String, maxlength: 50, trim: true },
     city: { type: String, maxlength: 100, trim: true },
     street: { type: String, maxlength: 200, trim: true },
     postalCode: { type: String, maxlength: 20, trim: true },
@@ -150,9 +151,22 @@ organizationSchema.index(
 );
 organizationSchema.index({ status: 1 });
 
+/* ---------- Document Methods ---------- */
+
+organizationSchema.methods.getOrgRoles = async function (): Promise<
+  { _id: Types.ObjectId; name: string }[]
+> {
+  return Role.find({ organizationId: this._id }, { _id: 1, name: 1 });
+};
+
 /* ---------- Export ---------- */
 
-export type OrganizationDocument = InferSchemaType<typeof organizationSchema>;
+export type OrganizationDocument = InferSchemaType<
+  typeof organizationSchema
+> & {
+  getOrgRoles: () => Promise<{ _id: Types.ObjectId; name: string }[]>;
+};
+
 export const Organization = model<OrganizationDocument>(
   "Organization",
   organizationSchema,

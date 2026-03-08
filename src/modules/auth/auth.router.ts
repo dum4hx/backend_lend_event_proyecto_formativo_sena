@@ -134,7 +134,9 @@ authRouter.post(
             name: result.user.name,
             roleId: result.user.roleId,
             roleName: result.roleName,
+            permissions: result.permissions,
           },
+          permissions: result.permissions,
         },
       });
     } catch (err) {
@@ -178,7 +180,9 @@ authRouter.post(
             name: result.user.name,
             roleId: result.user.roleId,
             roleName: result.roleName,
+            permissions: result.permissions,
           },
+          permissions: result.permissions,
         },
       });
     } catch (err) {
@@ -274,15 +278,17 @@ authRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userService } = await import("../user/user.service.ts");
-      const user = await userService.getProfile(req.user!.userId);
+      const profile = await userService.getProfile(req.user!.userId);
 
       res.json({
         status: "success",
         data: {
           user: {
-            ...user.toObject(),
+            ...profile.user.toObject(),
             roleName: req.user!.roleName,
+            permissions: profile.permissions,
           },
+          permissions: profile.permissions,
         },
       });
     } catch (err) {
@@ -301,7 +307,7 @@ authRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { userService } = await import("../user/user.service.ts");
-      const user = await userService.getProfile(req.user!.userId);
+      const profile = await userService.getProfile(req.user!.userId);
 
       // Check if subscription is active and paid
       const organizationStatusData = await authService.isActiveOrganization(
