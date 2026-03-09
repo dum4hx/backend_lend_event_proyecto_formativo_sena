@@ -5,9 +5,8 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { Package, PackageZodSchema } from "./models/package.model.ts";
-import { MaterialModel } from "../material/models/material_type.model.ts";
-import { organizationService } from "../organization/organization.service.ts";
+import { PackageZodSchema } from "./models/package.model.ts";
+import { packageService } from "./package.service.ts";
 import {
   validateBody,
   validateQuery,
@@ -72,24 +71,12 @@ packageRouter.get(
         ];
       }
 
-      const [packages, total] = await Promise.all([
-        Package.find(query)
-          .skip(skip)
-          .limit(limit)
-          .populate("materialTypes.materialTypeId", "name pricePerDay")
-          .sort({ createdAt: -1 }),
-        Package.countDocuments(query),
-      ]);
+      const result = await packageService.listPackages(
+        { page, limit, isActive, search },
+        organizationId,
+      );
 
-      res.json({
-        status: "success",
-        data: {
-          packages,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
+      res.json({ status: "success", data: result });
     } catch (err) {
       next(err);
     }
@@ -103,24 +90,11 @@ packageRouter.get(
 packageRouter.get(
   "/:id",
   requirePermission("packages:read"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const pkg = await Package.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      }).populate(
-        "materialTypes.materialTypeId",
-        "name description pricePerDay categoryId",
-      );
+      const pkg = await packageService.getPackage(req.params.id, getOrgId(req));
 
-      if (!pkg) {
-        throw AppError.notFound("Package not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { package: pkg },
-      });
+      res.json({ status: "success", data: { package: pkg } });
     } catch (err) {
       next(err);
     }
@@ -139,38 +113,9 @@ packageRouter.post(
     try {
       const organizationId = getOrgId(req);
 
-      // Validate that all material types exist
-      const materialTypeIds = req.body.materialTypes.map(
-        (mt: { materialTypeId: string }) => mt.materialTypeId,
-      );
+      const pkg = await packageService.createPackage(organizationId, req.body);
 
-      const existingTypes = await MaterialModel.find({
-        _id: { $in: materialTypeIds },
-      });
-
-      if (existingTypes.length !== materialTypeIds.length) {
-        throw AppError.badRequest("One or more material types not found");
-      }
-
-      // Check if package with same name exists
-      const existing = await Package.findOne({
-        organizationId,
-        name: req.body.name,
-      });
-
-      if (existing) {
-        throw AppError.conflict("A package with this name already exists");
-      }
-
-      const pkg = await Package.create({
-        ...req.body,
-        organizationId,
-      });
-
-      res.status(201).json({
-        status: "success",
-        data: { package: pkg },
-      });
+      res.status(201).json({ status: "success", data: { package: pkg } });
     } catch (err) {
       next(err);
     }
@@ -185,39 +130,13 @@ packageRouter.patch(
   "/:id",
   requirePermission("packages:update"),
   validateBody(packageUpdateSchema.omit({ organizationId: true })),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
 
-      // If materialTypes are being updated, validate them
-      if (req.body.materialTypes) {
-        const materialTypeIds = req.body.materialTypes.map(
-          (mt: { materialTypeId: string }) => mt.materialTypeId,
-        );
+      const pkg = await packageService.updatePackage(organizationId, req.params.id, req.body);
 
-        const existingTypes = await MaterialModel.find({
-          _id: { $in: materialTypeIds },
-        });
-
-        if (existingTypes.length !== materialTypeIds.length) {
-          throw AppError.badRequest("One or more material types not found");
-        }
-      }
-
-      const pkg = await Package.findOneAndUpdate(
-        { _id: req.params.id, organizationId },
-        { $set: req.body },
-        { new: true, runValidators: true },
-      );
-
-      if (!pkg) {
-        throw AppError.notFound("Package not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { package: pkg },
-      });
+      res.json({ status: "success", data: { package: pkg } });
     } catch (err) {
       next(err);
     }
@@ -231,23 +150,11 @@ packageRouter.patch(
 packageRouter.post(
   "/:id/activate",
   requirePermission("packages:update"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const pkg = await Package.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { isActive: true } },
-        { new: true },
-      );
+      const pkg = await packageService.activatePackage(getOrgId(req), req.params.id);
 
-      if (!pkg) {
-        throw AppError.notFound("Package not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { package: pkg },
-        message: "Package activated successfully",
-      });
+      res.json({ status: "success", data: { package: pkg }, message: "Package activated successfully" });
     } catch (err) {
       next(err);
     }
@@ -261,23 +168,11 @@ packageRouter.post(
 packageRouter.post(
   "/:id/deactivate",
   requirePermission("packages:update"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const pkg = await Package.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { isActive: false } },
-        { new: true },
-      );
+      const pkg = await packageService.deactivatePackage(getOrgId(req), req.params.id);
 
-      if (!pkg) {
-        throw AppError.notFound("Package not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { package: pkg },
-        message: "Package deactivated successfully",
-      });
+      res.json({ status: "success", data: { package: pkg }, message: "Package deactivated successfully" });
     } catch (err) {
       next(err);
     }
@@ -291,33 +186,11 @@ packageRouter.post(
 packageRouter.delete(
   "/:id",
   requirePermission("packages:delete"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      // Check if package is used in any requests
-      const { LoanRequest } =
-        await import("../request/models/request.model.ts");
-      const activeRequests = await LoanRequest.countDocuments({
-        packageId: req.params.id,
-        status: { $in: ["pending", "approved", "assigned", "ready"] },
-      });
+      await packageService.deletePackage(getOrgId(req), req.params.id);
 
-      if (activeRequests > 0) {
-        throw AppError.badRequest("Cannot delete package with active requests");
-      }
-
-      const pkg = await Package.findOneAndDelete({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      });
-
-      if (!pkg) {
-        throw AppError.notFound("Package not found");
-      }
-
-      res.json({
-        status: "success",
-        message: "Package deleted successfully",
-      });
+      res.json({ status: "success", message: "Package deleted successfully" });
     } catch (err) {
       next(err);
     }
