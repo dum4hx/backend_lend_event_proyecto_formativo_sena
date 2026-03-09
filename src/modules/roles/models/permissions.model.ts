@@ -21,6 +21,7 @@ export const permissionCategories = [
   "Subscription_types",
   "Subscription",
   "Permissions",
+  "Locations",
 ] as const;
 
 export type PermissionCategory = (typeof permissionCategories)[number];

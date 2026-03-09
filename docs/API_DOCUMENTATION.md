@@ -11,150 +11,210 @@
 1. [Introduction and Overview](#1-introduction-and-overview)
 2. [Getting Started Guide](#2-getting-started-guide)
 3. [Authentication and Authorization](#3-authentication-and-authorization)
-4. [Reference Documentation](#4-reference-documentation)
-5. [Code Samples](#5-code-samples)
-6. [Rate Limiting and Usage Guidelines](#6-rate-limiting-and-usage-guidelines)
-7. [Versioning and Deprecation Policy](#7-versioning-and-deprecation-policy)
 
----
+### Subscription Type Endpoints (Super Admin)
 
-## 1. Introduction and Overview
+The subscription type module allows the platform owner to manage plan configurations dynamically. The server implements both public utility routes and super-admin-only management routes. Public endpoints return dollar amounts converted from stored cents (e.g., `baseCost` / 100 → `basePriceMonthly`).
 
-### What is the LendEvent API?
+#### Public Routes (no auth required)
 
-The LendEvent API is a RESTful service designed for **event rental management businesses**. It provides a comprehensive platform for managing:
+##### GET /subscription-types
 
-- **Organizations & Users** – Multi-tenant architecture with role-based access control
-- **Customers** – CRM for rental clients
-- **Materials & Packages** – Catalog inventory management with individual item tracking
-- **Loan Requests & Approvals** – Complete rental workflow from request to return
-- **Invoicing & Billing** – Invoice generation, payment tracking, and Stripe integration
-- **Inspections** – Post-return damage assessment and documentation
+Lists all active subscription types (public).
 
-### Key Capabilities
-
-| Feature                      | Description                                                                               |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| **Multi-Tenancy**            | Each organization operates in isolation with dedicated data scoping                       |
-| **Role-Based Access (RBAC)** | Five roles: `super_admin`, `owner`, `manager`, `warehouse_operator`, `commercial_advisor` |
-| **Subscription Management**  | Dynamic subscription types with fixed or per-seat billing models                          |
-| **Stripe Integration**       | Secure payment processing with webhook support                                            |
-| **Catalog Limits**           | Plan-based limits on catalog items and team seats                                         |
-
-### Response Format
-
-All responses follow a consistent JSON structure:
+**Response:** `200 OK`
 
 ```json
 {
   "status": "success",
   "data": {
-    /* resource data */
-  },
-  "message": "Optional human-readable message"
-}
-```
-
-Error responses:
-
-```json
-{
-  "status": "error",
-  "message": "Error description",
-  "code": "ERROR_CODE",
-  "details": {
-    /* additional context */
+    "subscriptionTypes": [
+      {
+        "plan": "starter",
+        "displayName": "Starter",
+        "billingModel": "dynamic",
+        "maxCatalogItems": 100,
+        "maxSeats": 5,
+        "durationDays": 30,
+        "features": ["Up to 5 team members", "100 catalog items"],
+        "basePriceMonthly": 29,
+        "pricePerSeat": 5
+      }
+    ]
   }
 }
 ```
 
 ---
 
-## 2. Getting Started Guide
+##### GET /subscription-types/:plan
 
-### Prerequisites
+Gets a specific subscription type by plan name.
 
-- A registered organization account
-- HTTPS client (browser, curl, Postman, or JavaScript Fetch API)
-- Cookies must be enabled (authentication uses HttpOnly cookies)
+| Parameter | Location | Type   | Required | Description                                       |
+| --------- | -------- | ------ | -------- | ------------------------------------------------- |
+| plan      | path     | string | Yes      | Plan identifier (e.g., `starter`, `professional`) |
 
-### Quick Start: Your First API Call
+**Response:** `200 OK`
 
-#### Step 1: Register an Organization
-
-```bash
-curl -X POST https://api.test.local/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -c cookies.txt \
-  -d '{
-    "organization": {
-      "name": "EventPro Rentals",
-      "legalName": "EventPro Rentals LLC",
-      "email": "admin@eventpro.com"
-    },
-    "owner": {
-      "name": {
-        "firstName": "John",
-        "firstSurname": "Doe"
-      },
-      "email": "john@eventpro.com",
-      "password": "SecureP@ss123!",
-      "phone": "+15551234567"
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptionType": {
+      "plan": "starter",
+      "displayName": "Starter",
+      "billingModel": "dynamic",
+      "maxCatalogItems": 100,
+      "maxSeats": 5,
+      "durationDays": 30,
+      "features": ["Up to 5 team members", "100 catalog items"],
+      "basePriceMonthly": 29,
+      "pricePerSeat": 5
     }
-  }'
+  }
+}
 ```
 
-**Response (201 Created):**
+---
+
+##### POST /subscription-types/:plan/calculate-cost
+
+Calculates the cost for a plan with a given seat count. Request body is validated (integer, positive).
+
+| Parameter | Location | Type    | Required | Description     |
+| --------- | -------- | ------- | -------- | --------------- |
+| plan      | path     | string  | Yes      | Plan identifier |
+| seatCount | body     | integer | Yes      | Number of seats |
+
+**Response:** `200 OK`
 
 ```json
 {
   "status": "success",
   "data": {
-    "organization": {
-      "id": "507f1f77bcf86cd799439011",
-      "name": "EventPro Rentals",
-      "email": "admin@eventpro.com"
-    },
-    "user": {
-      "id": "507f1f77bcf86cd799439012",
-      "email": "john@eventpro.com",
-      "name": { "firstName": "John", "firstSurname": "Doe" },
-      "roleId": "65f0a1b2c3d4e5f607182930",
-      "roleName": "owner",
-      "permissions": ["organization:read", "users:create", "users:read"]
-    },
-    "permissions": ["organization:read", "users:create", "users:read"]
+    "plan": "professional",
+    "seatCount": 10,
+    "baseCost": 99,
+    "seatCost": 40,
+    "totalCost": 139,
+    "currency": "usd"
   }
 }
 ```
 
-The response sets `access_token` and `refresh_token` HttpOnly cookies automatically.
+---
 
-#### Step 2: Make an Authenticated Request
+#### Super Admin Routes (authentication + super_admin required)
 
-```bash
-curl -X GET https://api.test.local/api/v1/auth/me \
-  -b cookies.txt
-```
+All management routes are protected by `authenticate` and `requireSuperAdmin` middleware in the router.
 
-**Response (200 OK):**
+##### GET /subscription-types/admin/all
+
+Lists all subscription types including inactive ones. Requires `super_admin` role.
+
+**Response:** `200 OK`
 
 ```json
 {
   "status": "success",
   "data": {
-    "user": {
-      "id": "507f1f77bcf86cd799439012",
-      "email": "john@eventpro.com",
-      "name": { "firstName": "John", "firstSurname": "Doe" },
-      "roleId": "65f0a1b2c3d4e5f607182930",
-      "roleName": "owner",
-      "permissions": ["organization:read", "users:create", "users:read"]
-    },
-    "permissions": ["organization:read", "users:create", "users:read"]
+    "subscriptionTypes": [
+      /* full objects including status, stripe IDs, cents-based costs */
+    ]
   }
 }
 ```
+
+---
+
+##### POST /subscription-types
+
+Creates a new subscription type (super admin only). Request body validated against server schema.
+
+| Parameter         | Location | Type     | Required | Description                                        |
+| ----------------- | -------- | -------- | -------- | -------------------------------------------------- |
+| plan              | body     | string   | Yes      | Unique plan identifier (alphanumeric + underscore) |
+| displayName       | body     | string   | Yes      | Human-readable name                                |
+| description       | body     | string   | No       | Description (max 500 chars)                        |
+| billingModel      | body     | string   | Yes      | `fixed` or `dynamic`                               |
+| baseCost          | body     | integer  | Yes      | Base cost in cents                                 |
+| pricePerSeat      | body     | integer  | Yes      | Price per seat in cents                            |
+| maxSeats          | body     | integer  | No       | Max seats (-1 = unlimited, default: -1)            |
+| maxCatalogItems   | body     | integer  | No       | Max items (-1 = unlimited, default: -1)            |
+| durationDays      | body     | integer  | Yes      | Subscription period in days (min: 1, max: 365)     |
+| features          | body     | string[] | No       | List of feature descriptions                       |
+| sortOrder         | body     | integer  | No       | Display order (default: 0)                         |
+| stripePriceIdBase | body     | string   | No       | Stripe price ID for base                           |
+| stripePriceIdSeat | body     | string   | No       | Stripe price ID for seats                          |
+| status            | body     | string   | No       | `active`, `inactive`, `deprecated`                 |
+
+**Permission Required:** `subscription_types:create` (super_admin role)
+
+**Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptionType": {
+      /* created object */
+    }
+  }
+}
+```
+
+---
+
+##### PATCH /subscription-types/:plan
+
+Updates a subscription type (super admin only). Request body validated against update schema. `plan` cannot be changed. `durationDays` must remain within 1–365.
+
+**Permission Required:** `subscription_types:update`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptionType": {
+      /* updated object */
+    }
+  }
+}
+```
+
+---
+
+##### DELETE /subscription-types/:plan
+
+Deactivates a subscription type (soft delete) by setting `status` to `inactive`.
+
+**Permission Required:** `subscription_types:delete`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Subscription type \"custom_enterprise\" has been deactivated"
+}
+```
+
+---
+
+**Router notes:**
+
+- Public endpoints return monetary values converted to dollars (`basePriceMonthly`, `pricePerSeat`) for UI convenience; the database stores amounts in cents.
+- Management endpoints are prefixed in code by the router's middleware with `authenticate` and `requireSuperAdmin` — ensure requests include valid auth and appropriate role.
+  "permissions": ["organization:read", "users:create", "users:read"]
+  },
+  "permissions": ["organization:read", "users:create", "users:read"]
+  }
+  }
+
+````
 
 #### Step 3: Create Your First Customer
 
@@ -172,7 +232,7 @@ curl -X POST https://api.test.local/api/v1/customers \
     "documentType": "national_id",
     "documentNumber": "123456789"
   }'
-```
+````
 
 #### Step 4: Check Payment Status (Owner Only)
 

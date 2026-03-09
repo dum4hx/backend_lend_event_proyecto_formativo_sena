@@ -6,6 +6,7 @@ import {
   defaultOrganizationRoleDefs,
   OWNER_ROLE_NAME,
   Role,
+  rolePermissions,
   type UserRole,
 } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
@@ -711,15 +712,30 @@ export const authService = {
     const profile = await userService.getProfile(userId);
 
     // Check if user is owner
-    const rolePermissions = await roleService.getRolePermissions(
+    const userRolePermissions = await roleService.getRolePermissions(
       profile.user.roleId,
       profile.user.organizationId,
     );
-    // TODO: Validate owner permissions from roleservice instead of hardcoding "owner"
-    if (rolePermissions.includes("owner")) {
+    // Compare whether the user has all the permissions of the owner role
+    const ownerRolePermsSet = new Set(rolePermissions.owner);
+    const hasOwnerPermissions = userRolePermissions.every((perm) =>
+      ownerRolePermsSet.has(perm),
+    );
+
+    if (!hasOwnerPermissions) {
       throw AppError.unauthorized(
         "Only organization owners can check payment status",
       );
+    }
+
+    // Allow login if user is super admin, regardless of org status
+    const superAdminRolePermsSet = new Set(rolePermissions.super_admin);
+    const isSuperAdmin = userRolePermissions.every((perm) =>
+      superAdminRolePermsSet.has(perm),
+    );
+    if (isSuperAdmin) {
+      response.isActive = true;
+      return response;
     }
 
     // Get organization

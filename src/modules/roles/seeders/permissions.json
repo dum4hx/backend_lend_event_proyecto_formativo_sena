@@ -189,6 +189,34 @@
     "isPlatformPermission": false
   },
   {
+    "_id": "locations:create",
+    "displayName": "Create Locations",
+    "description": "Allows creating new physical locations within the organization.",
+    "category": "Locations",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "locations:read",
+    "displayName": "View Locations",
+    "description": "Allows viewing the list of physical locations and their details.",
+    "category": "Locations",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "locations:update",
+    "displayName": "Update Locations",
+    "description": "Allows editing location details and metadata.",
+    "category": "Locations",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "locations:delete",
+    "displayName": "Delete Locations",
+    "description": "Allows removing or deactivating location records.",
+    "category": "Locations",
+    "isPlatformPermission": false
+  },
+  {
     "_id": "packages:create",
     "displayName": "Create Packages",
     "description": "Allows creating new material bundles or packages.",
