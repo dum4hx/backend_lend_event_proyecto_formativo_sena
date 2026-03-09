@@ -5,6 +5,7 @@ import inspectionRouter from "../modules/inspection/inspection.router.ts";
 import invoiceRouter from "../modules/invoice/invoice.router.ts";
 import loanRouter from "../modules/loan/loan.router.ts";
 import materialRouter from "../modules/material/material.router.ts";
+import locationRouter from "../modules/location/location.router.ts";
 import organizationRouter from "../modules/organization/organization.router.ts";
 import packageRouter from "../modules/package/package.router.ts";
 import requestRouter from "../modules/request/request.router.ts";
@@ -22,6 +23,7 @@ export {
   invoiceRouter,
   loanRouter,
   materialRouter,
+  locationRouter,
   organizationRouter,
   packageRouter,
   requestRouter,
