@@ -19,6 +19,7 @@ import { SubscriptionType } from "../subscription_type/models/subscription_type.
 import { organizationService } from "../organization/organization.service.ts";
 import { PasswordResetToken } from "./models/password_reset_token.model.ts";
 import { InviteToken } from "./models/invite_token.model.ts";
+import { EmailVerificationToken } from "./models/email_verification_token.model.ts";
 import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
 import roleService from "../roles/roles.service.ts";
@@ -26,11 +27,28 @@ import roleService from "../roles/roles.service.ts";
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 5;
+const EMAIL_VERIFY_EXPIRY_MINUTES = 5;
+const MAX_EMAIL_VERIFY_ATTEMPTS = 5;
 const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS || "48",
   10,
 );
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://app.test.local";
+
+/* ---------- Internal Helpers ---------- */
+
+async function cleanupPendingRegistration(
+  userId: Types.ObjectId,
+  organizationId: Types.ObjectId | string,
+): Promise<void> {
+  const userCount = await User.countDocuments({ organizationId });
+  if (userCount <= 1) {
+    await Organization.deleteOne({ _id: organizationId });
+    await Role.deleteMany({ organizationId });
+  }
+  await User.deleteOne({ _id: userId });
+  await EmailVerificationToken.deleteMany({ userId });
+}
 
 /* ---------- Auth Service ---------- */
 
@@ -45,18 +63,25 @@ export const authService = {
   ): Promise<{
     organization: InstanceType<typeof Organization>;
     user: InstanceType<typeof User>;
-    tokens: TokenPair;
-    roleName: string;
-    permissions: string[];
   }> {
     const session = await startSession();
 
-    return await session.withTransaction(async () => {
+    // Captured outside the transaction for use after commit
+    let createdOrg: InstanceType<typeof Organization> = undefined as any;
+    let createdUser: InstanceType<typeof User> = undefined as any;
+
+    await session.withTransaction(async () => {
       // Check if email already exists for user
       const existingUser = await User.findOne({
         email: ownerData.email.trim().toLowerCase(),
       }).session(session);
       if (existingUser) {
+        if (existingUser.status === "pending_email_verification") {
+          throw AppError.conflict(
+            "A registration with this email is already pending email verification. Please check your inbox or wait 5 minutes to try again.",
+            { code: "PENDING_EMAIL_VERIFICATION" },
+          );
+        }
         throw AppError.conflict("A user with this email already exists", {
           code: "USER_EMAIL_ALREADY_EXISTS",
         });
@@ -171,33 +196,182 @@ export const authService = {
         ...ownerData,
         organizationId: organization._id,
         roleId: ownerRole._id.toString(),
-        status: "active",
+        status: "pending_email_verification",
       }).save({ session });
 
-      // Generate tokens
-      const tokens = await generateTokenPair({
-        sub: user._id.toString(),
-        org: organization._id.toString(),
-        roleId: user.roleId,
-        roleName: OWNER_ROLE_NAME,
-        email: user.email,
-      });
-
-      await session.commitTransaction();
-
-      logger.info("Organization registered", {
-        organizationId: organization._id.toString(),
-        ownerId: user._id.toString(),
-      });
-
-      return Promise.resolve({
-        organization,
-        user,
-        tokens,
-        roleName: OWNER_ROLE_NAME,
-        permissions: ownerRole.permissions,
-      });
+      createdOrg = organization;
+      createdUser = user;
     });
+
+    await session.endSession();
+
+    // Generate a 6-digit OTP for email verification
+    const code = crypto
+      .randomInt(0, 10 ** OTP_LENGTH)
+      .toString()
+      .padStart(OTP_LENGTH, "0");
+    const hashedCode = await argon2.hash(code);
+
+    await EmailVerificationToken.create({
+      userId: createdUser._id,
+      organizationId: createdOrg._id,
+      email: createdUser.email,
+      code: hashedCode,
+      expiresAt: new Date(Date.now() + EMAIL_VERIFY_EXPIRY_MINUTES * 60 * 1000),
+    });
+
+    try {
+      const firstName =
+        (createdUser.name as unknown as { firstName: string })?.firstName ??
+        "User";
+      await emailService.sendEmailVerificationCode(
+        createdUser.email,
+        code,
+        firstName,
+      );
+    } catch (emailErr) {
+      await cleanupPendingRegistration(createdUser._id, createdOrg._id);
+      logger.error("Failed to send verification email during registration", {
+        userId: createdUser._id.toString(),
+        error: emailErr,
+      });
+      throw AppError.internal(
+        "Failed to send verification email. Please try again.",
+      );
+    }
+
+    logger.info("Organization registered, awaiting email verification", {
+      organizationId: createdOrg._id.toString(),
+      ownerId: createdUser._id.toString(),
+    });
+
+    return { organization: createdOrg, user: createdUser };
+  },
+
+  /**
+   * Verifies the email OTP sent during registration and activates the account.
+   * Returns tokens and full profile data on success (same as the old register).
+   */
+  async verifyEmail(
+    email: string,
+    code: string,
+  ): Promise<{
+    organization: InstanceType<typeof Organization>;
+    user: InstanceType<typeof User>;
+    tokens: TokenPair;
+    roleName: string;
+    permissions: string[];
+  }> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const record = await EmailVerificationToken.findOne({
+      email: normalizedEmail,
+    });
+
+    if (!record) {
+      throw AppError.badRequest(
+        "No pending email verification found for this address.",
+      );
+    }
+
+    if (record.expiresAt < new Date()) {
+      await cleanupPendingRegistration(
+        record.userId as Types.ObjectId,
+        record.organizationId as Types.ObjectId | string,
+      );
+      throw AppError.badRequest(
+        "Verification code has expired. Your registration data has been removed. Please register again.",
+      );
+    }
+
+    if (record.attempts >= MAX_EMAIL_VERIFY_ATTEMPTS) {
+      await cleanupPendingRegistration(
+        record.userId as Types.ObjectId,
+        record.organizationId as Types.ObjectId | string,
+      );
+      throw AppError.badRequest(
+        "Too many failed verification attempts. Please register again.",
+      );
+    }
+
+    const isValid = await argon2.verify(record.code, code);
+    if (!isValid) {
+      record.attempts += 1;
+      await record.save();
+      const remaining = MAX_EMAIL_VERIFY_ATTEMPTS - record.attempts;
+      throw AppError.badRequest(
+        `Invalid verification code. ${remaining} attempt(s) remaining.`,
+      );
+    }
+
+    // Activate the user
+    const user = await User.findByIdAndUpdate(
+      record.userId,
+      { status: "active" },
+      { new: true },
+    );
+
+    if (!user) {
+      throw AppError.notFound("User account not found");
+    }
+
+    const organization = await Organization.findById(record.organizationId);
+    if (!organization) {
+      throw AppError.notFound("Organization not found");
+    }
+
+    // Clean up the verification token
+    await EmailVerificationToken.deleteMany({ userId: record.userId });
+
+    const roleName = await roleService.getRoleName(user.roleId);
+    const permissions = await roleService.getRolePermissions(
+      user.roleId,
+      organization._id.toString(),
+    );
+
+    const tokens = await generateTokenPair({
+      sub: user._id.toString(),
+      org: organization._id.toString(),
+      roleId: user.roleId,
+      roleName,
+      email: user.email,
+    });
+
+    logger.info("Email verified and account activated", {
+      userId: user._id.toString(),
+      organizationId: organization._id.toString(),
+    });
+
+    return { organization, user, tokens, roleName, permissions };
+  },
+
+  /**
+   * Deletes all pending-registration documents (user, org, roles) whose
+   * 5-minute verification window has elapsed. Called by the background job.
+   */
+  async purgeExpiredPendingRegistrations(): Promise<void> {
+    const cutoffTime = new Date(
+      Date.now() - EMAIL_VERIFY_EXPIRY_MINUTES * 60 * 1000,
+    );
+
+    const expiredUsers = await User.find({
+      status: "pending_email_verification",
+      createdAt: { $lt: cutoffTime },
+    })
+      .select("_id organizationId")
+      .lean();
+
+    if (expiredUsers.length === 0) return;
+
+    for (const pendingUser of expiredUsers) {
+      await cleanupPendingRegistration(
+        pendingUser._id as Types.ObjectId,
+        pendingUser.organizationId as Types.ObjectId | string,
+      );
+      logger.info("Purged expired pending registration", {
+        userId: pendingUser._id.toString(),
+      });
+    }
   },
 
   /**
@@ -228,6 +402,13 @@ export const authService = {
     }
 
     // Check user status
+    if (user.status === "pending_email_verification") {
+      throw AppError.unauthorized(
+        "Please verify your email address before logging in. Check your inbox for a verification code.",
+        { code: "EMAIL_NOT_VERIFIED" },
+      );
+    }
+
     if (user.status === "suspended") {
       throw AppError.unauthorized("Your account has been suspended");
     }

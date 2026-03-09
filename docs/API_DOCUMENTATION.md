@@ -297,7 +297,7 @@ Clears both authentication cookies.
 
 #### POST /auth/register
 
-Registers a new organization with owner account.
+Registers a new organization with owner account. The account is placed in a **pending email verification** state — no tokens are issued. A 6-digit OTP is emailed to the owner's address and must be confirmed via `POST /auth/verify-email` within **5 minutes**. If the code is not verified in time, all registration data (user, organization, roles) is automatically removed.
 
 | Parameter              | Location | Type   | Required | Description                               |
 | ---------------------- | -------- | ------ | -------- | ----------------------------------------- |
@@ -323,17 +323,53 @@ The `organization.address` object has the following structure:
 | owner.password          | body   | string   | Yes                 | Password (min 8 chars) |
 | owner.phone             | body   | string   | Yes                 | Phone in E.164 format  |
 
-**Response:** `201 Created`
+**Response:** `202 Accepted`
 
 ```json
 {
   "status": "success",
+  "message": "Registration successful. Please check your email for a 6-digit verification code to activate your account.",
+  "data": {
+    "organization": { "id": "...", "name": "...", "email": "..." },
+    "user": { "id": "...", "email": "...", "name": { "..." } }
+  }
+}
+```
+
+**Possible Error Codes (returned in `details.code`):**
+
+- `PENDING_EMAIL_VERIFICATION`: A registration with this email is already pending verification (try again in 5 min).
+- `USER_EMAIL_ALREADY_EXISTS`: A verified user with the provided owner email already exists.
+- `TAX_ID_ALREADY_EXISTS`: An organization with the provided `taxId` already exists.
+- `ORG_EMAIL_ALREADY_EXISTS`: An organization with the provided email already exists.
+- `USER_PHONE_ALREADY_EXISTS`: A user with the provided owner phone already exists.
+- `ORG_PHONE_ALREADY_EXISTS`: An organization with the provided phone already exists.
+
+---
+
+#### POST /auth/verify-email
+
+Verifies the 6-digit OTP sent to the owner's email during registration. On success the account is activated, authentication cookies are set, and the full profile is returned (identical to the old register `201` response).
+
+**Auth:** None required.
+
+| Parameter | Location | Type   | Required | Description                           |
+| --------- | -------- | ------ | -------- | ------------------------------------- |
+| email     | body     | string | Yes      | Owner email used during registration  |
+| code      | body     | string | Yes      | 6-digit numeric OTP received by email |
+
+**Response:** `201 Created` — Sets `access_token` and `refresh_token` cookies.
+
+```json
+{
+  "status": "success",
+  "message": "Email verified successfully. Your account is now active.",
   "data": {
     "organization": { "id": "...", "name": "...", "email": "..." },
     "user": {
       "id": "...",
       "email": "...",
-      "name": { ... },
+      "name": { "..." },
       "roleId": "...",
       "roleName": "owner",
       "permissions": ["organization:read", "users:create", "users:read"]
@@ -343,26 +379,14 @@ The `organization.address` object has the following structure:
 }
 ```
 
-**Possible Error Codes (returned in `details.code`):**
+**Error conditions:**
 
-- `USER_EMAIL_ALREADY_EXISTS`: A user with the provided owner email already exists.
-- `TAX_ID_ALREADY_EXISTS`: An organization with the provided `taxId` already exists.
-- `ORG_EMAIL_ALREADY_EXISTS`: An organization with the provided email already exists.
-- `USER_PHONE_ALREADY_EXISTS`: A user with the provided owner phone already exists.
-- `ORG_PHONE_ALREADY_EXISTS`: An organization with the provided phone already exists.
-
-These appear in error responses using the standard error envelope, for example:
-
-```json
-{
-  "status": "error",
-  "message": "A user with this email already exists",
-  "code": "CONFLICT",
-  "details": {
-    "code": "USER_EMAIL_ALREADY_EXISTS"
-  }
-}
-```
+| Status | Description                                                             |
+| ------ | ----------------------------------------------------------------------- |
+| 400    | No pending verification found for this email                            |
+| 400    | Verification code has expired — registration purged, must re-register   |
+| 400    | Invalid verification code (remaining attempt count included in message) |
+| 400    | Too many failed attempts — registration purged, must re-register        |
 
 ---
 

@@ -17,6 +17,7 @@ const userStatusOptions = [
   "inactive",
   "invited",
   "suspended",
+  "pending_email_verification",
 ] as const;
 
 /* ---------- Zod Schema for API Validation ---------- */

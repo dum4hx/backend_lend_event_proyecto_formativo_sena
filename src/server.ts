@@ -18,6 +18,7 @@ import authRouter from "./modules/auth/auth.router.ts";
 import * as routers from "./routers/index.ts";
 import { connectDB } from "./utils/db/connectDB.ts";
 import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
+import { authService } from "./modules/auth/auth.service.ts";
 
 /* ---------- Environment Variables ---------- */
 
@@ -148,8 +149,14 @@ const startServer = async (): Promise<void> => {
     await connectDB();
 
     // Seed default subscription types if none exist
-    // TODO: consider using seeder
     await subscriptionTypeService.seedDefaults();
+
+    // Schedule background cleanup of expired pending-email-verification registrations
+    setInterval(() => {
+      authService.purgeExpiredPendingRegistrations().catch((err: unknown) => {
+        console.error("Failed to purge expired pending registrations:", err);
+      });
+    }, 60 * 1000);
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

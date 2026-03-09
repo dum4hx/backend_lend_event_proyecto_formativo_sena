@@ -92,6 +92,14 @@ const acceptInviteSchema = z.object({
   password: passwordValidation,
 });
 
+const verifyEmailSchema = z.object({
+  email: z.email("Invalid email format"),
+  code: z
+    .string()
+    .length(6, "Verification code must be 6 digits")
+    .regex(/^\d{6}$/, "Verification code must be numeric"),
+});
+
 /* ---------- Routes ---------- */
 
 /**
@@ -108,20 +116,10 @@ authRouter.post(
 
       const result = await authService.register(organization, owner);
 
-      // Set cookies
-      res.cookie(
-        COOKIE_NAME,
-        result.tokens.accessToken,
-        accessTokenCookieOptions,
-      );
-      res.cookie(
-        REFRESH_COOKIE_NAME,
-        result.tokens.refreshToken,
-        refreshTokenCookieOptions,
-      );
-
-      res.status(201).json({
+      res.status(202).json({
         status: "success",
+        message:
+          "Registration successful. Please check your email for a 6-digit verification code to activate your account.",
         data: {
           organization: {
             id: result.organization._id,
@@ -132,11 +130,7 @@ authRouter.post(
             id: result.user._id,
             email: result.user.email,
             name: result.user.name,
-            roleId: result.user.roleId,
-            roleName: result.roleName,
-            permissions: result.permissions,
           },
-          permissions: result.permissions,
         },
       });
     } catch (err) {
@@ -435,6 +429,58 @@ authRouter.post(
         },
         message:
           "Account activated successfully. You can now log in with your password.",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/verify-email
+ * Verifies the 6-digit OTP sent to the owner's email during registration.
+ * On success sets auth cookies and returns the full account profile.
+ */
+authRouter.post(
+  "/verify-email",
+  authRateLimiter,
+  validateBody(verifyEmailSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, code } = req.body;
+
+      const result = await authService.verifyEmail(email, code);
+
+      res.cookie(
+        COOKIE_NAME,
+        result.tokens.accessToken,
+        accessTokenCookieOptions,
+      );
+      res.cookie(
+        REFRESH_COOKIE_NAME,
+        result.tokens.refreshToken,
+        refreshTokenCookieOptions,
+      );
+
+      res.status(201).json({
+        status: "success",
+        message: "Email verified successfully. Your account is now active.",
+        data: {
+          organization: {
+            id: result.organization._id,
+            name: result.organization.name,
+            email: result.organization.email,
+          },
+          user: {
+            id: result.user._id,
+            email: result.user.email,
+            name: result.user.name,
+            roleId: result.user.roleId,
+            roleName: result.roleName,
+            permissions: result.permissions,
+          },
+          permissions: result.permissions,
+        },
       });
     } catch (err) {
       next(err);
