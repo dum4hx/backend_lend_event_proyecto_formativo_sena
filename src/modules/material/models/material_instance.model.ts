@@ -23,6 +23,7 @@ export const MaterialInstanceZodSchema = z.object({
     .min(1, "Serial number is required")
     .max(100, "Maximum 100 characters")
     .trim(),
+  notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
   status: z
     .enum(["available", "in_use", "maintenance", "damaged", "retired"])
     .default("available"),
@@ -53,6 +54,11 @@ const materialInstanceSchema = new Schema(
       maxlength: 100,
       trim: true,
     },
+    notes: {
+      type: String,
+      maxlength: 500,
+      trim: true,
+    },
     status: {
       type: String,
       enum: materialStatusOptions,
@@ -75,7 +81,10 @@ materialInstanceSchema.index({ locationId: 1 });
 materialInstanceSchema.index({ status: 1 });
 
 // Ensure serial numbers are unique within an organization
-materialInstanceSchema.index({ organizationId: 1, serialNumber: 1 }, { unique: true });
+materialInstanceSchema.index(
+  { organizationId: 1, serialNumber: 1 },
+  { unique: true },
+);
 
 export type MaterialInstanceDocument = InferSchemaType<
   typeof materialInstanceSchema

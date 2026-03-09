@@ -5,15 +5,9 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import {
-  MaterialModel,
-  MaterialModelZodSchema,
-} from "./models/material_type.model.ts";
-import {
-  MaterialInstance,
-  MaterialInstanceZodSchema,
-} from "./models/material_instance.model.ts";
-import { Category, CategoryZodSchema } from "./models/category.model.ts";
+import { MaterialModelZodSchema } from "./models/material_type.model.ts";
+import { MaterialInstanceZodSchema } from "./models/material_instance.model.ts";
+import { CategoryZodSchema } from "./models/category.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import {
   validateBody,
@@ -72,12 +66,10 @@ materialRouter.get(
   requirePermission("materials:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const categories = await Category.find().sort({ name: 1 });
+      const organizationId = getOrgId(req);
+      const categories = await materialService.listCategories(organizationId);
 
-      res.json({
-        status: "success",
-        data: { categories },
-      });
+      res.json({ status: "success", data: { categories } });
     } catch (err) {
       next(err);
     }
@@ -94,12 +86,13 @@ materialRouter.post(
   validateBody(CategoryZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const category = await Category.create(req.body);
+      const organizationId = getOrgId(req);
+      const category = await materialService.createCategory(
+        organizationId,
+        req.body,
+      );
 
-      res.status(201).json({
-        status: "success",
-        data: { category },
-      });
+      res.status(201).json({ status: "success", data: { category } });
     } catch (err) {
       next(err);
     }
@@ -116,26 +109,13 @@ materialRouter.patch(
   validateBody(CategoryZodSchema.partial()),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const category = await Category.findById(req.params.id);
+      const updated = await materialService.updateCategory(
+        getOrgId(req),
+        req.params.id,
+        req.body,
+      );
 
-      if (!category) {
-        throw AppError.notFound("Category not found");
-      }
-
-      // Ensure the category belongs to the authenticated user's organization
-      if (category.organizationId.toString() !== getOrgId(req).toString()) {
-        throw AppError.notFound("Category not found");
-      }
-
-      // Apply partial updates
-      Object.assign(category, req.body);
-
-      await category.save();
-
-      res.json({
-        status: "success",
-        data: { category },
-      });
+      res.json({ status: "success", data: { category: updated } });
     } catch (err) {
       next(err);
     }
@@ -183,39 +163,18 @@ materialRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { page = 1, limit = 20, categoryId, search } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
 
-      const query: Record<string, unknown> = {};
-
-      if (categoryId) {
-        query.categoryId = categoryId;
-      }
-
-      if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
-        ];
-      }
-
-      const [materialTypes, total] = await Promise.all([
-        MaterialModel.find(query)
-          .skip(skip)
-          .limit(Number(limit))
-          .populate("categoryId", "name")
-          .sort({ name: 1 }),
-        MaterialModel.countDocuments(query),
-      ]);
-
-      res.json({
-        status: "success",
-        data: {
-          materialTypes,
-          total,
-          page: Number(page),
-          totalPages: Math.ceil(total / Number(limit)),
+      const result = await materialService.listMaterialTypes(
+        {
+          page: page as string | number,
+          limit: limit as string | number,
+          categoryId: categoryId as string | undefined,
+          search: search as string | undefined,
         },
-      });
+        getOrgId(req),
+      );
+
+      res.json({ status: "success", data: result });
     } catch (err) {
       next(err);
     }
@@ -229,21 +188,14 @@ materialRouter.get(
 materialRouter.get(
   "/types/:id",
   requirePermission("materials:read"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const materialType = await MaterialModel.findById(req.params.id).populate(
-        "categoryId",
-        "name",
+      const materialType = await materialService.getMaterialType(
+        req.params.id,
+        getOrgId(req),
       );
 
-      if (!materialType) {
-        throw AppError.notFound("Material type not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { materialType },
-      });
+      res.json({ status: "success", data: { materialType } });
     } catch (err) {
       next(err);
     }
@@ -263,32 +215,12 @@ materialRouter.post(
     try {
       const organizationId = getOrgId(req);
 
-      // Check catalog item limit
-      await organizationService.incrementCatalogItemCount(organizationId);
+      const materialType = await materialService.createMaterialType(
+        organizationId,
+        req.body,
+      );
 
-      try {
-        // Validate if category exists and belongs to the organization
-        if (req.body.categoryId) {
-          const category = await Category.findById(req.body.categoryId);
-          if (
-            !category ||
-            category.organizationId.toString() !== organizationId.toString()
-          ) {
-            throw AppError.notFound("Category not found");
-          }
-        }
-
-        const materialType = await MaterialModel.create(req.body);
-
-        res.status(201).json({
-          status: "success",
-          data: { materialType },
-        });
-      } catch (err) {
-        // Rollback catalog count on failure
-        await organizationService.decrementCatalogItemCount(organizationId);
-        throw err;
-      }
+      res.status(201).json({ status: "success", data: { materialType } });
     } catch (err) {
       next(err);
     }
@@ -305,20 +237,13 @@ materialRouter.patch(
   validateBody(MaterialModelZodSchema.partial()),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const materialType = await MaterialModel.findByIdAndUpdate(
+      const updated = await materialService.updateMaterialType(
+        getOrgId(req),
         req.params.id,
-        { $set: req.body },
-        { new: true, runValidators: true },
+        req.body,
       );
 
-      if (!materialType) {
-        throw AppError.notFound("Material type not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { materialType },
-      });
+      res.json({ status: "success", data: { materialType: updated } });
     } catch (err) {
       next(err);
     }
@@ -334,28 +259,7 @@ materialRouter.delete(
   requirePermission("materials:delete"),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const materialTypeId = req.params.id as string;
-
-      // Check if any instances exist
-      const instanceCount = await MaterialInstance.countDocuments({
-        modelId: materialTypeId,
-      });
-
-      if (instanceCount > 0) {
-        throw AppError.badRequest(
-          "Cannot delete material type with existing instances",
-          { instanceCount },
-        );
-      }
-
-      const materialType = await MaterialModel.findByIdAndDelete(req.params.id);
-
-      if (!materialType) {
-        throw AppError.notFound("Material type not found");
-      }
-
-      // Decrement catalog count
-      await organizationService.decrementCatalogItemCount(getOrgId(req));
+      await materialService.deleteMaterialType(getOrgId(req), req.params.id);
 
       res.json({
         status: "success",
@@ -386,40 +290,17 @@ materialRouter.get(
         materialTypeId,
         search,
       } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
 
-      const query: Record<string, unknown> = {};
-
-      if (status) {
-        query.status = status;
-      }
-
-      if (materialTypeId) {
-        query.modelId = materialTypeId;
-      }
-
-      if (search) {
-        query.serialNumber = { $regex: search, $options: "i" };
-      }
-
-      const [instances, total] = await Promise.all([
-        MaterialInstance.find(query)
-          .skip(skip)
-          .limit(Number(limit))
-          .populate("modelId", "name pricePerDay")
-          .sort({ createdAt: -1 }),
-        MaterialInstance.countDocuments(query),
-      ]);
-
-      res.json({
-        status: "success",
-        data: {
-          instances,
-          total,
-          page: Number(page),
-          totalPages: Math.ceil(total / Number(limit)),
-        },
+      const result = await materialService.listInstances({
+        page: page as string | number,
+        limit: limit as string | number,
+        status: status as string | undefined,
+        materialTypeId: materialTypeId as string | undefined,
+        search: search as string | undefined,
+        organizationId: getOrgId(req),
       });
+
+      res.json({ status: "success", data: result });
     } catch (err) {
       next(err);
     }
@@ -433,21 +314,14 @@ materialRouter.get(
 materialRouter.get(
   "/instances/:id",
   requirePermission("materials:read"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const instance = await MaterialInstance.findById(req.params.id).populate(
-        "modelId",
-        "name description pricePerDay categoryId",
+      const instance = await materialService.getInstance(
+        req.params.id,
+        getOrgId(req),
       );
 
-      if (!instance) {
-        throw AppError.notFound("Material instance not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { instance },
-      });
+      res.json({ status: "success", data: { instance } });
     } catch (err) {
       next(err);
     }
@@ -464,18 +338,13 @@ materialRouter.post(
   validateBody(MaterialInstanceZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Verify material type exists
-      const materialType = await MaterialModel.findById(req.body.modelId);
-      if (!materialType) {
-        throw AppError.notFound("Material type not found");
-      }
+      const organizationId = getOrgId(req);
+      const instance = await materialService.createInstance(
+        organizationId,
+        req.body,
+      );
 
-      const instance = await MaterialInstance.create(req.body);
-
-      res.status(201).json({
-        status: "success",
-        data: { instance },
-      });
+      res.status(201).json({ status: "success", data: { instance } });
     } catch (err) {
       next(err);
     }
@@ -490,44 +359,17 @@ materialRouter.patch(
   "/instances/:id/status",
   requirePermission("materials:state:update"),
   validateBody(updateStatusSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const { status, notes } = req.body;
+      const updated = await materialService.updateInstanceStatus(
+        getOrgId(req),
+        req.params.id,
+        status,
+        notes,
+      );
 
-      const instance = await MaterialInstance.findById(req.params.id);
-      if (!instance) {
-        throw AppError.notFound("Material instance not found");
-      }
-
-      // Validate status transition
-      const validTransitions: Record<string, string[]> = {
-        available: ["reserved", "maintenance", "damaged", "retired"],
-        reserved: ["available", "loaned"],
-        loaned: ["returned"],
-        returned: ["available", "maintenance", "damaged"],
-        maintenance: ["available", "retired"],
-        damaged: ["maintenance", "retired"],
-        lost: ["retired"],
-        retired: [],
-      };
-
-      const currentStatus = instance.status;
-      const allowedTransitions = validTransitions[currentStatus] ?? [];
-
-      if (!allowedTransitions.includes(status)) {
-        throw AppError.badRequest(
-          `Invalid status transition from '${currentStatus}' to '${status}'`,
-          { currentStatus, requestedStatus: status, allowedTransitions },
-        );
-      }
-
-      instance.status = status;
-      await instance.save();
-
-      res.json({
-        status: "success",
-        data: { instance },
-      });
+      res.json({ status: "success", data: { instance: updated } });
     } catch (err) {
       next(err);
     }
@@ -541,22 +383,9 @@ materialRouter.patch(
 materialRouter.delete(
   "/instances/:id",
   requirePermission("materials:delete"),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const instance = await MaterialInstance.findById(req.params.id);
-
-      if (!instance) {
-        throw AppError.notFound("Material instance not found");
-      }
-
-      // Only allow deletion if retired or never used
-      if (!["available", "retired"].includes(instance.status)) {
-        throw AppError.badRequest(
-          "Can only delete available or retired material instances",
-        );
-      }
-
-      await MaterialInstance.deleteOne({ _id: req.params.id });
+      await materialService.deleteInstance(getOrgId(req), req.params.id);
 
       res.json({
         status: "success",
