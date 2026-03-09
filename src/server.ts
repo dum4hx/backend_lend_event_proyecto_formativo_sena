@@ -101,6 +101,9 @@ app.use(`${apiV1}/customers`, routers.customerRouter);
 // Material routes (catalog, instances)
 app.use(`${apiV1}/materials`, routers.materialRouter);
 
+// Location routes (physical locations / sedes)
+app.use(`${apiV1}/locations`, routers.locationRouter);
+
 // Package routes
 app.use(`${apiV1}/packages`, routers.packageRouter);
 
