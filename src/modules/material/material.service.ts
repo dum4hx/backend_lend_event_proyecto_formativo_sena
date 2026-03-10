@@ -316,7 +316,12 @@ export const materialService = {
 
     const toCreate = { ...payload, organizationId } as Record<string, unknown>;
     const instance = await MaterialInstance.create(toCreate);
-    return instance;
+    // Populate the model field before returning
+    await instance.populate(
+      "modelId",
+      "name description pricePerDay categoryId",
+    );
+    return renameProperty(instance, "modelId", "model");
   },
 
   async updateInstanceStatus(
@@ -359,7 +364,7 @@ export const materialService = {
 
     await instance.save();
 
-    return instance;
+    return renameProperty(instance, "modelId", "model");
   },
 
   async deleteInstance(organizationId: Types.ObjectId | string, id: string) {

@@ -2472,12 +2472,12 @@ Gets a specific package.
 
 Creates a new package (bundle of materials).
 
-| Parameter     | Location | Type   | Required | Description                                 |
-| ------------- | -------- | ------ | -------- | ------------------------------------------- |
-| name          | body     | string | Yes      | Package name                                |
-| description   | body     | string | No       | Description                                 |
-| materialTypes | body     | array  | Yes      | Array of `{ materialTypeId, quantity }`     |
-| pricePerDay   | body     | number | No       | Override price (otherwise sum of materials) |
+| Parameter   | Location | Type   | Required | Description                                 |
+| ----------- | -------- | ------ | -------- | ------------------------------------------- |
+| name        | body     | string | Yes      | Package name                                |
+| description | body     | string | No       | Description                                 |
+| items       | body     | array  | Yes      | Array of `{ materialTypeId, quantity }`     |
+| pricePerDay | body     | number | No       | Override price (otherwise sum of materials) |
 
 ---
 
@@ -2590,32 +2590,109 @@ Marks a loan as returned.
 
 ### Inspection Endpoints
 
-#### GET /inspections
+### Package Endpoints
 
-Lists all inspections.
+All package routes require authentication and an active organization. Routes are protected with role-based permissions as noted.
+
+#### GET /packages
+
+Lists all packages in the organization.
+
+**Permission Required:** `packages:read`
+
+Query Parameters:
+
+| Parameter | Location | Type    | Required | Description                                            |
+| --------- | -------- | ------- | -------- | ------------------------------------------------------ |
+| page      | query    | integer | No       | Page number (default: 1)                               |
+| limit     | query    | integer | No       | Items per page (default: 20)                           |
+| isActive  | query    | boolean | No       | Filter active packages (true/false)                    |
+| search    | query    | string  | No       | Search by name or description (case-insensitive regex) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "packages": [
+      /* array of packages */
+    ],
+    "total": 0,
+    "page": 1,
+    "totalPages": 0
+  }
+}
+```
 
 ---
 
-#### GET /inspections/:id
+#### GET /packages/:id
 
-Gets a specific inspection.
+Gets a specific package by ID.
+
+**Permission Required:** `packages:read`
+
+**Response:** `200 OK` - returns `{ status: "success", data: { package: <package> } }`
 
 ---
 
-#### POST /inspections
+#### POST /packages
 
-Creates an inspection for a returned loan (warehouse operator action).
+Creates a new package (bundle of materials).
 
-| Parameter                  | Location | Type   | Required | Description               |
-| -------------------------- | -------- | ------ | -------- | ------------------------- |
-| loanId                     | body     | string | Yes      | Loan ID                   |
-| items                      | body     | array  | Yes      | Array of inspection items |
-| items[].materialInstanceId | body     | string | Yes      | Material instance ID      |
-| items[].condition          | body     | string | Yes      | `good`, `damaged`, `lost` |
-| items[].notes              | body     | string | No       | Inspection notes          |
-| items[].damageDescription  | body     | string | No       | Damage description        |
-| items[].damageCost         | body     | number | No       | Estimated damage cost     |
-| overallNotes               | body     | string | No       | General inspection notes  |
+**Permission Required:** `packages:create`
+
+Request body (validated against `PackageZodSchema` with `organizationId` omitted):
+
+| Parameter     | Location | Type   | Required | Description                                 |
+| ------------- | -------- | ------ | -------- | ------------------------------------------- |
+| name          | body     | string | Yes      | Package name                                |
+| description   | body     | string | No       | Description                                 |
+| materialTypes | body     | array  | Yes      | Array of `{ materialTypeId, quantity }`     |
+| pricePerDay   | body     | number | No       | Override price (otherwise sum of materials) |
+
+**Response:** `201 Created` - returns `{ status: "success", data: { package: <createdPackage> } }`
+
+---
+
+#### PATCH /packages/:id
+
+Updates a package (partial update).
+
+**Permission Required:** `packages:update`
+
+Request body: partial `PackageZodSchema` (organizationId omitted). Response: `{ status: "success", data: { package: <updatedPackage> } }`
+
+---
+
+#### POST /packages/:id/activate
+
+Activates a package.
+
+**Permission Required:** `packages:update`
+
+**Response:** `200 OK` - `{ status: "success", data: { package: <package> }, message: "Package activated successfully" }`
+
+---
+
+#### POST /packages/:id/deactivate
+
+Deactivates a package.
+
+**Permission Required:** `packages:update`
+
+**Response:** `200 OK` - `{ status: "success", data: { package: <package> }, message: "Package deactivated successfully" }`
+
+---
+
+#### DELETE /packages/:id
+
+Deletes a package.
+
+**Permission Required:** `packages:delete`
+
+**Response:** `200 OK` - `{ status: "success", message: "Package deleted successfully" }`
 
 ---
 

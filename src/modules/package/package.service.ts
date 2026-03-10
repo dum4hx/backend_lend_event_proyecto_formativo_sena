@@ -3,7 +3,6 @@ import { Package } from "./models/package.model.ts";
 import type { PackageInput } from "./models/package.model.ts";
 import { MaterialModel } from "../material/models/material_type.model.ts";
 import { AppError } from "../../errors/AppError.ts";
-import { organizationService } from "../organization/organization.service.ts";
 
 export const packageService = {
   async listPackages(

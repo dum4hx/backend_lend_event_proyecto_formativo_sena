@@ -33,7 +33,11 @@ const authRouter = Router();
 
 const registerSchema = z.object({
   organization: OrganizationZodSchema.omit({ ownerId: true }),
-  owner: UserZodSchema.omit({ organizationId: true, roleId: true }),
+  owner: UserZodSchema.omit({
+    organizationId: true,
+    roleId: true,
+    locations: true,
+  }),
 });
 
 const loginSchema = z.object({
