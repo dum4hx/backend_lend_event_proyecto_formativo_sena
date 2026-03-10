@@ -83,6 +83,10 @@ const subscriptionSchema = new Schema(
     cancelAtPeriodEnd: { type: Boolean, default: false },
     seatCount: { type: Number, default: 1, min: 1 },
     catalogItemCount: { type: Number, default: 0, min: 0 },
+    // Snapshot of plan limits captured at subscription time.
+    // Used as fallback when the SubscriptionType record is deleted or disabled.
+    maxSeats: { type: Number, default: -1 },
+    maxCatalogItems: { type: Number, default: -1 },
   },
   { _id: false },
 );

@@ -4,13 +4,11 @@ import {
   type Response,
   type NextFunction,
 } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { userService } from "./user.service.ts";
 import { authService } from "../auth/auth.service.ts";
-import {
-  organizationRoleOptions,
-  userRoleOptions,
-} from "../roles/models/role.model.ts";
+import { userRoleOptions } from "../roles/models/role.model.ts";
 import { UserUpdateZodSchema } from "./models/user.model.ts";
 import {
   validateBody,
@@ -46,6 +44,11 @@ const inviteUserSchema = z.object({
     secondSurname: z.string().max(50).optional(),
   }),
   email: z.email(),
+  locations: z.array(
+    z.string().refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid Location ID format",
+    }),
+  ),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
   roleId: z.string(),
 });

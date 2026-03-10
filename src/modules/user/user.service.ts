@@ -5,6 +5,7 @@ import { AppError } from "../../errors/AppError.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import rolesService from "../roles/roles.service.ts";
+import crypto from "crypto";
 
 /* ---------- User Service ---------- */
 
@@ -330,5 +331,13 @@ export const userService = {
     );
 
     return { user, permissions };
+  },
+
+  /**
+   * Generates a new password
+   */
+  async generateNewPassword(): Promise<string> {
+    const newPassword = crypto.randomBytes(32).toString("hex");
+    return newPassword;
   },
 };

@@ -24,6 +24,7 @@ import { EmailVerificationToken } from "./models/email_verification_token.model.
 import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
 import roleService from "../roles/roles.service.ts";
+import { userService } from "../user/user.service.ts";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
@@ -162,10 +163,14 @@ export const authService = {
             "Starter subscription plan not found or inactive",
           );
         }
+        // Snapshot plan limits so org operations remain functional even if
+        // the SubscriptionType record is later deleted or disabled.
         orgData.subscription = {
           plan: defaultPlan.plan,
           seatCount: defaultPlan.maxSeats === -1 ? 1 : defaultPlan.maxSeats,
           catalogItemCount: 0,
+          maxSeats: defaultPlan.maxSeats,
+          maxCatalogItems: defaultPlan.maxCatalogItems,
         };
       }
 
@@ -519,8 +524,20 @@ export const authService = {
       );
     }
 
+    // Validate location IDs are provided and belong to the organization
+    if (userData.locations && userData.locations.length > 0) {
+      await organizationService.validateLocationIds(
+        organizationId,
+        userData.locations,
+      );
+    } else {
+      throw AppError.badRequest(
+        "At least one location must be assigned to the user",
+      );
+    }
+
     // Generate a placeholder password (user will set their own via invite link)
-    const placeholderPassword = crypto.randomBytes(32).toString("hex");
+    const placeholderPassword = await userService.generateNewPassword();
 
     const userDoc = new User({
       ...userData,

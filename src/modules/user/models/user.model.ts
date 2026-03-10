@@ -46,6 +46,11 @@ export const UserZodSchema = z.object({
       "Password must contain at least one special character",
     ),
   roleId: z.string(),
+  locations: z.array(
+    z.string().refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid Location ID format",
+    }),
+  ),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
   }),
@@ -131,6 +136,7 @@ const userSchema = new Schema(
     },
     phone: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true, select: false },
+    locations: [{ type: Schema.Types.ObjectId, ref: "Location" }],
     roleId: {
       type: String,
       ref: "Role",

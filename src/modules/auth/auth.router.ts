@@ -130,6 +130,7 @@ authRouter.post(
             id: result.user._id,
             email: result.user.email,
             name: result.user.name,
+            locations: result.user.locations,
           },
         },
       });
@@ -174,6 +175,7 @@ authRouter.post(
             name: result.user.name,
             roleId: result.user.roleId,
             roleName: result.roleName,
+            locations: result.user.locations,
             permissions: result.permissions,
           },
           permissions: result.permissions,
@@ -477,6 +479,7 @@ authRouter.post(
             name: result.user.name,
             roleId: result.user.roleId,
             roleName: result.roleName,
+            locations: result.user.locations,
             permissions: result.permissions,
           },
           permissions: result.permissions,
