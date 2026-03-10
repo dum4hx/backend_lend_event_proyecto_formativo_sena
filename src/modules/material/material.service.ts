@@ -5,6 +5,7 @@ import { MaterialInstance } from "./models/material_instance.model.ts";
 import { LocationService } from "../location/location.service.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
+import { renameProperty } from "../../utils/renameProperty.ts";
 import { organizationService } from "../organization/organization.service.ts";
 
 /* ---------- Material Service ---------- */
@@ -251,7 +252,7 @@ export const materialService = {
       query.serialNumber = { $regex: search, $options: "i" };
     }
 
-    const [instances, total] = await Promise.all([
+    const [instancesDocs, total] = await Promise.all([
       MaterialInstance.find(query)
         .skip(skip)
         .limit(Number(limit))
@@ -259,6 +260,8 @@ export const materialService = {
         .sort({ createdAt: -1 }),
       MaterialInstance.countDocuments(query),
     ]);
+
+    const instances = renameProperty(instancesDocs, "modelId", "model");
 
     return {
       instances,
@@ -281,7 +284,7 @@ export const materialService = {
       throw AppError.notFound("Material instance not found");
     }
 
-    return instance;
+    return renameProperty(instance, "modelId", "model");
   },
 
   async createInstance(

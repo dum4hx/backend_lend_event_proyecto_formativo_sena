@@ -11,6 +11,7 @@ const materialStatusOptions: string[] = [
 ];
 
 // Zod schema for API validation
+// TODO: Consider adding more fields like purchaseDate, warrantyExpiry, etc. in the future
 export const MaterialInstanceZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
