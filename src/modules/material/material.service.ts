@@ -2,6 +2,7 @@ import type { Types } from "mongoose";
 import { Category } from "./models/category.model.ts";
 import { MaterialModel } from "./models/material_type.model.ts";
 import { MaterialInstance } from "./models/material_instance.model.ts";
+import { LocationService } from "../location/location.service.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import { organizationService } from "../organization/organization.service.ts";
@@ -294,6 +295,20 @@ export const materialService = {
     const materialType = await MaterialModel.findById(String(payload.modelId));
     if (!materialType) {
       throw AppError.notFound("Material type not found");
+    }
+
+    if (payload.locationId) {
+      const locationActive = await LocationService.locationExists(
+        String(payload.locationId),
+        String(organizationId),
+        true,
+      );
+      if (!locationActive) {
+        throw AppError.badRequest(
+          "Target location is either not found or inactive",
+          { locationId: payload.locationId },
+        );
+      }
     }
 
     const toCreate = { ...payload, organizationId } as Record<string, unknown>;

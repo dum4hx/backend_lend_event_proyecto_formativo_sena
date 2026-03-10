@@ -56,6 +56,51 @@ async function cleanupPendingRegistration(
 
 export const authService = {
   /**
+   * Checks if the user has super-admin permissions.
+   */
+  async isSuperAdmin(userId: Types.ObjectId | string): Promise<boolean> {
+    const { userService } = await import("../user/user.service.ts");
+    const profile = await userService.getProfile(userId);
+
+    const userRolePermissions = await roleService.getRolePermissions(
+      profile.user.roleId,
+      profile.user.organizationId,
+    );
+
+    // Compare whether the user has super admin permissions (at which case they should not be considered an owner)
+    const superAdminRolePermsSet = new Set(rolePermissions.super_admin);
+    const isSuperAdmin = userRolePermissions.every((perm) =>
+      superAdminRolePermsSet.has(perm),
+    );
+
+    return isSuperAdmin;
+  },
+
+  /**
+   * Checks whether the user is an owner (based on permissions).
+   */
+  async isOwner(userId: Types.ObjectId | string): Promise<boolean> {
+    const { userService } = await import("../user/user.service.ts");
+    const profile = await userService.getProfile(userId);
+
+    const userRolePermissions = await roleService.getRolePermissions(
+      profile.user.roleId,
+      profile.user.organizationId,
+    );
+
+    // Compare whether the user has all the permissions of the owner role
+    const ownerRolePermsSet = new Set(rolePermissions.owner);
+    const hasOwnerPermissions = userRolePermissions.every((perm) =>
+      ownerRolePermsSet.has(perm),
+    );
+
+    // If user has super admin permissions, they are not considered an owner for org-level checks
+    const isSuperAdmin = await authService.isSuperAdmin(userId);
+
+    return hasOwnerPermissions && !isSuperAdmin;
+  },
+
+  /**
    * Registers a new organization with an owner account.
    * Creates both organization and owner user in a transaction.
    */
@@ -729,15 +774,7 @@ export const authService = {
     const profile = await userService.getProfile(userId);
 
     // Check if user is owner
-    const userRolePermissions = await roleService.getRolePermissions(
-      profile.user.roleId,
-      profile.user.organizationId,
-    );
-    // Compare whether the user has all the permissions of the owner role
-    const ownerRolePermsSet = new Set(rolePermissions.owner);
-    const hasOwnerPermissions = userRolePermissions.every((perm) =>
-      ownerRolePermsSet.has(perm),
-    );
+    const hasOwnerPermissions = await authService.isOwner(userId);
 
     if (!hasOwnerPermissions) {
       throw AppError.unauthorized(
@@ -746,10 +783,7 @@ export const authService = {
     }
 
     // Allow login if user is super admin, regardless of org status
-    const superAdminRolePermsSet = new Set(rolePermissions.super_admin);
-    const isSuperAdmin = userRolePermissions.every((perm) =>
-      superAdminRolePermsSet.has(perm),
-    );
+    const isSuperAdmin = await authService.isSuperAdmin(userId);
     if (isSuperAdmin) {
       response.isActive = true;
       return response;

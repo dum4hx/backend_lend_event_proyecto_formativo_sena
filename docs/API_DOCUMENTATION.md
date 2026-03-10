@@ -2003,12 +2003,13 @@ Retrieves a paginated list of all locations in the organization.
 
 #### Query Parameters
 
-| Parameter | Type    | Required | Default | Description                                  |
-| --------- | ------- | -------- | ------- | -------------------------------------------- |
-| page      | integer | No       | 1       | Page number for pagination                   |
-| limit     | integer | No       | 20      | Number of items per page (max: 100)          |
-| search    | string  | No       | -       | Search by location name, street, or city     |
-| city      | string  | No       | -       | Filter by exact city name (case-insensitive) |
+| Parameter       | Type    | Required | Default | Description                                          |
+| --------------- | ------- | -------- | ------- | ---------------------------------------------------- |
+| page            | integer | No       | 1       | Page number for pagination                           |
+| limit           | integer | No       | 20      | Number of items per page (max: 100)                  |
+| search          | string  | No       | -       | Search by location name, street, or city             |
+| city            | string  | No       | -       | Filter by exact city name (case-insensitive)         |
+| includeInactive | boolean | No       | false   | Whether to include soft-deleted (inactive) locations |
 
 #### Success Response (200 OK)
 
@@ -2030,6 +2031,7 @@ Retrieves a paginated list of all locations in the organization.
           "propertyNumber": "45-20",
           "additionalInfo": "Piso 2"
         },
+        "isActive": true,
         "createdAt": "2026-02-20T10:30:00.000Z",
         "updatedAt": "2026-02-20T10:30:00.000Z"
       }
@@ -2217,7 +2219,7 @@ Same fields as POST, but all are optional. Only provided fields will be updated.
 
 ### DELETE /locations/:id
 
-Deletes a location from the organization.
+Deactivates a location (soft delete) from the organization.
 
 **Authentication Required:** Yes  
 **Permission Required:** `locations:delete`
@@ -2233,7 +2235,7 @@ Deletes a location from the organization.
 ```json
 {
   "status": "success",
-  "message": "Location deleted successfully",
+  "message": "Location deactivated successfully",
   "data": null
 }
 ```
@@ -2242,7 +2244,36 @@ Deletes a location from the organization.
 
 - **400 Bad Request** – Invalid location ID format
 - **404 Not Found** – Location does not exist
-- **409 Conflict** – Location is assigned to material instances and cannot be deleted
+- **409 Conflict** – Location is currently assigned to material instances and cannot be deactivated
+
+---
+
+### POST /locations/:id/restore
+
+Reactivates a soft-deleted location.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:delete`
+
+#### Path Parameters
+
+| Parameter | Type   | Required | Description               |
+| --------- | ------ | -------- | ------------------------- |
+| id        | string | Yes      | Location MongoDB ObjectId |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Location restored successfully",
+  "data": {
+    "status": "success",
+    "message": "Location restored successfully",
+    "data": { ... }
+  }
+}
+```
 
 ---
 

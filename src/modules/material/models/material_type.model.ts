@@ -71,6 +71,6 @@ materialTypeSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
 export type MaterialModelDocument = InferSchemaType<typeof materialTypeSchema>;
 export const MaterialModel = model<MaterialModelDocument>(
-  "MaterialModel",
+  "MaterialType",
   materialTypeSchema,
 );

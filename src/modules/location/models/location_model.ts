@@ -5,16 +5,16 @@ import { Schema, model, type InferSchemaType } from "mongoose";
  * ============================================================================
  * LOCATION MODEL
  * ============================================================================
- * 
+ *
  * This model represents the organization's physical locations such as
  * warehouses, offices, operation points, etc.
- * 
+ *
  * Features:
  * - Multi-tenancy: Each location belongs to an organization
  * - Validation with Zod for API requests
  * - Validation with Mongoose for database
  * - Unique compound index (organizationId + name) to prevent duplicates
- * 
+ *
  * Relations:
  * - Referenced by MaterialInstance (physical inventory)
  * - Can be related to user assignments
@@ -75,6 +75,7 @@ export const LocationZodSchema = z.object({
     .max(100, "Maximum 100 characters")
     .trim(),
   address: addressSchema,
+  isActive: z.boolean().default(true),
 });
 
 /**
@@ -135,12 +136,12 @@ const locationAddressSchema = new Schema(
 
 /**
  * Main Location schema in Mongoose
- * 
+ *
  * Fields:
  * - name: Identifying name of the location
  * - organizationId: Reference to owner organization (multi-tenancy)
  * - address: Embedded object with address data
- * 
+ *
  * Timestamps:
  * - createdAt: Creation date (automatic)
  * - updatedAt: Last update date (automatic)
@@ -162,6 +163,11 @@ const locationSchema = new Schema(
     address: {
       type: locationAddressSchema,
       required: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
     },
   },
   {

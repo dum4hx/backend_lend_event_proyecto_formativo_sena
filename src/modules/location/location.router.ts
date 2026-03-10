@@ -18,28 +18,30 @@ import {
   requireActiveOrganization,
   requirePermission,
   getOrgId,
+  getUserId,
 } from "../../middleware/auth.ts";
 
 /**
  * ============================================================================
  * LOCATION ROUTER
  * ============================================================================
- * 
+ *
  * Defines HTTP endpoints for physical location management.
- * 
+ *
  * Available endpoints:
  * - GET    /api/v1/locations       - List locations with pagination
  * - GET    /api/v1/locations/:id   - Get a location by ID
  * - POST   /api/v1/locations       - Create a new location
  * - PATCH  /api/v1/locations/:id   - Update a location
- * - DELETE /api/v1/locations/:id   - (DISABLED) Delete a location
- * 
+ * - DELETE /api/v1/locations/:id   - (Soft delete) Deactivate a location
+ * - POST   /api/v1/locations/:id/restore - Reactivate a location
+ *
  * Applied middleware:
  * - authenticate: Verifies JWT in httpOnly cookie
  * - requireActiveOrganization: Validates active organization in session
  * - requirePermission: Checks specific RBAC permissions
  * - validateBody/validateQuery: Validates input data with Zod
- * 
+ *
  * Features:
  * - Automatic multi-tenancy via getOrgId(req)
  * - Structured responses (status, message, data)
@@ -68,8 +70,12 @@ locationRouter.use(authenticate, requireActiveOrganization);
  * Extends base pagination schema with specific filters
  */
 const listLocationsQuerySchema = paginationSchema.extend({
-  search: z.string().optional(),  // Free text search
-  city: z.string().optional(),    // City filter
+  search: z.string().optional(), // Free text search
+  city: z.string().optional(), // City filter
+  includeInactive: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"), // Cast string query param to boolean
 });
 
 /**
@@ -87,15 +93,15 @@ const updateLocationSchema = LocationZodSchema.partial();
 /**
  * GET /api/v1/locations
  * Lists all locations in the organization with pagination and filters
- * 
+ *
  * Query Params:
  * - page: page number (default: 1)
  * - limit: items per page (default: 20)
  * - search: search in name/city/street
  * - city: exact city filter
- * 
+ *
  * Permissions: locations:read
- * 
+ *
  * Response 200:
  * {
  *   status: "success",
@@ -114,19 +120,20 @@ locationRouter.get(
     try {
       // Get organizationId from authenticated request and convert to string
       const organizationId = getOrgId(req).toString();
-      
+
       // Extract and type query params
       const query = req.query as {
         page?: string;
         limit?: string;
         search?: string;
         city?: string;
+        includeInactive?: boolean;
       };
 
       // Parse pagination parameters with default values
       const page = query.page ? parseInt(query.page, 10) : 1;
       const limit = query.limit ? parseInt(query.limit, 10) : 20;
-      const { search, city } = query;
+      const { search, city, includeInactive } = query;
 
       // Call service with all parameters
       const result = await LocationService.listLocations({
@@ -135,6 +142,7 @@ locationRouter.get(
         limit,
         ...(search && { search }),
         ...(city && { city }),
+        includeInactive,
       });
 
       // Successful response with standard structure
@@ -153,19 +161,19 @@ locationRouter.get(
 /**
  * GET /api/v1/locations/:id
  * Gets a specific location by its ID
- * 
+ *
  * Path Params:
  * - id: MongoDB ObjectId of the location
- * 
+ *
  * Permissions: locations:read
- * 
+ *
  * Response 200:
  * {
  *   status: "success",
  *   message: "Location fetched successfully",
  *   data: Location
  * }
- * 
+ *
  * Errors:
  * - 400: Invalid ID
  * - 404: Location not found or doesn't belong to organization
@@ -200,7 +208,7 @@ locationRouter.get(
 /**
  * POST /api/v1/locations
  * Creates a new location in the organization
- * 
+ *
  * Body (JSON):
  * {
  *   name: string,
@@ -213,16 +221,16 @@ locationRouter.get(
  *     additionalInfo?: string
  *   }
  * }
- * 
+ *
  * Permissions: locations:create
- * 
+ *
  * Response 201:
  * {
  *   status: "success",
  *   message: "Location created successfully",
  *   data: Location
  * }
- * 
+ *
  * Errors:
  * - 400: Invalid data (Zod validation)
  * - 409: Duplicate name in organization
@@ -235,11 +243,13 @@ locationRouter.post(
     try {
       // Get organizationId as ObjectId (service accepts both types)
       const organizationId = getOrgId(req);
+      const userId = getUserId(req).toString();
 
-      // Create location with body data + organizationId
+      // Create location with body data + organizationId + userId
       const location = await LocationService.createLocation({
         ...req.body,
         organizationId,
+        userId,
       });
 
       // Response with 201 Created code
@@ -257,10 +267,10 @@ locationRouter.post(
 /**
  * PATCH /api/v1/locations/:id
  * Updates an existing location (partial update)
- * 
+ *
  * Path Params:
  * - id: MongoDB ObjectId of the location
- * 
+ *
  * Body (JSON): Any subset of Location fields
  * Example:
  * {
@@ -268,16 +278,16 @@ locationRouter.post(
  *     "additionalInfo": "Floor 3"
  *   }
  * }
- * 
+ *
  * Permissions: locations:update
- * 
+ *
  * Response 200:
  * {
  *   status: "success",
  *   message: "Location updated successfully",
  *   data: Location
  * }
- * 
+ *
  * Errors:
  * - 400: Invalid ID or invalid data
  * - 404: Location not found
@@ -311,32 +321,24 @@ locationRouter.patch(
 
 /**
  * DELETE /api/v1/locations/:id
- * Deletes a location (ENDPOINT DISABLED)
- * 
- * ⚠️ IMPORTANT: This endpoint is commented out for data integrity reasons
- * 
- * Reasons to disable DELETE:
+ * Deactivates a location (soft delete)
+ *
+ * ⚠️ IMPORTANT: This operation is reversible and maintains historical data.
+ *
+ * Reasons for soft delete instead of hard delete:
  * 1. Locations are related to:
  *    - MaterialInstance (physical inventory)
  *    - User assignments
  *    - Movement and loan history
- * 
- * 2. Deleting a location would cause:
- *    - Loss of inventory traceability
- *    - Orphaned references in material instances
- *    - Inconsistencies in historical reports
- * 
- * RECOMMENDED ALTERNATIVES:
- * - Implement "isActive: boolean" field for logical deactivation
- * - Create endpoint PATCH /locations/:id/toggle-status
- * - Maintain referential integrity with soft deletes
- * 
- * If you need to enable physical deletion:
- * 1. Implement cascade delete in all related entities
- * 2. Add explicit user confirmation
- * 3. Create backup/audit log before deletion
+ *
+ * 2. Soft delete allows:
+ *    - Maintaining inventory traceability
+ *    - Preserving references in material instances for historical audits
+ *    - Filtering UI to only show active locations
+ *
+ * Constraints:
+ * - Cannot deactivate if any MaterialInstance is currently at this location
  */
-/*
 locationRouter.delete(
   "/:id",
   requirePermission("locations:delete"),
@@ -349,7 +351,7 @@ locationRouter.delete(
 
       res.status(200).json({
         status: "success",
-        message: "Location deleted successfully",
+        message: "Location deactivated successfully",
         data: null,
       });
     } catch (error) {
@@ -357,6 +359,45 @@ locationRouter.delete(
     }
   },
 );
-*/
+
+/**
+ * POST /api/v1/locations/:id/restore
+ * Reactivates a soft-deleted location
+ *
+ * Path Params:
+ * - id: MongoDB ObjectId of the location
+ *
+ * Permissions: locations:delete
+ *
+ * Response 200:
+ * {
+ *   status: "success",
+ *   message: "Location restored successfully",
+ *   data: Location
+ * }
+ */
+locationRouter.post(
+  "/:id/restore",
+  requirePermission("locations:delete"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const organizationId = getOrgId(req).toString();
+
+      const location = await LocationService.reactivateLocation(
+        id,
+        organizationId,
+      );
+
+      res.status(200).json({
+        status: "success",
+        message: "Location restored successfully",
+        data: location,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default locationRouter;
