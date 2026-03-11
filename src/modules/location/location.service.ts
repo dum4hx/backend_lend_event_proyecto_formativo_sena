@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { Location } from "./models/location_model.ts";
+import { Location } from "./models/location.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { authService } from "../auth/auth.service.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
@@ -38,6 +38,7 @@ interface ListLocationsParams {
   limit: number; // Items per page
   search?: string; // Search by name/city/street
   city?: string; // Specific city filter
+  status?: "available" | "full_capacity" | "maintenance" | "inactive"; // Status filter
   includeInactive?: boolean; // Whether to include inactive locations
 }
 
@@ -56,6 +57,8 @@ interface CreateLocationData {
     propertyNumber: string;
     additionalInfo?: string; // Optional
   };
+  status?: "available" | "full_capacity" | "maintenance" | "inactive"; // Optional, defaults to available
+  additionalDetails?: string; // Optional extra information about the location
 }
 
 /**
@@ -72,6 +75,8 @@ interface UpdateLocationData {
     propertyNumber?: string;
     additionalInfo?: string;
   };
+  status?: "available" | "full_capacity" | "maintenance" | "inactive";
+  additionalDetails?: string;
 }
 
 // ============================================================================
@@ -92,7 +97,7 @@ export class LocationService {
    * - Automatic organization scope
    */
   static async listLocations(params: ListLocationsParams) {
-    const { organizationId, page, limit, search, city, includeInactive } =
+    const { organizationId, page, limit, search, city, status, includeInactive } =
       params;
 
     // Calculate offset for pagination
@@ -109,6 +114,11 @@ export class LocationService {
     // Apply city filter (case-insensitive)
     if (city) {
       query["address.city"] = { $regex: city, $options: "i" };
+    }
+
+    // Apply status filter
+    if (status) {
+      query.status = status;
     }
 
     // Apply text search in multiple fields

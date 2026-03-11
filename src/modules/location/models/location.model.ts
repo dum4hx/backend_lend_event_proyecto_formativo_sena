@@ -26,6 +26,19 @@ import { Schema, model, type InferSchemaType } from "mongoose";
 // ============================================================================
 
 /**
+ * Location status enum
+ * Defines the operational state of a location
+ */
+export const LocationStatusEnum = z.enum([
+  "available",
+  "full_capacity",
+  "maintenance",
+  "inactive",
+]);
+
+export type LocationStatus = z.infer<typeof LocationStatusEnum>;
+
+/**
  * Validation schema for location address
  * All fields are required except state and additionalInfo
  */
@@ -75,6 +88,12 @@ export const LocationZodSchema = z.object({
     .max(100, "Maximum 100 characters")
     .trim(),
   address: addressSchema,
+  status: LocationStatusEnum.default("available"),
+  additionalDetails: z
+    .string()
+    .max(500, "Maximum 500 characters")
+    .trim()
+    .optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -141,6 +160,8 @@ const locationAddressSchema = new Schema(
  * - name: Identifying name of the location
  * - organizationId: Reference to owner organization (multi-tenancy)
  * - address: Embedded object with address data
+ * - status: Operational status of the location
+ * - additionalDetails: Extra information about the location
  *
  * Timestamps:
  * - createdAt: Creation date (automatic)
@@ -163,6 +184,17 @@ const locationSchema = new Schema(
     address: {
       type: locationAddressSchema,
       required: true,
+    },
+    status: {
+      type: String,
+      enum: ["available", "full_capacity", "maintenance", "inactive"],
+      default: "available",
+      index: true,
+    },
+    additionalDetails: {
+      type: String,
+      maxlength: 500,
+      trim: true,
     },
     isActive: {
       type: Boolean,

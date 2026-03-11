@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 
 import { LocationService } from "./location.service.ts";
-import { LocationZodSchema } from "./models/location_model.ts";
+import { LocationZodSchema } from "./models/location.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -72,6 +72,7 @@ locationRouter.use(authenticate, requireActiveOrganization);
 const listLocationsQuerySchema = paginationSchema.extend({
   search: z.string().optional(), // Free text search
   city: z.string().optional(), // City filter
+  status: z.enum(["available", "full_capacity", "maintenance", "inactive"]).optional(), // Status filter
   includeInactive: z
     .string()
     .optional()
@@ -99,6 +100,7 @@ const updateLocationSchema = LocationZodSchema.partial();
  * - limit: items per page (default: 20)
  * - search: search in name/city/street
  * - city: exact city filter
+ * - status: filter by status (available, full_capacity, maintenance, inactive)
  *
  * Permissions: locations:read
  *
@@ -127,13 +129,14 @@ locationRouter.get(
         limit?: string;
         search?: string;
         city?: string;
+        status?: "available" | "full_capacity" | "maintenance" | "inactive";
         includeInactive?: boolean;
       };
 
       // Parse pagination parameters with default values
       const page = query.page ? parseInt(query.page, 10) : 1;
       const limit = query.limit ? parseInt(query.limit, 10) : 20;
-      const { search, city, includeInactive } = query;
+      const { search, city, status, includeInactive } = query;
 
       // Call service with all parameters
       const result = await LocationService.listLocations({
@@ -142,7 +145,8 @@ locationRouter.get(
         limit,
         ...(search && { search }),
         ...(city && { city }),
-        includeInactive,
+        ...(status && { status }),
+        ...(includeInactive !== undefined && { includeInactive }),
       });
 
       // Successful response with standard structure
@@ -219,7 +223,9 @@ locationRouter.get(
  *     street: string,
  *     propertyNumber: string,
  *     additionalInfo?: string
- *   }
+ *   },
+ *   status?: string (available, full_capacity, maintenance, inactive),
+ *   additionalDetails?: string
  * }
  *
  * Permissions: locations:create

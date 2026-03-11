@@ -7,7 +7,7 @@ import {
 import { AppError } from "../../errors/AppError.ts";
 import type { PlanUsage } from "./types/index.ts";
 import { subscriptionTypeService } from "../subscription_type/subscription_type.service.ts";
-import { Location } from "../location/models/location_model.ts";
+import { Location } from "../location/models/location.model.ts";
 
 /* ---------- Internal Helpers ---------- */
 
