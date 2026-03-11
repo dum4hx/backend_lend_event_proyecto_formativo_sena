@@ -20,6 +20,23 @@ export const MaterialModelZodSchema = z.object({
     .max(500, "Maximum 500 characters")
     .trim(),
   pricePerDay: z.number().positive("Price must be greater than 0"),
+  /**
+   * Attribute values assigned to this material type.
+   * Each entry references a MaterialAttribute and provides the value for that attribute.
+   */
+  attributes: z
+    .array(
+      z.object({
+        attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+          message: "Invalid Attribute ID format",
+        }),
+        value: z
+          .string()
+          .min(1, "Attribute value cannot be empty")
+          .max(500, "Maximum 500 characters"),
+      }),
+    )
+    .default([]),
 });
 
 export type MaterialModelInput = z.infer<typeof MaterialModelZodSchema>;
@@ -56,6 +73,31 @@ const materialTypeSchema = new Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+    /**
+     * Attribute values applied to this material type.
+     * Validated against MaterialAttribute rules at the service layer.
+     */
+    attributes: {
+      type: [
+        new Schema(
+          {
+            attributeId: {
+              type: Schema.Types.ObjectId,
+              ref: "MaterialAttribute",
+              required: true,
+            },
+            value: {
+              type: String,
+              required: true,
+              maxlength: 500,
+              trim: true,
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
   },
   {

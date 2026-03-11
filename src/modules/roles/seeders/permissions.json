@@ -189,6 +189,34 @@
     "isPlatformPermission": false
   },
   {
+    "_id": "material_attributes:read",
+    "displayName": "View Material Attributes",
+    "description": "Allows listing and viewing material attribute definitions for the organization.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "material_attributes:create",
+    "displayName": "Create Material Attributes",
+    "description": "Allows defining new attribute types (e.g. weight, size) for the organization's materials.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "material_attributes:update",
+    "displayName": "Update Material Attributes",
+    "description": "Allows editing existing material attribute definitions, including allowed values and units.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "material_attributes:delete",
+    "displayName": "Delete Material Attributes",
+    "description": "Allows removing material attribute definitions that are not in use.",
+    "category": "Materials",
+    "isPlatformPermission": false
+  },
+  {
     "_id": "locations:create",
     "displayName": "Create Locations",
     "description": "Allows creating new physical locations within the organization.",

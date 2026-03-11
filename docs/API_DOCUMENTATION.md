@@ -2454,6 +2454,164 @@ Deletes a material instance. Only instances with `available` or `retired` status
 
 ---
 
+### Material Attribute Endpoints
+
+These endpoints manage configurable attribute definitions that organizations assign to material types (e.g., weight, height, RAM). Attributes are scoped to an organization and optionally restricted to a specific material category.
+
+#### GET /materials/attributes
+
+Lists all attribute definitions for the organization.
+
+**Permission Required:** `material_attributes:read`
+
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| categoryId | query    | string | No       | Filter attributes by category ID |
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attributes": [
+      {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+        "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+        "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
+        "name": "Weight",
+        "unit": "kg",
+        "allowedValues": [],
+        "isRequired": true,
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /materials/attributes/:id
+
+Gets a specific attribute definition.
+
+**Permission Required:** `material_attributes:read`
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attribute": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "RAM",
+      "unit": "GB",
+      "allowedValues": ["4", "8", "16", "32"],
+      "isRequired": false,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Errors:**
+
+- **404 Not Found** – Attribute not found or does not belong to the organization
+
+---
+
+#### POST /materials/attributes
+
+Creates a new attribute definition for the organization.
+
+**Permission Required:** `material_attributes:create`
+
+| Parameter     | Location | Type     | Required | Description                                                                     |
+| ------------- | -------- | -------- | -------- | ------------------------------------------------------------------------------- |
+| name          | body     | string   | Yes      | Attribute name (max 100 chars, unique per organization)                         |
+| unit          | body     | string   | Yes      | Unit of measurement (e.g., `kg`, `GB`, `cm`)                                    |
+| categoryId    | body     | string   | No       | If set, restricts this attribute to material types of this category             |
+| allowedValues | body     | string[] | No       | Enumerated acceptable values. Empty array means any value is accepted.          |
+| isRequired    | body     | boolean  | No       | Whether material types must provide a value for this attribute (default: false) |
+
+**Example Request:**
+
+```json
+{
+  "name": "RAM",
+  "unit": "GB",
+  "allowedValues": ["4", "8", "16", "32"],
+  "isRequired": true
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attribute": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "RAM",
+      "unit": "GB",
+      "allowedValues": ["4", "8", "16", "32"],
+      "isRequired": true,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Errors:**
+
+- **400 Bad Request** – Missing required fields or invalid data
+- **409 Conflict** – An attribute with this name already exists in the organization
+
+---
+
+#### PATCH /materials/attributes/:id
+
+Updates an attribute definition. All fields are optional.
+
+**Permission Required:** `material_attributes:update`
+
+| Parameter     | Location | Type     | Required | Description                                                                          |
+| ------------- | -------- | -------- | -------- | ------------------------------------------------------------------------------------ |
+| name          | body     | string   | No       | Attribute name                                                                       |
+| unit          | body     | string   | No       | Unit of measurement                                                                  |
+| categoryId    | body     | string   | No       | Cannot be changed if material types from other categories already use this attribute |
+| allowedValues | body     | string[] | No       | Cannot remove values currently in use by existing material types                     |
+| isRequired    | body     | boolean  | No       | Required flag                                                                        |
+
+**Errors:**
+
+- **400 Bad Request** – Attempt to narrow `allowedValues` removes a value still in use, or `categoryId` change would exclude existing material types that reference this attribute
+- **404 Not Found** – Attribute not found or does not belong to the organization
+- **409 Conflict** – Name already taken by another attribute in the organization
+
+---
+
+#### DELETE /materials/attributes/:id
+
+Deletes an attribute definition. Blocked if any material type currently references this attribute.
+
+**Permission Required:** `material_attributes:delete`
+
+**Errors:**
+
+- **404 Not Found** – Attribute not found or does not belong to the organization
+- **409 Conflict** – Attribute is still assigned to one or more material types and cannot be deleted
+
+---
+
 ### Package Endpoints
 
 #### GET /packages

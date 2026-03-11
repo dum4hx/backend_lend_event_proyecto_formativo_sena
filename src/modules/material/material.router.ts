@@ -8,6 +8,7 @@ import { z } from "zod";
 import { MaterialModelZodSchema } from "./models/material_type.model.ts";
 import { MaterialInstanceZodSchema } from "./models/material_instance.model.ts";
 import { CategoryZodSchema } from "./models/category.model.ts";
+import { MaterialAttributeZodSchema } from "./models/material_attribute.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import {
   validateBody,
@@ -138,6 +139,126 @@ materialRouter.delete(
       res.json({
         status: "success",
         message: "Category deleted successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ---------- Material Attribute Routes ---------- */
+
+const listAttributesQuerySchema = z.object({
+  categoryId: z.string().optional(),
+});
+
+// Omit organizationId from client-facing validation; it is injected server-side
+const createAttributeSchema = MaterialAttributeZodSchema.omit({
+  organizationId: true,
+});
+const updateAttributeSchema = createAttributeSchema.partial();
+
+/**
+ * GET /api/v1/materials/attributes
+ * Lists all material attributes for the organization. Optionally filtered by categoryId.
+ */
+materialRouter.get(
+  "/attributes",
+  requirePermission("material_attributes:read"),
+  validateQuery(listAttributesQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const { categoryId } = req.query as { categoryId?: string };
+      const opts = categoryId ? { categoryId } : {};
+      const attributes = await materialService.listAttributes(
+        organizationId,
+        opts,
+      );
+      res.json({ status: "success", data: { attributes } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/materials/attributes/:id
+ * Gets a specific material attribute.
+ */
+materialRouter.get(
+  "/attributes/:id",
+  requirePermission("material_attributes:read"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const attribute = await materialService.getAttribute(
+        req.params.id,
+        getOrgId(req),
+      );
+      res.json({ status: "success", data: { attribute } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/materials/attributes
+ * Creates a new material attribute for the organization.
+ */
+materialRouter.post(
+  "/attributes",
+  requirePermission("material_attributes:create"),
+  validateBody(createAttributeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const attribute = await materialService.createAttribute(
+        organizationId,
+        req.body,
+      );
+      res.status(201).json({ status: "success", data: { attribute } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/materials/attributes/:id
+ * Updates a material attribute. All fields are optional.
+ */
+materialRouter.patch(
+  "/attributes/:id",
+  requirePermission("material_attributes:update"),
+  validateBody(updateAttributeSchema),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const updated = await materialService.updateAttribute(
+        getOrgId(req),
+        req.params.id,
+        req.body,
+      );
+      res.json({ status: "success", data: { attribute: updated } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /api/v1/materials/attributes/:id
+ * Deletes a material attribute. Fails if any material type currently uses it.
+ */
+materialRouter.delete(
+  "/attributes/:id",
+  requirePermission("material_attributes:delete"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      await materialService.deleteAttribute(getOrgId(req), req.params.id);
+      res.json({
+        status: "success",
+        message: "Material attribute deleted successfully",
       });
     } catch (err) {
       next(err);

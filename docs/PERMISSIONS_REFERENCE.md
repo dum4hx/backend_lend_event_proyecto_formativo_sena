@@ -26,6 +26,10 @@ Each section explains the purpose of a permission and the action it allows.
 - [`loans:read`](#loansread)
 - [`loans:return`](#loansreturn)
 - [`loans:update`](#loansupdate)
+- [`material_attributes:create`](#material_attributescreate)
+- [`material_attributes:delete`](#material_attributesdelete)
+- [`material_attributes:read`](#material_attributesread)
+- [`material_attributes:update`](#material_attributesupdate)
 - [`materials:create`](#materialscreate)
 - [`materials:delete`](#materialsdelete)
 - [`materials:read`](#materialsread)
@@ -63,6 +67,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`users:update`](#usersupdate)
 
 ## Permission Details
+
 ### `analytics:read`
 
 - **Display Name:** View Analytics
@@ -262,6 +267,46 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows browsing the inventory and material catalog.
 - **Allowed Action:** View/list records and details for this resource.
 - **Resource Target:** Materials
+
+### `material_attributes:create`
+
+- **Display Name:** Create Material Attributes
+- **Category:** Materials
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows defining new configurable attributes for material types within the organization.
+- **Allowed Action:** Create new records in this resource.
+- **Resource Target:** Material Attributes
+
+### `material_attributes:delete`
+
+- **Display Name:** Delete Material Attributes
+- **Category:** Materials
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows permanently removing attribute definitions that are not currently assigned to any material type.
+- **Allowed Action:** Remove records from this resource.
+- **Resource Target:** Material Attributes
+
+### `material_attributes:read`
+
+- **Display Name:** View Material Attributes
+- **Category:** Materials
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows listing and viewing configurable attribute definitions for material types.
+- **Allowed Action:** View/list records and details for this resource.
+- **Resource Target:** Material Attributes
+
+### `material_attributes:update`
+
+- **Display Name:** Update Material Attributes
+- **Category:** Materials
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows modifying attribute definitions (name, unit, allowed values, required flag).
+- **Allowed Action:** Modify existing records in this resource.
+- **Resource Target:** Material Attributes
 
 ### `materials:update`
 
