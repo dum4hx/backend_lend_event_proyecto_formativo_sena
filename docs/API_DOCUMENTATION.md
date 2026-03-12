@@ -2660,10 +2660,33 @@ Creates a new loan request (commercial advisor action).
 | Parameter  | Location | Type   | Required | Description                |
 | ---------- | -------- | ------ | -------- | -------------------------- |
 | customerId | body     | string | Yes      | Customer ID                |
-| items      | body     | array  | Yes      | Array of items/packages    |
+| items      | body     | array  | Yes      | Array of request items     |
 | startDate  | body     | string | Yes      | Loan start date (ISO 8601) |
 | endDate    | body     | string | Yes      | Loan end date (ISO 8601)   |
 | notes      | body     | string | No       | Additional notes           |
+
+`items[]` contract (recommended):
+
+| Field       | Type                           | Required | Description                                      |
+| ----------- | ------------------------------ | -------- | ------------------------------------------------ |
+| type        | `material` \| `package`        | Yes      | Defines which entity is resolved by `referenceId` |
+| referenceId | string                         | Yes      | Material Type ID when type=`material`, Package ID when type=`package` |
+| quantity    | number                         | No       | Defaults to `1`                                  |
+
+Legacy compatibility still supported per item:
+
+| Field          | Type   | Description                                |
+| -------------- | ------ | ------------------------------------------ |
+| materialTypeId | string | Legacy alias for `type=material` + `referenceId` |
+| packageId      | string | Legacy alias for `type=package` + `referenceId`  |
+
+Validation and resolution behavior:
+
+- `type=material` resolves an active material type in the organization.
+- `type=package` resolves an active package in the organization.
+- Invalid type returns `400 BAD_REQUEST`.
+- Missing/inactive material reference returns `404 NOT_FOUND`.
+- Missing/inactive package reference returns `404 NOT_FOUND`.
 
 ---
 

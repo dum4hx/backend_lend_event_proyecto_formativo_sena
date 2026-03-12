@@ -12,6 +12,7 @@ import {
   requestStatusOptions,
 } from "./models/request.model.ts";
 import { Package } from "../package/models/package.model.ts";
+import { MaterialModel } from "../material/models/material_type.model.ts";
 import { Customer } from "../customer/models/customer.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import {
@@ -37,20 +38,82 @@ requestRouter.use(authenticate, requireActiveOrganization);
 
 const listRequestsQuerySchema = paginationSchema.extend({
   status: z.enum(requestStatusOptions).optional(),
-  customerId: z.string().optional(),
-  packageId: z.string().optional(),
+  customerId: z
+    .string()
+    .refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid customerId format",
+    })
+    .optional(),
+  packageId: z
+    .string()
+    .refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid packageId format",
+    })
+    .optional(),
 });
+
+const createRequestItemSchema = z.object({
+  type: z.string().optional(),
+  referenceId: z.string().optional(),
+  materialTypeId: z.string().optional(),
+  packageId: z.string().optional(),
+  quantity: z.number().int().positive().default(1),
+});
+
+type NormalizedRequestItem = {
+  type: "material" | "package";
+  referenceId: string;
+  quantity: number;
+};
+
+const normalizeRequestItem = (
+  item: z.infer<typeof createRequestItemSchema>,
+  itemIndex: number,
+): NormalizedRequestItem => {
+  const fallbackType = item.materialTypeId
+    ? "material"
+    : item.packageId
+      ? "package"
+      : undefined;
+
+  const resolvedType = item.type ?? fallbackType;
+
+  if (resolvedType !== "material" && resolvedType !== "package") {
+    throw AppError.badRequest(`Invalid type for item at index ${itemIndex}`);
+  }
+
+  const resolvedReferenceId =
+    item.referenceId ??
+    (resolvedType === "material" ? item.materialTypeId : item.packageId);
+
+  if (!resolvedReferenceId || !Types.ObjectId.isValid(resolvedReferenceId)) {
+    throw AppError.badRequest(
+      `Invalid referenceId for ${resolvedType} item at index ${itemIndex}`,
+    );
+  }
+
+  return {
+    type: resolvedType,
+    referenceId: resolvedReferenceId,
+    quantity: item.quantity,
+  };
+};
 
 const createRequestSchema = LoanRequestZodSchema.pick({
   customerId: true,
-  items: true,
   startDate: true,
   endDate: true,
   notes: true,
-}).refine((data) => data.endDate > data.startDate, {
-  message: "End date must be after start date",
-  path: ["endDate"],
-});
+})
+  .extend({
+    items: z
+      .array(createRequestItemSchema)
+      .min(1, "At least one item is required"),
+  })
+  .refine((data) => data.endDate > data.startDate, {
+    message: "End date must be after start date",
+    path: ["endDate"],
+  });
 
 const assignMaterialsSchema = z.object({
   assignments: z.array(
@@ -102,7 +165,12 @@ requestRouter.get(
         query.customerId = customerId;
       }
       if (packageId) {
-        query.packageId = packageId;
+        query.items = {
+          $elemMatch: {
+            type: "package",
+            referenceId: new Types.ObjectId(packageId),
+          },
+        };
       }
 
       const sortField = sortBy ?? "createdAt";
@@ -113,7 +181,6 @@ requestRouter.get(
           .skip(skip)
           .limit(limit)
           .populate("customerId", "email name")
-          .populate("packageId", "name pricePerDay")
           .populate("assignedMaterials.materialInstanceId", "serialNumber")
           .sort({ [sortField]: sortDirection }),
         LoanRequest.countDocuments(query),
@@ -148,7 +215,6 @@ requestRouter.get(
         organizationId: getOrgId(req),
       })
         .populate("customerId", "email name phone address")
-        .populate("packageId", "name description materialTypes pricePerDay")
         .populate(
           "assignedMaterials.materialInstanceId",
           "serialNumber status modelId",
@@ -192,20 +258,46 @@ requestRouter.post(
         throw AppError.notFound("Customer not found or inactive");
       }
 
-      // Validate package exists and is active
-      const pkg = await Package.findOne({
-        _id: req.body.packageId,
-        organizationId,
-        isActive: true,
-      });
+      const normalizedItems = req.body.items.map(
+        (item: z.infer<typeof createRequestItemSchema>, index: number) =>
+          normalizeRequestItem(item, index),
+      );
 
-      if (!pkg) {
-        throw AppError.notFound("Package not found or inactive");
+      // Resolve each item reference by type to ensure requests cannot be created
+      // with invalid or inactive catalog references.
+      for (let itemIndex = 0; itemIndex < normalizedItems.length; itemIndex++) {
+        const item = normalizedItems[itemIndex];
+
+        if (item.type === "material") {
+          const material = await MaterialModel.findOne({
+            _id: item.referenceId,
+            organizationId,
+          });
+
+          if (!material) {
+            throw AppError.notFound(
+              `Material not found or inactive for item at index ${itemIndex}`,
+            );
+          }
+          continue;
+        }
+
+        const pkg = await Package.findOne({
+          _id: item.referenceId,
+          organizationId,
+          $or: [{ status: "active" }, { isActive: true }],
+        });
+
+        if (!pkg) {
+          throw AppError.notFound(
+            `Package not found or inactive for item at index ${itemIndex}`,
+          );
+        }
       }
 
       // Check date validity
-      const startDate = new Date(req.body.requestedStartDate);
-      const endDate = new Date(req.body.requestedEndDate);
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(req.body.endDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -219,14 +311,16 @@ requestRouter.post(
 
       const request = await LoanRequest.create({
         ...req.body,
+        items: normalizedItems,
         organizationId,
-        createdById: user.id,
+        createdBy: user.id,
         status: "pending",
       });
 
-      const populatedRequest = await LoanRequest.findById(request._id)
-        .populate("customerId", "email name")
-        .populate("packageId", "name pricePerDay");
+      const populatedRequest = await LoanRequest.findById(request._id).populate(
+        "customerId",
+        "email name",
+      );
 
       res.status(201).json({
         status: "success",
@@ -329,7 +423,7 @@ requestRouter.post(
         _id: req.params.id,
         organizationId: getOrgId(req),
         status: "approved",
-      }).populate("packageId");
+      });
 
       if (!request) {
         throw AppError.notFound("Request not found or not in approved status");
