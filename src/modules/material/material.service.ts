@@ -480,6 +480,14 @@ export const materialService = {
           { locationId: payload.locationId },
         );
       }
+
+      // Check capacity for the specific material type at the target location
+      await LocationService.validateCapacity(
+        String(payload.locationId),
+        String(payload.modelId),
+        String(organizationId),
+        payload.force === true,
+      );
     }
 
     const toCreate = { ...payload, organizationId } as Record<string, unknown>;

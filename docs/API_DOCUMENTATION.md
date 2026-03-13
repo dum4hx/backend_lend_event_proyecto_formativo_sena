@@ -2101,15 +2101,18 @@ Creates a new location in the organization.
 
 #### Request Body
 
-| Field                  | Type   | Required | Constraints        | Description                      |
-| ---------------------- | ------ | -------- | ------------------ | -------------------------------- |
-| name                   | string | Yes      | 1-100 characters   | Location name                    |
-| address.country        | string | Yes      | 1-50 characters    | Country code or name             |
-| address.state          | string | No       | Max 100 characters | State or region                  |
-| address.city           | string | Yes      | 1-100 characters   | City name                        |
-| address.street         | string | Yes      | 1-100 characters   | Street name                      |
-| address.propertyNumber | string | Yes      | 1-50 characters    | Building/property number         |
-| address.additionalInfo | string | No       | Max 200 characters | Floor, suite, additional details |
+| Field                               | Type     | Required | Constraints        | Description                                                 |
+| ----------------------------------- | -------- | -------- | ------------------ | ----------------------------------------------------------- |
+| name                                | string   | Yes      | 1-100 characters   | Location name                                               |
+| address.country                     | string   | Yes      | 1-50 characters    | Country code or name                                        |
+| address.state                       | string   | No       | Max 100 characters | State or region                                             |
+| address.city                        | string   | Yes      | 1-100 characters   | City name                                                   |
+| address.street                      | string   | Yes      | 1-100 characters   | Street name                                                 |
+| address.propertyNumber              | string   | Yes      | 1-50 characters    | Building/property number                                    |
+| address.additionalInfo              | string   | No       | Max 200 characters | Floor, suite, additional details                            |
+| materialCapacities                  | object[] | No       | Array of mappings  | Defines max quantity of specific material types in location |
+| materialCapacities[].materialTypeId | string   | Yes      | Valid ObjectId     | ID of the material type to set capacity for                 |
+| materialCapacities[].maxQuantity    | number   | Yes      | Min 0              | Maximum number of items of this type allowed here           |
 
 #### Example Request
 
@@ -2123,7 +2126,13 @@ Creates a new location in the organization.
     "street": "Carrera 50",
     "propertyNumber": "32-10",
     "additionalInfo": "Bodega 3, entrada por el costado"
-  }
+  },
+  "materialCapacities": [
+    {
+      "materialTypeId": "507f1f77bcf86cd799439014",
+      "maxQuantity": 100
+    }
+  ]
 }
 ```
 
@@ -2411,12 +2420,16 @@ Creates a new material instance.
 
 **Permission Required:** `materials:create`
 
-| Parameter    | Location | Type   | Required | Description                                                                       |
-| ------------ | -------- | ------ | -------- | --------------------------------------------------------------------------------- |
-| modelId      | body     | string | Yes      | Material type ID                                                                  |
-| serialNumber | body     | string | Yes      | Unique serial number (max 100 chars)                                              |
-| locationId   | body     | string | Yes      | Location ID                                                                       |
-| status       | body     | string | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`) |
+| Parameter    | Location | Type    | Required | Description                                                                       |
+| ------------ | -------- | ------- | -------- | --------------------------------------------------------------------------------- |
+| modelId      | body     | string  | Yes      | Material type ID                                                                  |
+| serialNumber | body     | string  | Yes      | Unique serial number (max 100 chars)                                              |
+| locationId   | body     | string  | Yes      | Location ID                                                                       |
+| status       | body     | string  | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`) |
+| force        | body     | boolean | No       | If true, bypasses capacity warnings at the location.                              |
+
+**Capacity Management Behavior:**
+If the target `locationId` has a defined capacity for the `modelId` and it is already at full capacity, the API will return a **409 Conflict** error with a warning message. To proceed, the client must resubmit the request including `"force": true` in the body.
 
 ---
 
@@ -2667,16 +2680,16 @@ Creates a new loan request (commercial advisor action).
 
 `items[]` contract (recommended):
 
-| Field       | Type                           | Required | Description                                      |
-| ----------- | ------------------------------ | -------- | ------------------------------------------------ |
-| type        | `material` \| `package`        | Yes      | Defines which entity is resolved by `referenceId` |
-| referenceId | string                         | Yes      | Material Type ID when type=`material`, Package ID when type=`package` |
-| quantity    | number                         | No       | Defaults to `1`                                  |
+| Field       | Type                    | Required | Description                                                           |
+| ----------- | ----------------------- | -------- | --------------------------------------------------------------------- |
+| type        | `material` \| `package` | Yes      | Defines which entity is resolved by `referenceId`                     |
+| referenceId | string                  | Yes      | Material Type ID when type=`material`, Package ID when type=`package` |
+| quantity    | number                  | No       | Defaults to `1`                                                       |
 
 Legacy compatibility still supported per item:
 
-| Field          | Type   | Description                                |
-| -------------- | ------ | ------------------------------------------ |
+| Field          | Type   | Description                                      |
+| -------------- | ------ | ------------------------------------------------ |
 | materialTypeId | string | Legacy alias for `type=material` + `referenceId` |
 | packageId      | string | Legacy alias for `type=package` + `referenceId`  |
 

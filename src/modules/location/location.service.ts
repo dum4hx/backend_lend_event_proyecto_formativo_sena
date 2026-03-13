@@ -59,6 +59,10 @@ interface CreateLocationData {
   };
   status?: "available" | "full_capacity" | "maintenance" | "inactive"; // Optional, defaults to available
   additionalDetails?: string; // Optional extra information about the location
+  materialCapacities?: Array<{
+    materialTypeId: string;
+    maxQuantity: number;
+  }>;
 }
 
 /**
@@ -77,6 +81,10 @@ interface UpdateLocationData {
   };
   status?: "available" | "full_capacity" | "maintenance" | "inactive";
   additionalDetails?: string;
+  materialCapacities?: Array<{
+    materialTypeId: string;
+    maxQuantity: number;
+  }>;
 }
 
 // ============================================================================
@@ -97,8 +105,15 @@ export class LocationService {
    * - Automatic organization scope
    */
   static async listLocations(params: ListLocationsParams) {
-    const { organizationId, page, limit, search, city, status, includeInactive } =
-      params;
+    const {
+      organizationId,
+      page,
+      limit,
+      search,
+      city,
+      status,
+      includeInactive,
+    } = params;
 
     // Calculate offset for pagination
     const skip = (page - 1) * limit;
@@ -351,10 +366,76 @@ export class LocationService {
       query.isActive = true;
     }
 
-    // Count documents (more efficient than findOne)
+    // Execute count
     const count = await Location.countDocuments(query);
-
     return count > 0;
+  }
+
+  /**
+   * Gets the current occupancy of a material type at a location
+   *
+   * @param locationId - Location ID
+   * @param materialTypeId - Material Type ID
+   * @returns Current count of material instances at the location
+   */
+  static async getMaterialOccupancy(
+    locationId: string | Types.ObjectId,
+    materialTypeId: string | Types.ObjectId,
+  ): Promise<number> {
+    return await MaterialInstance.countDocuments({
+      locationId,
+      materialTypeId,
+      isActive: true, // Only count active instances
+    });
+  }
+
+  /**
+   * Validates if a location has capacity for a material type
+   *
+   * @param locationId - Location ID
+   * @param materialTypeId - Material Type ID
+   * @param organizationId - Organization ID
+   * @param force - Whether to force the operation even if at full capacity
+   * @throws AppError.notFound if location doesn't exist
+   * @throws AppError.conflict if capacity reached and force is false (warning)
+   */
+  static async validateCapacity(
+    locationId: string,
+    materialTypeId: string,
+    organizationId: string,
+    force = false,
+  ): Promise<void> {
+    const location = await this.getLocationById(locationId, organizationId);
+
+    // Find if there's a specific capacity for this material type
+    const capacitySetting = location.materialCapacities?.find(
+      (c) => c.materialTypeId.toString() === materialTypeId.toString(),
+    );
+
+    // If no capacity limit is defined, allow everything
+    if (!capacitySetting) {
+      return;
+    }
+
+    const currentOccupancy = await this.getMaterialOccupancy(
+      locationId,
+      materialTypeId,
+    );
+
+    if (currentOccupancy >= capacitySetting.maxQuantity) {
+      if (!force) {
+        throw AppError.conflict(
+          `The location "${location.name}" has reached its maximum capacity (${capacitySetting.maxQuantity}) for this material type.`,
+          {
+            type: "CAPACITY_WARNING",
+            currentOccupancy,
+            maxQuantity: capacitySetting.maxQuantity,
+            message:
+              "Adding more items to this location is discouraged as it is already at full capacity. Please confirm if you want to proceed anyway.",
+          },
+        );
+      }
+    }
   }
 
   /**

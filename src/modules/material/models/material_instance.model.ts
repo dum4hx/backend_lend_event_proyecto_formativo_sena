@@ -41,6 +41,11 @@ export const MaterialInstanceZodSchema = z.object({
       }),
     )
     .optional(),
+  /**
+   * Optional flag to ignore capacity warnings
+   * If true, allows the operation even if the location is at full capacity
+   */
+  force: z.boolean().optional().default(false),
 });
 
 export type MaterialInstanceInput = z.infer<typeof MaterialInstanceZodSchema>;

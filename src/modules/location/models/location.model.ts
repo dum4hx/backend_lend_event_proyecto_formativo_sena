@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Schema, model, type InferSchemaType } from "mongoose";
+import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 /**
  * ============================================================================
@@ -89,6 +89,23 @@ export const LocationZodSchema = z.object({
     .trim(),
   address: addressSchema,
   status: LocationStatusEnum.default("available"),
+  /**
+   * Capacity mapping for each material type
+   * Defines how many of each material type this location can hold
+   */
+  materialCapacities: z
+    .array(
+      z.object({
+        materialTypeId: z
+          .string()
+          .refine((val) => Types.ObjectId.isValid(val), {
+            message: "Invalid Material Type ID format",
+          }),
+        maxQuantity: z.number().int().min(0, "Max quantity must be at least 0"),
+      }),
+    )
+    .optional()
+    .default([]),
   additionalDetails: z
     .string()
     .max(500, "Maximum 500 characters")
@@ -190,6 +207,30 @@ const locationSchema = new Schema(
       enum: ["available", "full_capacity", "maintenance", "inactive"],
       default: "available",
       index: true,
+    },
+    /**
+     * Capacity mapping for each material type
+     * Defines how many of each material type this location can hold
+     */
+    materialCapacities: {
+      type: [
+        new Schema(
+          {
+            materialTypeId: {
+              type: Schema.Types.ObjectId,
+              ref: "MaterialType",
+              required: true,
+            },
+            maxQuantity: {
+              type: Number,
+              required: true,
+              min: 0,
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
     additionalDetails: {
       type: String,

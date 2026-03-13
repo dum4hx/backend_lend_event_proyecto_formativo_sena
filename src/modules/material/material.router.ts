@@ -452,6 +452,10 @@ materialRouter.get(
 /**
  * POST /api/v1/materials/instances
  * Creates a new material instance.
+ *
+ * Supports capacity validation:
+ * - If location is at full capacity for the material type, returns 409 Conflict.
+ * - Client can override by sending 'force: true' in the request body.
  */
 materialRouter.post(
   "/instances",
