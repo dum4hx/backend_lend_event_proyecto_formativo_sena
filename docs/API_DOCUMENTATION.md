@@ -2534,7 +2534,7 @@ Creates a new attribute definition for the organization.
 | Parameter     | Location | Type     | Required | Description                                                                     |
 | ------------- | -------- | -------- | -------- | ------------------------------------------------------------------------------- |
 | name          | body     | string   | Yes      | Attribute name (max 100 chars, unique per organization)                         |
-| unit          | body     | string   | Yes      | Unit of measurement (e.g., `kg`, `GB`, `cm`)                                    |
+| unit          | body     | string   | No       | Unit of measurement (e.g., `kg`, `GB`, `cm`)                                    |
 | categoryId    | body     | string   | No       | If set, restricts this attribute to material types of this category             |
 | allowedValues | body     | string[] | No       | Enumerated acceptable values. Empty array means any value is accepted.          |
 | isRequired    | body     | boolean  | No       | Whether material types must provide a value for this attribute (default: false) |

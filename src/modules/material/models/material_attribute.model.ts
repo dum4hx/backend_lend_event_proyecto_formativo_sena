@@ -17,11 +17,7 @@ export const MaterialAttributeZodSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Maximum 100 characters")
     .trim(),
-  unit: z
-    .string()
-    .min(1, "Unit is required")
-    .max(50, "Maximum 50 characters")
-    .trim(),
+  unit: z.string().max(50, "Maximum 50 characters").trim().optional(),
   allowedValues: z
     .array(
       z
@@ -62,7 +58,8 @@ const materialAttributeSchema = new Schema(
     },
     unit: {
       type: String,
-      required: true,
+      required: false,
+      default: "",
       maxlength: 50,
       trim: true,
     },

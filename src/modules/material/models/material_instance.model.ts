@@ -31,6 +31,16 @@ export const MaterialInstanceZodSchema = z.object({
   locationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Location ID format",
   }),
+  attributes: z
+    .array(
+      z.object({
+        attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+          message: "Invalid Attribute ID format",
+        }),
+        value: z.string().max(100, "Maximum 100 characters").trim(),
+      }),
+    )
+    .optional(),
 });
 
 export type MaterialInstanceInput = z.infer<typeof MaterialInstanceZodSchema>;
@@ -70,6 +80,21 @@ const materialInstanceSchema = new Schema(
       ref: "Location",
       required: true,
     },
+    attributes: [
+      {
+        attributeId: {
+          type: Schema.Types.ObjectId,
+          ref: "Attribute",
+          required: true,
+        },
+        value: {
+          type: String,
+          maxlength: 100,
+          trim: true,
+          required: true,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

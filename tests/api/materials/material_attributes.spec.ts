@@ -130,13 +130,18 @@ test.describe("Material Attributes Module", () => {
 
   // ── Error cases ───────────────────────────────────────────────────────
 
-  test("POST /materials/attributes - should return 400 for missing required fields", async ({
+  test("POST /materials/attributes - should create an attribute without a unit", async ({
     request,
   }) => {
     const res = await request.post("materials/attributes", {
-      data: { name: "NoUnit" }, // missing unit
+      data: {
+        name: `NoUnit ${Date.now()}`,
+        isRequired: false,
+      },
     });
-    expect(res.status()).toBe(400);
+    expect(res.status()).toBe(201);
+    const body = await res.json();
+    expect(body.data.attribute.unit).toBe("");
   });
 
   test("POST /materials/attributes - should return 409 on duplicate name", async ({
