@@ -2725,11 +2725,33 @@ Rejects a loan request.
 
 #### POST /requests/:id/assign-materials
 
-Assigns specific material instances to a request (warehouse operator).
+Assigns inventory instances and prepares the request in a single operation (warehouse operator).
+
+This endpoint performs assignment + ready transition atomically:
+
+- Valid request state: `approved`
+- Each `materialInstanceId` must be unique in the same payload
+- Each instance must exist in the same organization
+- Each instance must match the provided `materialTypeId`
+- Availability is enforced at write-time (`status=available`) to prevent race conditions
+- On conflict/error, all updates are rolled back
 
 | Parameter   | Location | Type  | Required | Description                                       |
 | ----------- | -------- | ----- | -------- | ------------------------------------------------- |
 | assignments | body     | array | Yes      | Array of `{ materialTypeId, materialInstanceId }` |
+
+**Success (200):** request returns with `status: "ready"` and assigned materials persisted.
+
+**Common errors:**
+
+- `400 BAD_REQUEST`: invalid payload, duplicated `materialInstanceId`, type-instance mismatch
+- `404 NOT_FOUND`: request or material instance does not exist in organization
+- `409 CONFLICT`: request not in `approved` status or one/more instances unavailable
+
+Legacy compatibility remains available through:
+
+- `POST /requests/:id/assign`
+- `POST /requests/:id/ready`
 
 ---
 

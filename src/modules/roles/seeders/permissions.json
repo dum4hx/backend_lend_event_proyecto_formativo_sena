@@ -301,6 +301,13 @@
     "isPlatformPermission": false
   },
   {
+    "_id": "requests:assign",
+    "displayName": "Assign Request Materials",
+    "description": "Allows assigning inventory instances to approved requests and marking them ready.",
+    "category": "Requests",
+    "isPlatformPermission": false
+  },
+  {
     "_id": "requests:delete",
     "displayName": "Delete Requests",
     "description": "Allows canceling or removing request records.",
