@@ -331,7 +331,7 @@ materialRouter.get(
 materialRouter.post(
   "/types",
   requirePermission("materials:create"),
-  validateBody(MaterialModelZodSchema),
+  validateBody(MaterialModelZodSchema.omit({ organizationId: true })),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
@@ -460,7 +460,7 @@ materialRouter.get(
 materialRouter.post(
   "/instances",
   requirePermission("materials:create"),
-  validateBody(MaterialInstanceZodSchema),
+  validateBody(MaterialInstanceZodSchema.omit({ organizationId: true })),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);

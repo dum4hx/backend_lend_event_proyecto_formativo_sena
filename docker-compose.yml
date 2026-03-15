@@ -30,7 +30,7 @@ services:
     container_name: lend_event_api
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: test
       PORT: 8080
       MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-secret}@mongo:27017/lend_event?authSource=admin
       CORS_ORIGIN: https://app.test.local

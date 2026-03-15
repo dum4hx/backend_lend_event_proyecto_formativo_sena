@@ -19,6 +19,7 @@
         "allowImportingTsExtensions": true,
         "noEmit": false,
         "rewriteRelativeImportExtensions": true,
+        "emitDeclarationOnly": false,
         // Stricter Typechecking Options
         "noUncheckedIndexedAccess": true,
         "exactOptionalPropertyTypes": true,
@@ -37,5 +38,12 @@
         "noUncheckedSideEffectImports": true,
         "moduleDetection": "force",
         "skipLibCheck": true,
-    }
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "tests/**/*",
+        "playwright.config.ts"
+    ]
 }

@@ -11,14 +11,16 @@ test.describe("Permissions Module", () => {
     const unauthCtx = await baseRequest.newContext({
       baseURL: baseURL || "",
       ignoreHTTPSErrors: true,
+      storageState: { cookies: [], origins: [] },
     });
 
-    const response = await unauthCtx.get("/permissions");
-    await unauthCtx.dispose();
+    const response = await unauthCtx.get("permissions");
 
     expect(response.status()).toBe(401);
     const body = await response.json();
     expect(body.code).toBe("UNAUTHORIZED");
+
+    await unauthCtx.dispose();
   });
 
   test("GET /permissions - should list permissions for authenticated user", async ({
@@ -31,8 +33,7 @@ test.describe("Permissions Module", () => {
       ignoreHTTPSErrors: true,
     });
 
-    const response = await authCtx.get("/permissions");
-    await authCtx.dispose();
+    const response = await authCtx.get("permissions");
 
     expect(response.status()).toBe(200);
 
@@ -44,5 +45,7 @@ test.describe("Permissions Module", () => {
     expect(ids.length).toBeGreaterThan(0);
     // Owner role should include common permissions like users:read
     expect(ids).toContain("users:read");
+
+    await authCtx.dispose();
   });
 });

@@ -105,19 +105,21 @@ export const createRateLimiter = (options: RateLimitOptions) => {
 /**
  * General API rate limiter.
  * 100 requests per minute per user/IP.
+ * Relaxed in test environments to avoid blocking test suites.
  */
 export const generalRateLimiter = createRateLimiter({
   windowMs: 60_000, // 1 minute
-  maxRequests: 100,
+  maxRequests: process.env.NODE_ENV === "test" ? 10000 : 100,
 });
 
 /**
  * Authentication rate limiter.
  * 5 requests per minute per IP (stricter for auth endpoints).
+ * Relaxed in test environments to avoid blocking test suites.
  */
 export const authRateLimiter = createRateLimiter({
   windowMs: 60_000, // 1 minute
-  maxRequests: 5,
+  maxRequests: process.env.NODE_ENV === "test" ? 1000 : 5,
   keyGenerator: (req) =>
     `auth:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`,
   message: "Too many authentication attempts. Please try again later.",

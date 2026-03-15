@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { defaultOrgData, validateAuthCookies } from "../../utils/helpers.ts";
 
-test.describe("Auth Module", () => {
+test.describe.serial("Auth Module", () => {
   let createdUserEmail: string;
   let createdUserPassword: string;
 
@@ -18,11 +18,26 @@ test.describe("Auth Module", () => {
         data: payload,
       });
 
-      expect(response.status()).toBe(201);
+      expect(response.status()).toBe(202);
       const body = await response.json();
       expect(body.status).toBe("success");
       expect(body.data.user.email).toBe(createdUserEmail);
       expect(body.data.organization).toBeDefined();
+    });
+
+    // Verify Email step (using hardcoded OTP for test environment)
+    await test.step("Verify Email", async () => {
+      const response = await request.post("auth/verify-email", {
+        data: {
+          email: createdUserEmail,
+          code: "123456",
+        },
+      });
+
+      expect(response.status()).toBe(201);
+      const body = await response.json();
+      expect(body.status).toBe("success");
+      expect(body.data.user.email).toBe(createdUserEmail);
     });
 
     // Login step

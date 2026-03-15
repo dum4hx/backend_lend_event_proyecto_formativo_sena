@@ -239,6 +239,6 @@ If you need context:
 - Router patterns: See `src/modules/auth/auth.router.ts` or `src/modules/user/user.router.ts`
 - Service patterns: See `src/modules/auth/auth.service.ts` or any `.service.ts` file
 - Test patterns: See `tests/api/users/users.spec.ts` or `tests/api/auth/auth.spec.ts`
-- API docs format: See [API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
+- API docs format: See [API_DOCUMENTATION.md](../../docs/API_DOCUMENTATION.md)
 
 If the spec is unclear, **ask the user directly in the conversation** rather than guessing; then adjust your implementation.

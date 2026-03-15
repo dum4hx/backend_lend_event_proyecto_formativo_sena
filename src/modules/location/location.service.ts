@@ -384,7 +384,7 @@ export class LocationService {
   ): Promise<number> {
     return await MaterialInstance.countDocuments({
       locationId,
-      materialTypeId,
+      modelId: materialTypeId,
       isActive: true, // Only count active instances
     });
   }

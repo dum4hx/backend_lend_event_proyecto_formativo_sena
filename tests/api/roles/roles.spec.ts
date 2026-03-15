@@ -16,9 +16,9 @@ test.describe("Roles Module", () => {
     request,
   }) => {
     const payload = {
-      name: "super_admin",
+      name: `test_role_${Date.now()}`,
       permissions: ["organization:read", "roles:read"],
-      description: "Test org-level super admin",
+      description: "Test org-level custom role",
     };
 
     const res = await request.post("roles", { data: payload });

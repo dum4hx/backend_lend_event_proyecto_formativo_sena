@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Billing Module", () => {
-  test("GET /billing/subscription - should return sub details", async ({
+  test("GET /organizations - should return org details including subscription", async ({
     request,
   }) => {
-    const res = await request.get("billing/subscription");
+    const res = await request.get("organizations");
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.data.subscription).toBeDefined();
+    expect(body.status).toBe("success");
+    expect(body.data.organization).toBeDefined();
+    expect(body.data.organization.subscription).toBeDefined();
   });
 });

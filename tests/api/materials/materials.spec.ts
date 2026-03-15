@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Materials Module", () => {
+test.describe.serial("Materials Module", () => {
   let categoryId: string;
   let materialTypeId: string;
 
@@ -12,7 +12,7 @@ test.describe("Materials Module", () => {
     });
     expect(res.status()).toBe(201);
     const body = await res.json();
-    categoryId = body.data.category.id;
+    categoryId = body.data.category._id;
   });
 
   test("GET /materials/categories - should list categories", async ({
@@ -30,17 +30,14 @@ test.describe("Materials Module", () => {
     const res = await request.post("materials/types", {
       data: {
         name: `Canon ${Date.now()}`,
-        sku: `CAM-${Date.now()}`,
         categoryId,
-        description: "Desc",
+        description: "A camera material type",
         pricePerDay: 1000,
-        replacementValue: 50000,
-        specifications: { sensor: "CMOS" },
       },
     });
     expect(res.status()).toBe(201);
     const body = await res.json();
-    materialTypeId = body.data.materialType.id;
+    materialTypeId = body.data.materialType._id;
   });
 
   // Dependent on type
@@ -48,13 +45,27 @@ test.describe("Materials Module", () => {
     request,
   }) => {
     if (!materialTypeId) test.skip();
+
+    // First create a location to use as locationId
+    const locRes = await request.post("locations", {
+      data: {
+        name: `Instance Loc ${Date.now()}`,
+        address: {
+          country: "Colombia",
+          city: "Medellín",
+          street: "Calle 10",
+          propertyNumber: "1",
+        },
+      },
+    });
+    const locBody = await locRes.json();
+    const locationId = locBody.data._id;
+
     const res = await request.post("materials/instances", {
       data: {
-        materialTypeId,
+        modelId: materialTypeId,
         serialNumber: `SN-${Date.now()}`,
-        locationId: "LOC-001", // Assuming string or mocked
-        purchaseDate: "2024-01-01",
-        purchasePrice: 10000,
+        locationId,
       },
     });
     expect(res.status()).toBe(201);

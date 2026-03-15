@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Material Attributes Module", () => {
+test.describe.serial("Material Attributes Module", () => {
   let attributeId: string;
   let categoryId: string;
 
@@ -14,7 +14,7 @@ test.describe("Material Attributes Module", () => {
     });
     expect(res.status()).toBe(201);
     const body = await res.json();
-    categoryId = body.data.category.id;
+    categoryId = body.data.category._id;
   });
 
   // ── Happy path: CRUD ──────────────────────────────────────────────────
@@ -49,6 +49,7 @@ test.describe("Material Attributes Module", () => {
         unit: "GB",
         allowedValues: ["4", "8", "16", "32"],
         isRequired: true,
+        categoryId,
       },
     });
     expect(res.status()).toBe(201);

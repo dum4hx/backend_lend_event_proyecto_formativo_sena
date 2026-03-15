@@ -44,6 +44,7 @@ export default defineConfig({
     {
       name: "admin-setup",
       testDir: "./tests/setup",
+      testMatch: "**/*.setup.ts",
       use: { storageState: undefined },
     },
     /* Regular API tests — pre-loaded with regular-user cookies */

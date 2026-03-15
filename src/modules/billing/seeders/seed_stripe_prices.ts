@@ -1,12 +1,9 @@
-
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { logger } from "../../utils/logger.ts";
-import { SubscriptionType } from "../../modules/subscription_type/models/subscription_type.model.ts";
+import { logger } from "../../../utils/logger.ts";
+import { SubscriptionType } from "../../../modules/subscription_type/models/subscription_type.model.ts";
 
 dotenv.config();
-
-
 
 const DB_CONNECTION_STRING = process.env.DB_CONNECTION_STRING || "";
 
@@ -54,7 +51,7 @@ async function seedStripePrices() {
               stripePriceIdBase: newBaseId,
               stripePriceIdSeat: newSeatId,
             },
-          }
+          },
         );
 
         if (result.modifiedCount > 0) {
@@ -69,7 +66,7 @@ async function seedStripePrices() {
     }
 
     logger.info(
-      `Seeding complete. ${updatedCount} subscription type(s) were updated.`
+      `Seeding complete. ${updatedCount} subscription type(s) were updated.`,
     );
   } catch (error) {
     logger.error("An error occurred during the seeding process:", error);

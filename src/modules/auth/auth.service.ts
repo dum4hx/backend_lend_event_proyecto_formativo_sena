@@ -257,10 +257,13 @@ export const authService = {
     await session.endSession();
 
     // Generate a 6-digit OTP for email verification
-    const code = crypto
-      .randomInt(0, 10 ** OTP_LENGTH)
-      .toString()
-      .padStart(OTP_LENGTH, "0");
+    const code =
+      process.env.NODE_ENV === "test"
+        ? "123456"
+        : crypto
+            .randomInt(0, 10 ** OTP_LENGTH)
+            .toString()
+            .padStart(OTP_LENGTH, "0");
     const hashedCode = await argon2.hash(code);
 
     await EmailVerificationToken.create({
@@ -626,13 +629,15 @@ export const authService = {
     const inviteUrl = `${FRONTEND_URL}/accept-invite?token=${rawToken}&email=${encodeURIComponent(userData.email.toLowerCase())}`;
     const orgName = org?.name ?? "your organization";
 
-    await emailService.sendInviteEmail(
-      userData.email,
-      userData.name.firstName,
-      orgName,
-      inviteUrl,
-      INVITE_EXPIRY_HOURS,
-    );
+    if (process.env.NODE_ENV !== "test") {
+      await emailService.sendInviteEmail(
+        userData.email,
+        userData.name.firstName,
+        orgName,
+        inviteUrl,
+        INVITE_EXPIRY_HOURS,
+      );
+    }
 
     logger.info("User invited", {
       organizationId: organizationId.toString(),

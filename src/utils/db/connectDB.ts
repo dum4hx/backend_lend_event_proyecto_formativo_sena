@@ -4,7 +4,8 @@ import { AppError } from "../../errors/AppError.ts";
 
 export const connectDB = async () => {
   try {
-    const connectionString = process.env.DB_CONNECTION_STRING || null;
+    const connectionString =
+      process.env.MONGODB_URI || process.env.DB_CONNECTION_STRING || null;
 
     // Throw error if no connection string stablished
     if (!connectionString) {

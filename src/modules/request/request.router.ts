@@ -6,16 +6,14 @@ import {
 } from "express";
 import { z } from "zod";
 import { Types } from "mongoose";
+import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import {
   LoanRequest,
   type LoanRequestDocument,
   LoanRequestZodSchema,
   requestStatusOptions,
 } from "./models/request.model.ts";
-import { Package } from "../package/models/package.model.ts";
-import { MaterialModel } from "../material/models/material_type.model.ts";
-import { Customer } from "../customer/models/customer.model.ts";
-import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { requestService } from "./request.service.ts";
 import {
   validateBody,
   validateQuery,
@@ -61,45 +59,6 @@ const createRequestItemSchema = z.object({
   quantity: z.number().int().positive().default(1),
 });
 
-type NormalizedRequestItem = {
-  type: "material" | "package";
-  referenceId: string;
-  quantity: number;
-};
-
-const normalizeRequestItem = (
-  item: z.infer<typeof createRequestItemSchema>,
-  itemIndex: number,
-): NormalizedRequestItem => {
-  const fallbackType = item.materialTypeId
-    ? "material"
-    : item.packageId
-      ? "package"
-      : undefined;
-
-  const resolvedType = item.type ?? fallbackType;
-
-  if (resolvedType !== "material" && resolvedType !== "package") {
-    throw AppError.badRequest(`Invalid type for item at index ${itemIndex}`);
-  }
-
-  const resolvedReferenceId =
-    item.referenceId ??
-    (resolvedType === "material" ? item.materialTypeId : item.packageId);
-
-  if (!resolvedReferenceId || !Types.ObjectId.isValid(resolvedReferenceId)) {
-    throw AppError.badRequest(
-      `Invalid referenceId for ${resolvedType} item at index ${itemIndex}`,
-    );
-  }
-
-  return {
-    type: resolvedType,
-    referenceId: resolvedReferenceId,
-    quantity: item.quantity,
-  };
-};
-
 const createRequestSchema = LoanRequestZodSchema.pick({
   customerId: true,
   startDate: true,
@@ -120,9 +79,11 @@ const assignMaterialsSchema = z.object({
   assignments: z
     .array(
       z.object({
-        materialTypeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid materialTypeId format",
-        }),
+        materialTypeId: z
+          .string()
+          .refine((val) => Types.ObjectId.isValid(val), {
+            message: "Invalid materialTypeId format",
+          }),
         materialInstanceId: z
           .string()
           .refine((val) => Types.ObjectId.isValid(val), {
@@ -141,7 +102,9 @@ const rejectRequestSchema = z.object({
   reason: z.string().min(1).max(1000),
 });
 
-type AssignmentInput = z.infer<typeof assignMaterialsSchema>["assignments"][number];
+type AssignmentInput = z.infer<
+  typeof assignMaterialsSchema
+>["assignments"][number];
 
 type AssignmentWithIndex = {
   materialInstanceId: Types.ObjectId;
@@ -178,7 +141,9 @@ const mapAssignmentsToRequestItemIndexes = (
   const materialTypeQueues = buildMaterialTypeQueues(request);
 
   return assignments.map((assignment, index) => {
-    const materialTypeId = new Types.ObjectId(assignment.materialTypeId).toString();
+    const materialTypeId = new Types.ObjectId(
+      assignment.materialTypeId,
+    ).toString();
     const itemQueue = materialTypeQueues.get(materialTypeId);
 
     if (!itemQueue || itemQueue.length === 0) {
@@ -215,55 +180,13 @@ requestRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        customerId,
-        packageId,
-        sortBy,
-        sortOrder,
-      } = req.query as unknown as z.infer<typeof listRequestsQuerySchema>;
-      const skip = (page - 1) * limit;
+      const query = req.query as any;
 
-      const query: Record<string, unknown> = { organizationId };
-
-      if (status) {
-        query.status = status;
-      }
-      if (customerId) {
-        query.customerId = customerId;
-      }
-      if (packageId) {
-        query.items = {
-          $elemMatch: {
-            type: "package",
-            referenceId: new Types.ObjectId(packageId),
-          },
-        };
-      }
-
-      const sortField = sortBy ?? "createdAt";
-      const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-      const [requests, total] = await Promise.all([
-        LoanRequest.find(query)
-          .skip(skip)
-          .limit(limit)
-          .populate("customerId", "email name")
-          .populate("assignedMaterials.materialInstanceId", "serialNumber")
-          .sort({ [sortField]: sortDirection }),
-        LoanRequest.countDocuments(query),
-      ]);
+      const result = await requestService.listRequests(organizationId, query);
 
       res.json({
         status: "success",
-        data: {
-          requests,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: result,
       });
     } catch (err) {
       next(err);
@@ -280,19 +203,17 @@ requestRouter.get(
   requirePermission("requests:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      })
-        .populate("customerId", "email name phone address")
-        .populate(
-          "assignedMaterials.materialInstanceId",
-          "serialNumber status modelId",
-        );
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
 
-      if (!request) {
-        throw AppError.notFound("Request not found");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
+
+      const request = await requestService.getRequestById(
+        requestId,
+        organizationId,
+      );
 
       res.json({
         status: "success",
@@ -317,84 +238,15 @@ requestRouter.post(
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
 
-      // Validate customer exists and is active
-      const customer = await Customer.findOne({
-        _id: req.body.customerId,
+      const request = await requestService.createRequest(
         organizationId,
-        status: "active",
-      });
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found or inactive");
-      }
-
-      const normalizedItems = req.body.items.map(
-        (item: z.infer<typeof createRequestItemSchema>, index: number) =>
-          normalizeRequestItem(item, index),
-      );
-
-      // Resolve each item reference by type to ensure requests cannot be created
-      // with invalid or inactive catalog references.
-      for (let itemIndex = 0; itemIndex < normalizedItems.length; itemIndex++) {
-        const item = normalizedItems[itemIndex];
-
-        if (item.type === "material") {
-          const material = await MaterialModel.findOne({
-            _id: item.referenceId,
-            organizationId,
-          });
-
-          if (!material) {
-            throw AppError.notFound(
-              `Material not found or inactive for item at index ${itemIndex}`,
-            );
-          }
-          continue;
-        }
-
-        const pkg = await Package.findOne({
-          _id: item.referenceId,
-          organizationId,
-          $or: [{ status: "active" }, { isActive: true }],
-        });
-
-        if (!pkg) {
-          throw AppError.notFound(
-            `Package not found or inactive for item at index ${itemIndex}`,
-          );
-        }
-      }
-
-      // Check date validity
-      const startDate = new Date(req.body.startDate);
-      const endDate = new Date(req.body.endDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (startDate < today) {
-        throw AppError.badRequest("Start date cannot be in the past");
-      }
-
-      if (endDate <= startDate) {
-        throw AppError.badRequest("End date must be after start date");
-      }
-
-      const request = await LoanRequest.create({
-        ...req.body,
-        items: normalizedItems,
-        organizationId,
-        createdBy: user.id,
-        status: "pending",
-      });
-
-      const populatedRequest = await LoanRequest.findById(request._id).populate(
-        "customerId",
-        "email name",
+        user.id,
+        req.body,
       );
 
       res.status(201).json({
         status: "success",
-        data: { request: populatedRequest },
+        data: { request },
       });
     } catch (err) {
       next(err);
@@ -412,26 +264,20 @@ requestRouter.post(
   validateBody(approveRequestSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const organizationId = getOrgId(req);
       const user = getAuthUser(req);
+      const requestId = req.params.id;
 
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "pending",
-      });
-
-      if (!request) {
-        throw AppError.notFound("Request not found or not in pending status");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      request.status = "approved";
-      request.approvedBy = new Types.ObjectId(user.id);
-      request.approvedAt = new Date();
-      if (req.body.notes) {
-        request.notes =
-          (request.notes ?? "") + `\nApproval notes: ${req.body.notes}`;
-      }
-      await request.save();
+      const request = await requestService.approveRequest(
+        requestId,
+        organizationId,
+        user.id,
+        req.body.notes,
+      );
 
       res.json({
         status: "success",
@@ -454,19 +300,18 @@ requestRouter.post(
   validateBody(rejectRequestSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "pending",
-      });
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
 
-      if (!request) {
-        throw AppError.notFound("Request not found or not in pending status");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      request.status = "rejected";
-      request.rejectionReason = req.body.reason;
-      await request.save();
+      const request = await requestService.rejectRequest(
+        requestId,
+        organizationId,
+        req.body.reason,
+      );
 
       res.json({
         status: "success",
@@ -504,10 +349,14 @@ requestRouter.post(
       );
 
       if (duplicatedInstanceIds.length > 0) {
-        throw AppError.badRequest("Duplicated materialInstanceId in assignments");
+        throw AppError.badRequest(
+          "Duplicated materialInstanceId in assignments",
+        );
       }
 
-      let updatedRequest: Awaited<ReturnType<typeof LoanRequest.findById>> | null = null;
+      let updatedRequest: Awaited<
+        ReturnType<typeof LoanRequest.findById>
+      > | null = null;
 
       await session.withTransaction(async () => {
         const request = await LoanRequest.findOne(
@@ -547,7 +396,9 @@ requestRouter.post(
         const instances = await MaterialInstance.find(
           {
             _id: {
-              $in: mappedAssignments.map((assignment) => assignment.materialInstanceId),
+              $in: mappedAssignments.map(
+                (assignment) => assignment.materialInstanceId,
+              ),
             },
             organizationId,
           },
@@ -587,8 +438,12 @@ requestRouter.post(
             );
           }
 
-          const assignmentTypeId = new Types.ObjectId(assignmentInput.materialTypeId).toString();
-          const instanceTypeId = new Types.ObjectId(instance.modelId).toString();
+          const assignmentTypeId = new Types.ObjectId(
+            assignmentInput.materialTypeId,
+          ).toString();
+          const instanceTypeId = new Types.ObjectId(
+            instance.modelId,
+          ).toString();
 
           if (assignmentTypeId !== instanceTypeId) {
             throw AppError.badRequest(
@@ -600,7 +455,9 @@ requestRouter.post(
         const updateInstancesResult = await MaterialInstance.updateMany(
           {
             _id: {
-              $in: mappedAssignments.map((assignment) => assignment.materialInstanceId),
+              $in: mappedAssignments.map(
+                (assignment) => assignment.materialInstanceId,
+              ),
             },
             organizationId,
             status: "available",
@@ -662,48 +519,18 @@ requestRouter.post(
   validateBody(assignMaterialsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "approved",
-      });
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
 
-      if (!request) {
-        throw AppError.notFound("Request not found or not in approved status");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      const { assignments } = req.body;
-
-      // Validate all material instances are available
-      const instanceIds = assignments.map(
-        (a: { materialInstanceId: string }) => a.materialInstanceId,
+      const request = await requestService.assignMaterials(
+        requestId,
+        organizationId,
+        req.body.assignments,
       );
-      const instances = await MaterialInstance.find({
-        _id: { $in: instanceIds },
-        status: "available",
-      });
-
-      if (instances.length !== instanceIds.length) {
-        throw AppError.badRequest(
-          "One or more material instances are not available",
-        );
-      }
-
-      // Update instance statuses to reserved
-      await MaterialInstance.updateMany(
-        { _id: { $in: instanceIds } },
-        { $set: { status: "reserved" } },
-      );
-
-      // Set assigned materials on request
-      request.assignedMaterials = assignments.map(
-        (a: { materialTypeId: string; materialInstanceId: string }) => ({
-          materialTypeId: a.materialTypeId,
-          materialInstanceId: a.materialInstanceId,
-        }),
-      );
-      request.status = "assigned";
-      await request.save();
 
       res.json({
         status: "success",
@@ -725,25 +552,17 @@ requestRouter.post(
   requirePermission("requests:assign"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "assigned",
-      });
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
 
-      if (!request) {
-        throw AppError.notFound("Request not found or not in assigned status");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      if (
-        !request.assignedMaterials ||
-        request.assignedMaterials.length === 0
-      ) {
-        throw AppError.badRequest("No materials assigned to this request");
-      }
-
-      request.status = "ready";
-      await request.save();
+      const request = await requestService.markAsReady(
+        requestId,
+        organizationId,
+      );
 
       res.json({
         status: "success",
@@ -765,29 +584,17 @@ requestRouter.post(
   requirePermission("requests:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await LoanRequest.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: { $in: ["pending", "approved", "assigned", "ready"] },
-      });
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
 
-      if (!request) {
-        throw AppError.notFound("Request not found or cannot be cancelled");
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      // If materials were assigned, release them
-      if (request.assignedMaterials && request.assignedMaterials.length > 0) {
-        const instanceIds = request.assignedMaterials.map(
-          (am) => am.materialInstanceId,
-        );
-        await MaterialInstance.updateMany(
-          { _id: { $in: instanceIds } },
-          { $set: { status: "available" } },
-        );
-      }
-
-      request.status = "cancelled";
-      await request.save();
+      const request = await requestService.cancelRequest(
+        requestId,
+        organizationId,
+      );
 
       res.json({
         status: "success",
