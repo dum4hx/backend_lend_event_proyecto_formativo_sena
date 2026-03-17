@@ -13,8 +13,12 @@ import {
   getUserId,
 } from "../../middleware/auth.ts";
 import { TransferRequestZodSchema } from "./models/transfer_request.model.ts";
-import { TransferZodSchema } from "./models/transfer.model.ts";
+import {
+  TransferZodSchema,
+  ItemConditionEnum,
+} from "./models/transfer.model.ts";
 import { z } from "zod";
+import { Types } from "mongoose";
 
 const transferRouter = Router();
 
@@ -79,7 +83,7 @@ transferRouter.patch(
   requirePermission("transfers:update"),
   validateBody(
     z.object({
-      status: z.enum(["approved", "rejected", "cancelled"]),
+      status: z.enum(["approved", "rejected"]),
     }),
   ),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
@@ -180,6 +184,19 @@ transferRouter.patch(
         .max(500, "Maximum 500 characters")
         .trim()
         .optional(),
+      items: z
+        .array(
+          z.object({
+            instanceId: z
+              .string()
+              .refine(
+                (val) => Types.ObjectId.isValid(val),
+                "Invalid Instance ID",
+              ),
+            receivedCondition: ItemConditionEnum,
+          }),
+        )
+        .optional(),
     }),
   ),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
@@ -189,6 +206,7 @@ transferRouter.patch(
         getUserId(req),
         req.params.id,
         req.body.receiverNotes,
+        req.body.items,
       );
       res.status(200).json({ status: "success", data });
     } catch (err) {

@@ -9,10 +9,22 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
  * Represents the physical movement of material instances between locations.
  */
 
+export const ItemConditionEnum = z.enum([
+  "OK",
+  "DAMAGED",
+  "MISSING_PARTS",
+  "DIRTY",
+  "REPAIR_REQUIRED",
+  "LOST",
+]);
+
+export type ItemCondition = z.infer<typeof ItemConditionEnum>;
+
 export const TransferStatusEnum = z.enum([
+  "picking",
   "in_transit",
   "received",
-  "cancelled",
+  "issue_reported",
 ]);
 
 export type TransferStatus = z.infer<typeof TransferStatusEnum>;
@@ -36,6 +48,8 @@ export const TransferZodSchema = z.object({
         instanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
           message: "Invalid Instance ID format",
         }),
+        sentCondition: ItemConditionEnum.optional(),
+        receivedCondition: ItemConditionEnum.optional(),
         notes: z.string().max(200, "Maximum 200 characters").trim().optional(),
       }),
     )
@@ -80,6 +94,14 @@ const transferSchema = new Schema(
           ref: "MaterialInstance",
           required: true,
         },
+        sentCondition: {
+          type: String,
+          enum: ItemConditionEnum.options,
+        },
+        receivedCondition: {
+          type: String,
+          enum: ItemConditionEnum.options,
+        },
         notes: {
           type: String,
           maxlength: 200,
@@ -99,7 +121,7 @@ const transferSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["in_transit", "received", "cancelled"],
+      enum: ["picking", "in_transit", "received", "issue_reported"],
       default: "in_transit",
       index: true,
     },
@@ -110,7 +132,7 @@ const transferSchema = new Schema(
     receivedAt: {
       type: Date,
     },
-    sentBy: {
+    pickedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,

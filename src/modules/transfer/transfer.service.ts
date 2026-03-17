@@ -47,7 +47,8 @@ class TransferService {
       toLocationId: payload.toLocationId,
       organizationId,
       requestedBy: userId,
-      status: "pending" as const,
+      status: "requested" as const,
+      items: payload.items,
       ...(payload.notes !== undefined && { notes: payload.notes }),
     });
 
@@ -61,7 +62,7 @@ class TransferService {
     organizationId: string | Types.ObjectId,
     userId: string | Types.ObjectId,
     requestId: string | Types.ObjectId,
-    status: "approved" | "rejected" | "cancelled",
+    status: "approved" | "rejected",
   ) {
     const request = await TransferRequest.findOne({
       _id: requestId,
@@ -69,14 +70,14 @@ class TransferService {
     });
     if (!request) throw AppError.notFound("Transfer request not found");
 
-    if (request.status !== "pending") {
+    if (request.status !== "requested") {
       throw AppError.badRequest(
         `Cannot respond to a request in ${request.status} status`,
       );
     }
 
     request.status = status;
-    request.respondedBy = userId as any;
+    request.approvedBy = userId as any;
     request.respondedAt = new Date();
     await request.save();
 
@@ -178,7 +179,7 @@ class TransferService {
             toLocationId: payload.toLocationId,
             items: payload.items,
             organizationId,
-            sentBy: userId,
+            pickedBy: userId,
             status: "in_transit" as const,
             sentAt: new Date(),
             ...(payload.requestId !== undefined && {
@@ -192,14 +193,6 @@ class TransferService {
         { session },
       );
 
-      if (payload.requestId) {
-        await TransferRequest.updateOne(
-          { _id: payload.requestId },
-          { status: "fulfilled" },
-          { session },
-        );
-      }
-
       return transfer;
     });
   }
@@ -212,6 +205,7 @@ class TransferService {
     userId: string | Types.ObjectId,
     transferId: string | Types.ObjectId,
     receiverNotes?: string,
+    itemConditions?: Array<{ instanceId: string; receivedCondition: string }>,
   ) {
     const session = await startSession();
     return await session.withTransaction(async () => {
@@ -232,6 +226,19 @@ class TransferService {
       transfer.receivedBy = userId as any;
       transfer.receivedAt = new Date();
       if (receiverNotes) transfer.receiverNotes = receiverNotes;
+
+      // Apply per-item received conditions if provided
+      if (itemConditions && itemConditions.length > 0) {
+        for (const item of transfer.items) {
+          const condition = itemConditions.find(
+            (c) => c.instanceId.toString() === item.instanceId.toString(),
+          );
+          if (condition) {
+            (item as any).receivedCondition = condition.receivedCondition;
+          }
+        }
+      }
+
       await transfer.save({ session });
 
       // Update instances: set new location and set back to 'available'
@@ -259,7 +266,7 @@ class TransferService {
     filters: any = {},
   ) {
     return Transfer.find({ organizationId, ...filters })
-      .populate("sentBy", "name email")
+      .populate("pickedBy", "name email")
       .populate("receivedBy", "name email")
       .populate("fromLocationId", "name")
       .populate("toLocationId", "name")
@@ -274,7 +281,7 @@ class TransferService {
     transferId: string | Types.ObjectId,
   ) {
     const transfer = await Transfer.findOne({ _id: transferId, organizationId })
-      .populate("sentBy", "name email")
+      .populate("pickedBy", "name email")
       .populate("receivedBy", "name email")
       .populate("fromLocationId", "name")
       .populate("toLocationId", "name")

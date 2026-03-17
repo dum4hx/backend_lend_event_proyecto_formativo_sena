@@ -6,6 +6,7 @@ test.describe("Transfers Module", () => {
   let fromLocationId: string;
   let toLocationId: string;
   let materialInstanceId: string;
+  let modelId: string;
   let transferRequestId: string;
   let transferId: string;
 
@@ -59,7 +60,7 @@ test.describe("Transfers Module", () => {
       },
     });
     const type = await typeRes.json();
-    const modelId = type.data.materialType._id;
+    modelId = type.data.materialType._id;
 
     // 4. Create a material instance at the origin location
     const instanceRes = await request.post("/api/v1/materials/instances", {
@@ -80,6 +81,7 @@ test.describe("Transfers Module", () => {
       data: {
         fromLocationId,
         toLocationId,
+        items: [{ modelId, quantity: 1 }],
         notes: "Request for testing",
       },
     });
@@ -87,7 +89,7 @@ test.describe("Transfers Module", () => {
     const body = await response.json();
     expect(body.status).toBe("success");
     expect(body.data.fromLocationId).toBe(fromLocationId);
-    expect(body.data.status).toBe("pending");
+    expect(body.data.status).toBe("requested");
     transferRequestId = body.data._id;
   });
 
