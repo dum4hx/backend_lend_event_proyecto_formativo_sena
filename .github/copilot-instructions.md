@@ -22,7 +22,7 @@ This file tells the Copilot-style agent how to contribute code to this repositor
 
 - Service Requirements
   - Keep framework/HTTP concerns out of services.
-  - Perform early business checks (org state, quotas, preconditions) and throw `AppError` for expected failures.
+  - Perform early business checks (org state, quotas, preconditions) and use `AppError` factory helpers for expected failures (e.g., `AppError.badRequest()`, `AppError.notFound()`). Avoid instantiating `new AppError(...)` directly.
   - Return plain DTOs / POJOs (not raw Mongoose documents) from service methods.
 
 - Test Requirements

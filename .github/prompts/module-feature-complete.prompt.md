@@ -27,7 +27,7 @@ You are implementing a feature for the LendEvent event-rental management API. Yo
 - **Framework**: Express 5.x with TypeScript
 - **Validation**: Zod schemas for request/response validation
 - **Auth**: HttpOnly cookies (`access_token`, `refresh_token`), middleware-based auth + RBAC
-- **Error Handling**: Custom `AppError` exception class thrown from service, caught and formatted by middleware
+- **Error Handling**: Use `AppError` factory helpers thrown from service, caught and formatted by middleware (e.g., `AppError.badRequest()`, `AppError.notFound()`).
 - **Database**: MongoDB/Mongoose (implicit through models)
 - **Testing**: Playwright with storage state (pre-authenticated requests), `expect()` for assertions
 
@@ -77,7 +77,7 @@ import { AppError } from "../../errors/AppError.ts";
 class <Service> {
   async methodName(orgId: string, payload: <Type>): Promise<any> {
     // Validate org quota, permissions, etc.
-    if (!org) throw new AppError(404, "Organization not found");
+    if (!org) throw AppError.notFound("Organization not found");
 
     // Business logic
     // interact with models, other services
@@ -169,7 +169,7 @@ When implementing a feature, **use the conversation context OR ask clarifying qu
 
 - [ ] Separate business logic from HTTP concerns
 - [ ] Validate quotas, org state, permissions as early checks
-- [ ] Throw `AppError(status, message, details?)` for user-facing errors
+- [ ] Use `AppError` factory helpers (e.g., `AppError.badRequest(message, details)`, `AppError.notFound(message, details)`, `AppError.internal(message, cause)`) for user-facing errors; do not call `new AppError(...)`.
 - [ ] Return DTOs (plain objects), not Mongoose documents directly
 - [ ] Use dependency injection or service references for cross-module calls
 - [ ] Add JSDoc for public methods
@@ -191,6 +191,27 @@ When implementing a feature, **use the conversation context OR ask clarifying qu
 - [ ] Document all response codes and error conditions
 - [ ] Add notes for special behaviors (rate limits, defaults, validation rules)
 - [ ] Update Table of Contents if adding new section
+
+### Permissions Update Checklist
+
+- If the feature requires a new or changed permission, include these steps in your change set:
+  - [ ] Add the new permission object to `src/modules/roles/seeders/permissions.json` with `_id`, `displayName`, `description`, `category` and `isPlatformPermission` (boolean).
+  - [ ] Add the permission string to `src/modules/roles/models/role.model.ts` in the `rolePermissions` map under the role that should receive it. If the permission is platform-only, add it to `super_admin_only_permsissions` instead.
+  - [ ] Update `docs/PERMISSIONS_REFERENCE.md` describing the permission and its intended role(s).
+  - [ ] Run the permissions seeder in dry-run mode to validate the changes, then run it (non-dry) only after verifying DB credentials and approvals.
+
+  Example commands (PowerShell):
+
+  - Dry run (safe):
+    - `$env:DRY_RUN='1'; npx tsx src/modules/roles/seeders/permissions.seeder.ts`
+
+  - Apply to DB (only after review):
+    - `npx tsx src/modules/roles/seeders/permissions.seeder.ts`
+
+  - Notes:
+    - Ensure the `_id` in `permissions.json` exactly matches the permission string you add to `rolePermissions`.
+    - For platform-only permissions (global admin capabilities), keep them in `super_admin_only_permsissions` and **do not** include them in organization role lists.
+
 
 ---
 

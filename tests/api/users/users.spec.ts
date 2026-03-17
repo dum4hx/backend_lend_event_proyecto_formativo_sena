@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { generateRandomEmail } from "../../utils/helpers.ts";
+import { generateRandomEmail, generateRandomPhone } from "../../utils/helpers.ts";
 
 test.describe("Users Module", () => {
   let roleId: string;
@@ -29,7 +29,6 @@ test.describe("Users Module", () => {
       },
     });
     const locBody = await locRes.json();
-    console.log("Location creation status:", locRes.status(), "body:", JSON.stringify(locBody));
     locationId = locBody.data._id;
   });
 
@@ -45,7 +44,7 @@ test.describe("Users Module", () => {
     const inviteData = {
       name: { firstName: "Invited", firstSurname: "User" },
       email: generateRandomEmail(),
-      phone: "+573009998877",
+      phone: generateRandomPhone(),
       roleId,
       locations: [locationId],
     };
@@ -55,7 +54,8 @@ test.describe("Users Module", () => {
     });
 
     if (response.status() !== 201) {
-      console.log("Invite error body:", await response.json());
+      const errBody = await response.json();
+      throw new Error(`Invite failed with ${response.status()}: ${JSON.stringify(errBody)}`);
     }
     expect(response.status()).toBe(201);
     const body = await response.json();

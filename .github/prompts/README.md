@@ -63,7 +63,7 @@ The prompt generates:
 ✅ Separation of concerns (router → service → db)
 ✅ Zod validation with custom error messages
 ✅ Auth + RBAC via middleware
-✅ Error handling with AppError + error responder
+✅ Error handling via AppError factory helpers + error responder
 ✅ HttpOnly cookie authentication
 ✅ Playwright tests with pre-authenticated requests
 ✅ Consistent response JSON shape

@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { generateRandomEmail, generateRandomPhone } from "../../utils/helpers.ts";
+import {
+  generateRandomEmail,
+  generateRandomPhone,
+} from "../../utils/helpers.ts";
 
 type InstanceStatus = "available" | "maintenance";
 
@@ -72,7 +75,7 @@ const createMaterialType = async (
 ): Promise<string> => {
   const categoryRes = await request.post("materials/categories", {
     data: {
-      name: `Request Category ${Date.now()}`,
+      name: `Request Category ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       description: "Category for request tests",
     },
   });
@@ -87,7 +90,7 @@ const createMaterialType = async (
     data: {
       organizationId,
       categoryId,
-      name: `Request Material ${Date.now()}`,
+      name: `Request Material ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       description: "Material for request tests",
       pricePerDay: 10,
       attributes: [],
@@ -107,7 +110,7 @@ const createLocation = async (
 ): Promise<string> => {
   const locationRes = await request.post("locations", {
     data: {
-      name: `Request Location ${Date.now()}`,
+      name: `Request Location ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       address: {
         country: "Colombia",
         city: "Bogota",
@@ -154,7 +157,11 @@ const createMaterialInstance = async (
 const createApprovedRequestForMaterial = async (
   request: import("@playwright/test").APIRequestContext,
   quantity = 1,
-): Promise<{ requestId: string; materialTypeId: string; locationId: string }> => {
+): Promise<{
+  requestId: string;
+  materialTypeId: string;
+  locationId: string;
+}> => {
   const organizationId = await getOrganizationId(request);
   const customerId = await createCustomer(request);
   const materialTypeId = await createMaterialType(request, organizationId);
@@ -257,7 +264,9 @@ test.describe("Requests Module", () => {
     expect(res.status()).toBe(201);
     const body = (await res.json()) as {
       status: string;
-      data?: { request?: { items?: Array<{ type?: string; referenceId?: string }> } };
+      data?: {
+        request?: { items?: Array<{ type?: string; referenceId?: string }> };
+      };
     };
     expect(body.status).toBe("success");
     expect(body.data?.request?.items?.[0]?.type).toBe("material");
@@ -285,7 +294,9 @@ test.describe("Requests Module", () => {
     expect(res.status()).toBe(201);
     const body = (await res.json()) as {
       status: string;
-      data?: { request?: { items?: Array<{ type?: string; referenceId?: string }> } };
+      data?: {
+        request?: { items?: Array<{ type?: string; referenceId?: string }> };
+      };
     };
     expect(body.status).toBe("success");
     expect(body.data?.request?.items?.[0]?.type).toBe("package");
@@ -310,7 +321,9 @@ test.describe("Requests Module", () => {
 
     expect(res.status()).toBe(201);
     const body = (await res.json()) as {
-      data?: { request?: { items?: Array<{ type?: string; referenceId?: string }> } };
+      data?: {
+        request?: { items?: Array<{ type?: string; referenceId?: string }> };
+      };
     };
     expect(body.data?.request?.items?.[0]?.type).toBe("material");
     expect(body.data?.request?.items?.[0]?.referenceId).toBe(materialTypeId);
@@ -335,7 +348,9 @@ test.describe("Requests Module", () => {
 
     expect(res.status()).toBe(201);
     const body = (await res.json()) as {
-      data?: { request?: { items?: Array<{ type?: string; referenceId?: string }> } };
+      data?: {
+        request?: { items?: Array<{ type?: string; referenceId?: string }> };
+      };
     };
     expect(body.data?.request?.items?.[0]?.type).toBe("package");
     expect(body.data?.request?.items?.[0]?.referenceId).toBe(packageId);
@@ -463,7 +478,10 @@ test.describe("Requests Module", () => {
     const organizationId = await getOrganizationId(request);
     const { requestId, materialTypeId, locationId } =
       await createApprovedRequestForMaterial(request);
-    const otherMaterialTypeId = await createMaterialType(request, organizationId);
+    const otherMaterialTypeId = await createMaterialType(
+      request,
+      organizationId,
+    );
     const otherInstance = await createMaterialInstance(
       request,
       otherMaterialTypeId,

@@ -72,7 +72,7 @@ test.describe("Location Capacity Module", () => {
     });
     expect(res2.status()).toBe(409);
     const body2 = await res2.json();
-    expect(body2.status).toBe("error");
+    expect(body2.status).toBe("fail");
     expect(body2.details.type).toBe("CAPACITY_WARNING");
 
     // 3. Create second instance with force=true (should succeed)

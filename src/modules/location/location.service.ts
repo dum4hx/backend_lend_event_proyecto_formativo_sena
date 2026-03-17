@@ -385,7 +385,7 @@ export class LocationService {
     return await MaterialInstance.countDocuments({
       locationId,
       modelId: materialTypeId,
-      isActive: true, // Only count active instances
+      status: { $ne: "retired" }, // Only count non-retired instances
     });
   }
 

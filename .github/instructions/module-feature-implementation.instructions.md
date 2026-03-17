@@ -11,8 +11,8 @@ For module endpoint features, always follow `.github/prompts/module-feature-comp
 ## Architecture And Separation
 
 - Keep concerns separated.
-- Routers handle HTTP concerns (routing, middleware, validation, response mapping).
-- Services handle business logic and throw `AppError` for expected failures.
+ - Routers handle HTTP concerns (routing, middleware, validation, response mapping).
+ - Services handle business logic and use `AppError` factory helpers for expected failures (e.g., `AppError.badRequest()`, `AppError.notFound()`). Do not instantiate `new AppError(...)` directly.
 - Do not put business rules directly in router handlers.
 
 ## Router Requirements
@@ -32,7 +32,7 @@ Apply this section when a change touches business logic in module services.
 
 - Keep HTTP framework details out of service methods.
 - Perform early checks for org state, quotas, and business preconditions.
-- Throw `new AppError(status, message, details?)` for user-facing errors.
+ - Use `AppError` factory helpers (e.g., `AppError.badRequest(message, details)`, `AppError.notFound(message, details)`, `AppError.internal(message, cause)`) for user-facing errors instead of `new AppError(...)`.
 - Return DTO/plain objects instead of leaking raw persistence documents.
 
 ## Test Requirements
@@ -49,6 +49,21 @@ Apply this section when endpoint behavior or service behavior changes.
 - If any router endpoint is added/changed/removed, update `docs/API_DOCUMENTATION.md` in the same change. This is a hard rule.
 - Document each endpoint with method/path, auth/permission requirements, request parameters, example request, success responses, and error conditions.
 - Keep documentation format aligned with existing sections and table style.
+
+## Permissions & RBAC Updates
+
+- When a feature introduces a new permission key (for example `resource:action`), the change MUST include three coordinated updates in the same change:
+	- Add the canonical permission entry to `src/modules/roles/seeders/permissions.json` with the fields: `_id`, `displayName`, `description`, `category`, and `isPlatformPermission` (boolean).
+	- Add the permission string to the appropriate role in `src/modules/roles/models/role.model.ts` by updating the `rolePermissions` entry for the role that should receive it. If the permission is platform-only, add it to `super_admin_only_permsissions` instead.
+	- Update `docs/PERMISSIONS_REFERENCE.md` to document the new permission, its purpose, and whether it is platform-only.
+
+- After adding the permission entries, run the permissions seeder to apply changes to the database. First perform a dry-run to verify output, then run the seeder against the target database only after confirming DB access and environment variables.
+	- Dry-run (PowerShell):
+		- `$env:DRY_RUN='1'; npx tsx src/modules/roles/seeders/permissions.seeder.ts`
+	- Real run (only after review/approval and correct DB credentials):
+		- `npx tsx src/modules/roles/seeders/permissions.seeder.ts`
+
+- Why: keeping the canonical `permissions.json`, the in-repo role mapping (`rolePermissions`), and the persisted Permission documents in sync is required so clients and APIs receive a correct, discoverable permissions catalogue.
 
 ## Quality Guardrails
 
