@@ -44,8 +44,12 @@ export const defaultOrgData = () => ({
     taxId: generateTaxId(),
     address: {
       street: "Calle 123 #45-67",
+      streetType: "Calle",
+      primaryNumber: "123",
+      secondaryNumber: "45",
+      complementaryNumber: "67",
       city: "Bogotá",
-      state: "Cundinamarca",
+      department: "Cundinamarca",
       country: "Colombia",
       postalCode: "110111",
     },
