@@ -2,7 +2,7 @@
 
 Generated at: 2026-03-08T21:18:03.050Z
 
-Total permissions: 52
+Total permissions: 55
 
 This document is generated from the MongoDB `permissions` collection.
 Each section explains the purpose of a permission and the action it allows.
@@ -61,6 +61,9 @@ Each section explains the purpose of a permission and the action it allows.
 - [`subscription_types:delete`](#subscription_typesdelete)
 - [`subscription_types:read`](#subscription_typesread)
 - [`subscription_types:update`](#subscription_typesupdate)
+- [`transfers:create`](#transferscreate)
+- [`transfers:read`](#transfersread)
+- [`transfers:update`](#transfersupdate)
 - [`users:create`](#userscreate)
 - [`users:delete`](#usersdelete)
 - [`users:read`](#usersread)
@@ -587,6 +590,36 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows modifying existing subscription plan details and limits.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Subscription Types
+
+### `transfers:create`
+
+- **Display Name:** Create Transfers
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating transfer requests and initiating physical transfers between locations.
+- **Allowed Action:** Create new records in this resource.
+- **Resource Target:** Transfers
+
+### `transfers:read`
+
+- **Display Name:** View Transfers
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing transfer requests and transfer records.
+- **Allowed Action:** View/list records and details for this resource.
+- **Resource Target:** Transfers
+
+### `transfers:update`
+
+- **Display Name:** Update Transfers
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows responding to transfer requests and marking transfers as received.
+- **Allowed Action:** Modify existing records in this resource.
+- **Resource Target:** Transfers
 
 ### `users:create`
 

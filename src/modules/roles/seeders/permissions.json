@@ -432,5 +432,26 @@
     "description": "Allows access to data dashboards and performance metrics.",
     "category": "Analytics",
     "isPlatformPermission": false
+  },
+  {
+    "_id": "transfers:create",
+    "displayName": "Create Transfers",
+    "description": "Allows creating transfer requests and initiating physical transfers between locations.",
+    "category": "Transfers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "transfers:read",
+    "displayName": "View Transfers",
+    "description": "Allows viewing transfer requests and transfer records.",
+    "category": "Transfers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "transfers:update",
+    "displayName": "Update Transfers",
+    "description": "Allows responding to transfer requests and marking transfers as received.",
+    "category": "Transfers",
+    "isPlatformPermission": false
   }
 ]
