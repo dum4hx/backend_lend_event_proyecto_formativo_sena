@@ -9,7 +9,7 @@ docker/nginx/ssl
 test-results
 playwright-report/
 playwright/.auth/
-tests/utils/auth/
+tests/utils/auth/*
 
 # TypeScript cache and output
 # Replace 'dist' with your actual output directory if it's different (e.g., 'build', 'out')

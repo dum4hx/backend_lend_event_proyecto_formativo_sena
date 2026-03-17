@@ -5,38 +5,38 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 const customerStatusOptions = ["active", "inactive", "blacklisted"] as const;
 export const documentTypes = [
-        {
-          value: "cc",
-          displayName: "Cédula de Ciudadanía",
-          description: "Colombian National ID",
-        },
-        {
-          value: "ce",
-          displayName: "Cédula de Extranjería",
-          description: "Colombian Foreign ID",
-        },
-        {
-          value: "passport",
-          displayName: "Passport",
-          description: "International Passport",
-        },
-        {
-          value: "nit",
-          displayName: "NIT",
-          description: "Tax Identification Number",
-        },
-        {
-          value: "other",
-          displayName: "Other",
-          description: "Other identification type",
-        },
-      ];
+  {
+    value: "cc",
+    displayName: "Cédula de Ciudadanía",
+    description: "Colombian National ID",
+  },
+  {
+    value: "ce",
+    displayName: "Cédula de Extranjería",
+    description: "Colombian Foreign ID",
+  },
+  {
+    value: "passport",
+    displayName: "Passport",
+    description: "International Passport",
+  },
+  {
+    value: "nit",
+    displayName: "NIT",
+    description: "Tax Identification Number",
+  },
+  {
+    value: "other",
+    displayName: "Other",
+    description: "Other identification type",
+  },
+];
 
 const customerDocTypes = z.enum(
   documentTypes.map((dt) => dt.value) as [
     (typeof documentTypes)[number]["value"],
-    ...(typeof documentTypes)[number]["value"][]
-  ]
+    ...(typeof documentTypes)[number]["value"][],
+  ],
 );
 
 /* ---------- Zod Schema for API Validation ---------- */
@@ -51,6 +51,7 @@ const customerNameSchema = z.object({
 const customerAddressSchema = z.object({
   country: z.string().min(1).max(50).trim(),
   city: z.string().min(1).max(100).trim(),
+  state: z.string().min(1).max(100).trim(),
   street: z.string().min(1).max(200).trim(),
   postalCode: z.string().max(20).trim().optional(),
   additionalInfo: z.string().max(300).trim().optional(),
@@ -89,9 +90,10 @@ const customerNameMongooseSchema = new Schema(
 
 const customerAddressMongooseSchema = new Schema(
   {
-    country: { type: String, maxlength: 50, trim: true },
-    city: { type: String, maxlength: 100, trim: true },
-    street: { type: String, maxlength: 200, trim: true },
+    country: { type: String, required: true, maxlength: 50, trim: true },
+    city: { type: String, required: true, maxlength: 100, trim: true },
+    state: { type: String, required: true, maxlength: 100, trim: true },
+    street: { type: String, required: true, maxlength: 200, trim: true },
     postalCode: { type: String, maxlength: 20, trim: true },
     additionalInfo: { type: String, maxlength: 300, trim: true },
   },

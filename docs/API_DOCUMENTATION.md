@@ -1958,15 +1958,20 @@ Gets a specific customer.
 
 Creates a new customer.
 
-| Parameter         | Location | Type   | Required | Description                                            |
-| ----------------- | -------- | ------ | -------- | ------------------------------------------------------ |
-| name.firstName    | body     | string | Yes      | First name                                             |
-| name.firstSurname | body     | string | Yes      | Surname                                                |
-| email             | body     | string | Yes      | Email address                                          |
-| phone             | body     | string | Yes      | Phone in E.164 format                                  |
-| documentType      | body     | string | Yes      | `national_id`, `passport`, `drivers_license`, `tax_id` |
-| documentNumber    | body     | string | Yes      | Document number                                        |
-| address           | body     | object | No       | Address information                                    |
+| Parameter         | Location | Type   | Required | Description                                                   |
+| ----------------- | -------- | ------ | -------- | ------------------------------------------------------------- |
+| name.firstName    | body     | string | Yes      | First name                                                    |
+| name.firstSurname | body     | string | Yes      | Surname                                                       |
+| email             | body     | string | Yes      | Email address                                                 |
+| phone             | body     | string | Yes      | Phone in E.164 format                                         |
+| documentType      | body     | string | Yes      | `cc`, `ce`, `passport`, `nit`, `other`                        |
+| documentNumber    | body     | string | Yes      | Document number                                               |
+| address.country   | body     | string | Yes      | Country name                                                  |
+| address.city      | body     | string | Yes      | City name                                                     |
+| address.state     | body     | string | Yes      | State/Department name                                         |
+| address.street    | body     | string | Yes      | Street address                                                |
+| address           | body     | object | No       | Full address object (containing country, city, state, street) |
+| notes             | body     | string | No       | Additional information                                        |
 
 **Permission Required:** `customers:create`
 

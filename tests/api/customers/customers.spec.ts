@@ -15,7 +15,12 @@ test.describe("Customers Module", () => {
       phone: generateRandomPhone(),
       documentType: "cc",
       documentNumber: documentNumber,
-      address: { street: "Main St", city: "Medellín", country: "Colombia" },
+      address: {
+        street: "Main St",
+        city: "Medellín",
+        state: "Antioquia",
+        country: "Colombia",
+      },
     };
 
     // Create
