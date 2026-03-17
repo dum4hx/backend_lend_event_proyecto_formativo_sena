@@ -10,6 +10,7 @@ test-results
 playwright-report/
 playwright/.auth/
 tests/utils/auth/*
+adminStorageState.json
 
 # TypeScript cache and output
 # Replace 'dist' with your actual output directory if it's different (e.g., 'build', 'out')

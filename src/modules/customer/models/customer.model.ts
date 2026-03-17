@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
+import {
+  AddressZodSchema,
+  addressMongooseSchema,
+} from "../../shared/address.schema.ts";
 
 /* ---------- Customer Status ---------- */
 
@@ -48,15 +52,6 @@ const customerNameSchema = z.object({
   secondSurname: z.string().max(50).trim().optional().or(z.literal("")),
 });
 
-const customerAddressSchema = z.object({
-  country: z.string().min(1).max(50).trim(),
-  city: z.string().min(1).max(100).trim(),
-  state: z.string().min(1).max(100).trim(),
-  street: z.string().min(1).max(200).trim(),
-  postalCode: z.string().max(20).trim().optional(),
-  additionalInfo: z.string().max(300).trim().optional(),
-});
-
 export const CustomerZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
@@ -66,7 +61,7 @@ export const CustomerZodSchema = z.object({
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)"),
   documentType: customerDocTypes.optional(),
   documentNumber: z.string().max(50).trim().optional(),
-  address: customerAddressSchema.optional(),
+  address: AddressZodSchema.optional(),
   notes: z.string().max(1000).trim().optional(),
 });
 
@@ -84,18 +79,6 @@ const customerNameMongooseSchema = new Schema(
     secondName: { type: String, maxlength: 50, trim: true },
     firstSurname: { type: String, required: true, maxlength: 50, trim: true },
     secondSurname: { type: String, maxlength: 50, trim: true },
-  },
-  { _id: false },
-);
-
-const customerAddressMongooseSchema = new Schema(
-  {
-    country: { type: String, required: true, maxlength: 50, trim: true },
-    city: { type: String, required: true, maxlength: 100, trim: true },
-    state: { type: String, required: true, maxlength: 100, trim: true },
-    street: { type: String, required: true, maxlength: 200, trim: true },
-    postalCode: { type: String, maxlength: 20, trim: true },
-    additionalInfo: { type: String, maxlength: 300, trim: true },
   },
   { _id: false },
 );
@@ -135,7 +118,7 @@ const customerSchema = new Schema(
       maxlength: 50,
       trim: true,
     },
-    address: customerAddressMongooseSchema,
+    address: addressMongooseSchema,
     notes: {
       type: String,
       maxlength: 1000,

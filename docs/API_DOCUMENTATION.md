@@ -369,19 +369,22 @@ Registers a new organization with owner account. The account is placed in a **pe
 | organization.address   | body     | object | No       | Address object (see details below)        |
 | owner.name.firstName   | body     | string | Yes      | Owner's first name                        |
 
-The `organization.address` object has the following structure:
+The `organization.address` object has the following structure (Colombian address format):
 
-| Field                   | Type   | Required | Description         |
-| ----------------------- | ------ | -------- | ------------------- | ---------------------- |
-| country                 | string | Yes      | Country name        |
-| state                   | string | Yes      | State or department |
-| city                    | string | Yes      | City name           |
-| street                  | string | Yes      | Street address      |
-| postalCode              | string | No       | Postal code         |
-| owner.name.firstSurname | body   | string   | Yes                 | Owner's surname        |
-| owner.email             | body   | string   | Yes                 | Owner's email (unique) |
-| owner.password          | body   | string   | Yes                 | Password (min 8 chars) |
-| owner.phone             | body   | string   | Yes                 | Phone in E.164 format  |
+| Field                   | Type   | Required | Description                                                                                           |
+| ----------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------- | ---------------------- |
+| streetType              | string | Yes      | One of: Calle, Carrera, Avenida, Avenida Calle, Avenida Carrera, Diagonal, Transversal, Circular, Via |
+| primaryNumber           | string | Yes      | Primary street/road number (max 20 chars)                                                             |
+| secondaryNumber         | string | Yes      | Cross street number (max 20 chars)                                                                    |
+| complementaryNumber     | string | Yes      | Complement identifier, e.g. apartment/office number (max 20 chars)                                    |
+| department              | string | Yes      | Colombian department / state (max 100 chars)                                                          |
+| city                    | string | Yes      | City name (max 100 chars)                                                                             |
+| additionalDetails       | string | No       | Additional free-text details, e.g. "Centro Empresarial, Oficina 602"                                  |
+| postalCode              | string | No       | Postal code (max 20 chars)                                                                            |
+| owner.name.firstSurname | body   | string   | Yes                                                                                                   | Owner's surname        |
+| owner.email             | body   | string   | Yes                                                                                                   | Owner's email (unique) |
+| owner.password          | body   | string   | Yes                                                                                                   | Password (min 8 chars) |
+| owner.phone             | body   | string   | Yes                                                                                                   | Phone in E.164 format  |
 
 **Response:** `202 Accepted`
 
@@ -1659,10 +1662,12 @@ Gets a paginated list of all organizations with their details.
         "email": "contact@innovate.com",
         "phone": "+1234567890",
         "address": {
-          "country": "USA",
-          "city": "San Francisco",
-          "street": "123 Market St",
-          "postalCode": "94103"
+          "streetType": "Calle",
+          "primaryNumber": "123",
+          "secondaryNumber": "10",
+          "complementaryNumber": "5",
+          "department": "Cundinamarca",
+          "city": "Bogotá"
         },
         "subscription": {
           "plan": "professional",
@@ -1958,20 +1963,24 @@ Gets a specific customer.
 
 Creates a new customer.
 
-| Parameter         | Location | Type   | Required | Description                                                   |
-| ----------------- | -------- | ------ | -------- | ------------------------------------------------------------- |
-| name.firstName    | body     | string | Yes      | First name                                                    |
-| name.firstSurname | body     | string | Yes      | Surname                                                       |
-| email             | body     | string | Yes      | Email address                                                 |
-| phone             | body     | string | Yes      | Phone in E.164 format                                         |
-| documentType      | body     | string | Yes      | `cc`, `ce`, `passport`, `nit`, `other`                        |
-| documentNumber    | body     | string | Yes      | Document number                                               |
-| address.country   | body     | string | Yes      | Country name                                                  |
-| address.city      | body     | string | Yes      | City name                                                     |
-| address.state     | body     | string | Yes      | State/Department name                                         |
-| address.street    | body     | string | Yes      | Street address                                                |
-| address           | body     | object | No       | Full address object (containing country, city, state, street) |
-| notes             | body     | string | No       | Additional information                                        |
+| Parameter                   | Location | Type   | Required | Description                                                                                                               |
+| --------------------------- | -------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| name.firstName              | body     | string | Yes      | First name                                                                                                                |
+| name.firstSurname           | body     | string | Yes      | Surname                                                                                                                   |
+| email                       | body     | string | Yes      | Email address                                                                                                             |
+| phone                       | body     | string | Yes      | Phone in E.164 format                                                                                                     |
+| documentType                | body     | string | Yes      | `cc`, `ce`, `passport`, `nit`, `other`                                                                                    |
+| documentNumber              | body     | string | Yes      | Document number                                                                                                           |
+| address                     | body     | object | No       | Colombian address object (see fields below). The entire object is optional but all sub-fields are required when provided. |
+| address.streetType          | body     | string | Yes\*    | One of: Calle, Carrera, Avenida, Avenida Calle, Avenida Carrera, Diagonal, Transversal, Circular, Via                     |
+| address.primaryNumber       | body     | string | Yes\*    | Primary street/road number (max 20 chars)                                                                                 |
+| address.secondaryNumber     | body     | string | Yes\*    | Cross street number (max 20 chars)                                                                                        |
+| address.complementaryNumber | body     | string | Yes\*    | Complement identifier, e.g. apartment/office (max 20 chars)                                                               |
+| address.department          | body     | string | Yes\*    | Colombian department (max 100 chars)                                                                                      |
+| address.city                | body     | string | Yes\*    | City name (max 100 chars)                                                                                                 |
+| address.additionalDetails   | body     | string | No       | Additional free-text details (max 300 chars)                                                                              |
+| address.postalCode          | body     | string | No       | Postal code (max 20 chars)                                                                                                |
+| notes                       | body     | string | No       | Additional information                                                                                                    |
 
 **Permission Required:** `customers:create`
 
@@ -2183,12 +2192,13 @@ Retrieves a paginated list of all locations in the organization.
         "name": "Bodega Principal",
         "organizationId": "507f1f77bcf86cd799439012",
         "address": {
-          "country": "CO",
-          "state": "Cundinamarca",
+          "streetType": "Calle",
+          "primaryNumber": "10",
+          "secondaryNumber": "45",
+          "complementaryNumber": "20",
+          "department": "Cundinamarca",
           "city": "Bogotá",
-          "street": "Calle 10",
-          "propertyNumber": "45-20",
-          "additionalInfo": "Piso 2"
+          "additionalDetails": "Piso 2"
         },
         "isActive": true,
         "createdAt": "2026-02-20T10:30:00.000Z",
@@ -2260,18 +2270,20 @@ Creates a new location in the organization.
 
 #### Request Body
 
-| Field                               | Type     | Required | Constraints        | Description                                                 |
-| ----------------------------------- | -------- | -------- | ------------------ | ----------------------------------------------------------- |
-| name                                | string   | Yes      | 1-100 characters   | Location name                                               |
-| address.country                     | string   | Yes      | 1-50 characters    | Country code or name                                        |
-| address.state                       | string   | No       | Max 100 characters | State or region                                             |
-| address.city                        | string   | Yes      | 1-100 characters   | City name                                                   |
-| address.street                      | string   | Yes      | 1-100 characters   | Street name                                                 |
-| address.propertyNumber              | string   | Yes      | 1-50 characters    | Building/property number                                    |
-| address.additionalInfo              | string   | No       | Max 200 characters | Floor, suite, additional details                            |
-| materialCapacities                  | object[] | No       | Array of mappings  | Defines max quantity of specific material types in location |
-| materialCapacities[].materialTypeId | string   | Yes      | Valid ObjectId     | ID of the material type to set capacity for                 |
-| materialCapacities[].maxQuantity    | number   | Yes      | Min 0              | Maximum number of items of this type allowed here           |
+| Field                               | Type     | Required | Constraints        | Description                                                                                           |
+| ----------------------------------- | -------- | -------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
+| name                                | string   | Yes      | 1-100 characters   | Location name                                                                                         |
+| address.streetType                  | string   | Yes      | Enum (9 values)    | One of: Calle, Carrera, Avenida, Avenida Calle, Avenida Carrera, Diagonal, Transversal, Circular, Via |
+| address.primaryNumber               | string   | Yes      | 1-20 characters    | Primary street/road number                                                                            |
+| address.secondaryNumber             | string   | Yes      | 1-20 characters    | Cross street number                                                                                   |
+| address.complementaryNumber         | string   | Yes      | 1-20 characters    | Complement identifier, e.g. apartment/office number                                                   |
+| address.department                  | string   | Yes      | 1-100 characters   | Colombian department                                                                                  |
+| address.city                        | string   | Yes      | 1-100 characters   | City name                                                                                             |
+| address.additionalDetails           | string   | No       | Max 300 characters | Floor, suite, or any additional free-text details                                                     |
+| address.postalCode                  | string   | No       | Max 20 characters  | Postal code                                                                                           |
+| materialCapacities                  | object[] | No       | Array of mappings  | Defines max quantity of specific material types in location                                           |
+| materialCapacities[].materialTypeId | string   | Yes      | Valid ObjectId     | ID of the material type to set capacity for                                                           |
+| materialCapacities[].maxQuantity    | number   | Yes      | Min 0              | Maximum number of items of this type allowed here                                                     |
 
 #### Example Request
 
@@ -2279,12 +2291,13 @@ Creates a new location in the organization.
 {
   "name": "Bodega Norte",
   "address": {
-    "country": "Colombia",
-    "state": "Antioquia",
+    "streetType": "Carrera",
+    "primaryNumber": "50",
+    "secondaryNumber": "32",
+    "complementaryNumber": "10",
+    "department": "Antioquia",
     "city": "Medellín",
-    "street": "Carrera 50",
-    "propertyNumber": "32-10",
-    "additionalInfo": "Bodega 3, entrada por el costado"
+    "additionalDetails": "Bodega 3, entrada por el costado"
   },
   "materialCapacities": [
     {

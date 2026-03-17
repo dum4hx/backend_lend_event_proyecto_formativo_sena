@@ -55,9 +55,12 @@ const createCustomer = async (
       documentType: "cc",
       documentNumber: `${Date.now()}`,
       address: {
-        country: "Colombia",
-        city: "Bogota",
-        street: "Street 123",
+        streetType: "Calle",
+        primaryNumber: "123",
+        secondaryNumber: "10",
+        complementaryNumber: "50",
+        department: "Cundinamarca",
+        city: "Bogotá",
       },
     },
   });
@@ -112,10 +115,12 @@ const createLocation = async (
     data: {
       name: `Request Location ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       address: {
-        country: "Colombia",
-        city: "Bogota",
-        street: "Street 456",
-        propertyNumber: "100",
+        streetType: "Carrera",
+        primaryNumber: "45",
+        secondaryNumber: "12",
+        complementaryNumber: "30",
+        department: "Cundinamarca",
+        city: "Bogotá",
       },
     },
   });

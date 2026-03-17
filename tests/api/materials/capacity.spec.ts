@@ -32,10 +32,12 @@ test.describe("Location Capacity Module", () => {
       data: {
         name: `Capacity Warehouse ${Date.now()}`,
         address: {
-          country: "Colombia",
+          streetType: "Calle",
+          primaryNumber: "10",
+          secondaryNumber: "12",
+          complementaryNumber: "3",
+          department: "Antioquia",
           city: "Medellín",
-          street: "Calle 10",
-          propertyNumber: "123",
         },
         materialCapacities: [
           {

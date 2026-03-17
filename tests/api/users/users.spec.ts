@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { generateRandomEmail, generateRandomPhone } from "../../utils/helpers.ts";
+import {
+  generateRandomEmail,
+  generateRandomPhone,
+} from "../../utils/helpers.ts";
 
 test.describe("Users Module", () => {
   let roleId: string;
@@ -11,9 +14,9 @@ test.describe("Users Module", () => {
     const rolesBody = await rolesRes.json();
     const roles = rolesBody.data.items;
     // Pick any role that is not "owner" — prefer a non-system role if available
-    const targetRole = roles.find(
-      (r: any) => r.name !== "owner" && r.name !== "super_admin",
-    ) ?? roles.find((r: any) => r.name === "owner");
+    const targetRole =
+      roles.find((r: any) => r.name !== "owner" && r.name !== "super_admin") ??
+      roles.find((r: any) => r.name === "owner");
     roleId = targetRole._id;
 
     // Create a location (required: at least one for invite)
@@ -21,10 +24,12 @@ test.describe("Users Module", () => {
       data: {
         name: `Invite Test Loc ${Date.now()}`,
         address: {
-          country: "Colombia",
+          streetType: "Calle",
+          primaryNumber: "1",
+          secondaryNumber: "2",
+          complementaryNumber: "3",
+          department: "Cundinamarca",
           city: "Bogotá",
-          street: "Calle 1",
-          propertyNumber: "1",
         },
       },
     });
@@ -55,7 +60,9 @@ test.describe("Users Module", () => {
 
     if (response.status() !== 201) {
       const errBody = await response.json();
-      throw new Error(`Invite failed with ${response.status()}: ${JSON.stringify(errBody)}`);
+      throw new Error(
+        `Invite failed with ${response.status()}: ${JSON.stringify(errBody)}`,
+      );
     }
     expect(response.status()).toBe(201);
     const body = await response.json();

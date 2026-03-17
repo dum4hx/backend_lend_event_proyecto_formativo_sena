@@ -141,7 +141,7 @@ export class LocationService {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { "address.city": { $regex: search, $options: "i" } },
-        { "address.street": { $regex: search, $options: "i" } },
+        { "address.department": { $regex: search, $options: "i" } },
       ];
     }
 

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
 import { Role } from "../../roles/models/role.model.ts";
+import {
+  AddressZodSchema,
+  addressMongooseSchema,
+} from "../../shared/address.schema.ts";
 
 /* ---------- Subscription Plans ---------- */
 
@@ -21,14 +25,6 @@ const organizationStatusOptions = ["active", "suspended", "cancelled"] as const;
 
 /* ---------- Zod Schema for API Validation ---------- */
 
-const addressSchema = z.object({
-  country: z.string().min(1).max(50).trim(),
-  state: z.string().min(1).max(50).trim(),
-  city: z.string().min(1).max(100).trim(),
-  street: z.string().min(1).max(200).trim(),
-  postalCode: z.string().max(20).trim().optional(),
-});
-
 export const OrganizationZodSchema = z.object({
   name: z.string().min(1, "Organization name is required").max(200).trim(),
   legalName: z.string().min(1, "Legal name is required").max(200).trim(),
@@ -38,7 +34,7 @@ export const OrganizationZodSchema = z.object({
     .string()
     .regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)")
     .optional(),
-  address: addressSchema.optional(),
+  address: AddressZodSchema.optional(),
   ownerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Owner ID format",
   }),
@@ -51,19 +47,6 @@ export const OrganizationUpdateZodSchema = OrganizationZodSchema.partial().omit(
 );
 
 export type OrganizationInput = z.infer<typeof OrganizationZodSchema>;
-
-/* ---------- Mongoose Address Sub-Schema ---------- */
-
-const organizationAddressSchema = new Schema(
-  {
-    country: { type: String, maxlength: 50, trim: true, default: "Colombia" },
-    state: { type: String, maxlength: 50, trim: true },
-    city: { type: String, maxlength: 100, trim: true },
-    street: { type: String, maxlength: 200, trim: true },
-    postalCode: { type: String, maxlength: 20, trim: true },
-  },
-  { _id: false },
-);
 
 /* ---------- Subscription Sub-Schema ---------- */
 
@@ -124,7 +107,7 @@ const organizationSchema = new Schema(
       type: String,
       trim: true,
     },
-    address: organizationAddressSchema,
+    address: addressMongooseSchema,
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: "User",

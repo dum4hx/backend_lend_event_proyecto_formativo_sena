@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
+import {
+  AddressZodSchema,
+  addressMongooseSchema,
+} from "../../shared/address.schema.ts";
 
 /**
  * ============================================================================
@@ -39,45 +43,6 @@ export const LocationStatusEnum = z.enum([
 export type LocationStatus = z.infer<typeof LocationStatusEnum>;
 
 /**
- * Validation schema for location address
- * All fields are required except state and additionalInfo
- */
-const addressSchema = z.object({
-  country: z
-    .string()
-    .min(1, "Country is required")
-    .max(50, "Maximum 50 characters")
-    .trim(),
-  state: z
-    .string()
-    .max(100, "Maximum 100 characters")
-    .trim()
-    .optional()
-    .or(z.literal("")), // Allows empty string or undefined
-  city: z
-    .string()
-    .min(1, "City is required")
-    .max(100, "Maximum 100 characters")
-    .trim(),
-  street: z
-    .string()
-    .min(1, "Street is required")
-    .max(100, "Maximum 100 characters")
-    .trim(),
-  propertyNumber: z
-    .string()
-    .min(1, "Property number is required")
-    .max(50, "Maximum 50 characters")
-    .trim(),
-  additionalInfo: z
-    .string()
-    .max(200, "Maximum 200 characters")
-    .trim()
-    .optional()
-    .or(z.literal("")), // Allows empty string or undefined
-});
-
-/**
  * Main validation schema for Location
  * Used in POST/PATCH endpoints to validate request body
  */
@@ -87,7 +52,7 @@ export const LocationZodSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Maximum 100 characters")
     .trim(),
-  address: addressSchema,
+  address: AddressZodSchema,
   status: LocationStatusEnum.default("available"),
   /**
    * Capacity mapping for each material type
@@ -125,52 +90,6 @@ export type LocationInput = z.infer<typeof LocationZodSchema>;
 // ============================================================================
 
 /**
- * Sub-schema for address
- * _id: false prevents Mongoose from generating an ObjectId for each address
- */
-const locationAddressSchema = new Schema(
-  {
-    country: {
-      type: String,
-      required: true,
-      maxlength: 50,
-      trim: true,
-    },
-    state: {
-      type: String,
-      maxlength: 100,
-      trim: true,
-    },
-    city: {
-      type: String,
-      required: true,
-      maxlength: 100,
-      trim: true,
-    },
-    street: {
-      type: String,
-      required: true,
-      maxlength: 100,
-      trim: true,
-    },
-    propertyNumber: {
-      type: String,
-      required: true,
-      maxlength: 50,
-      trim: true,
-    },
-    additionalInfo: {
-      type: String,
-      maxlength: 200,
-      trim: true,
-    },
-  },
-  {
-    _id: false, // Don't generate _id for subdocuments
-  },
-);
-
-/**
  * Main Location schema in Mongoose
  *
  * Fields:
@@ -199,7 +118,7 @@ const locationSchema = new Schema(
       index: true, // Optimizes queries by organization
     },
     address: {
-      type: locationAddressSchema,
+      type: addressMongooseSchema,
       required: true,
     },
     status: {

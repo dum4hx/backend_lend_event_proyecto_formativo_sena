@@ -51,10 +51,12 @@ test.describe.serial("Materials Module", () => {
       data: {
         name: `Instance Loc ${Date.now()}`,
         address: {
-          country: "Colombia",
+          streetType: "Calle",
+          primaryNumber: "10",
+          secondaryNumber: "1",
+          complementaryNumber: "0",
+          department: "Antioquia",
           city: "Medellín",
-          street: "Calle 10",
-          propertyNumber: "1",
         },
       },
     });

@@ -16,10 +16,12 @@ test.describe("Customers Module", () => {
       documentType: "cc",
       documentNumber: documentNumber,
       address: {
-        street: "Main St",
+        streetType: "Calle",
+        primaryNumber: "Main",
+        secondaryNumber: "8A",
+        complementaryNumber: "47",
+        department: "Antioquia",
         city: "Medellín",
-        state: "Antioquia",
-        country: "Colombia",
       },
     };
 

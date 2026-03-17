@@ -16,10 +16,12 @@ test.describe("Transfers Module", () => {
       data: {
         name: `From Location ${Date.now()}`,
         address: {
-          country: "Colombia",
+          streetType: "Calle",
+          primaryNumber: "1",
+          secondaryNumber: "23",
+          complementaryNumber: "10",
+          department: "Cundinamarca",
           city: "Bogotá",
-          street: "Calle 1",
-          propertyNumber: "123",
         },
       },
     });
@@ -30,10 +32,12 @@ test.describe("Transfers Module", () => {
       data: {
         name: `To Location ${Date.now()}`,
         address: {
-          country: "Colombia",
+          streetType: "Calle",
+          primaryNumber: "2",
+          secondaryNumber: "45",
+          complementaryNumber: "6",
+          department: "Antioquia",
           city: "Medellín",
-          street: "Calle 2",
-          propertyNumber: "456",
         },
       },
     });
