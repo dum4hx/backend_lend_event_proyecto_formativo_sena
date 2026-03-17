@@ -17,7 +17,8 @@
     "test:all": "npx playwright test",
     "test:auth": "npx playwright test tests/api/auth",
     "test:users": "npx playwright test tests/api/users",
-    "test:ui": "npx playwright test --ui"
+    "test:ui": "npx playwright test --ui",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -32,6 +33,7 @@
     "@types/node": "^25.2.0",
     "@types/nodemailer": "^7.0.9",
     "@types/winston": "^2.4.4",
+    "husky": "^9.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
