@@ -217,6 +217,66 @@ customerRouter.patch(
 );
 
 /**
+ * POST /api/v1/customers/:id/activate
+ * Activates (or reactivates) a customer.
+ */
+customerRouter.post(
+  "/:id/activate",
+  requirePermission("customers:update"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customer = await Customer.findOneAndUpdate(
+        { _id: req.params.id, organizationId: getOrgId(req) },
+        { $set: { status: "active" } },
+        { new: true },
+      );
+
+      if (!customer) {
+        throw AppError.notFound("Customer not found");
+      }
+
+      res.json({
+        status: "success",
+        data: { customer },
+        message: "Customer activated successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/customers/:id/deactivate
+ * Deactivates a customer (sets status to inactive).
+ */
+customerRouter.post(
+  "/:id/deactivate",
+  requirePermission("customers:update"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customer = await Customer.findOneAndUpdate(
+        { _id: req.params.id, organizationId: getOrgId(req) },
+        { $set: { status: "inactive" } },
+        { new: true },
+      );
+
+      if (!customer) {
+        throw AppError.notFound("Customer not found");
+      }
+
+      res.json({
+        status: "success",
+        data: { customer },
+        message: "Customer deactivated successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * POST /api/v1/customers/:id/blacklist
  * Blacklists a customer.
  */

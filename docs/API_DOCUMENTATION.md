@@ -1976,17 +1976,171 @@ Creates a new customer.
 
 Updates a customer's information.
 
+**Permission Required:** `customers:update`
+
+---
+
+#### POST /customers/:id/activate
+
+Activates or reactivates a customer (changes status to `active`).
+
+**Authentication Required:** Yes
+
+**Permission Required:** `customers:update`
+
+**Example Request:**
+
+```bash
+curl -X POST https://api.test.local/api/v1/customers/507f1f77bcf86cd799439011/activate \
+  -b cookies.txt
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Customer activated successfully",
+  "data": {
+    "customer": {
+      "_id": "507f1f77bcf86cd799439011",
+      "organizationId": "507f1f77bcf86cd799439012",
+      "name": {
+        "firstName": "Juan",
+        "firstSurname": "Pérez"
+      },
+      "email": "juan.perez@example.com",
+      "phone": "+573001234567",
+      "status": "active",
+      "totalLoans": 5,
+      "activeLoans": 1,
+      "createdAt": "2026-01-15T10:30:00.000Z",
+      "updatedAt": "2026-03-16T14:20:00.000Z"
+    }
+  }
+}
+```
+
+**Notes:**
+
+- Can reactivate customers with status `inactive` or `blacklisted`
+- Customer will regain access to all services
+
+---
+
+#### POST /customers/:id/deactivate
+
+Deactivates a customer (changes status to `inactive`).
+
+**Authentication Required:** Yes
+
+**Permission Required:** `customers:update`
+
+**Example Request:**
+
+```bash
+curl -X POST https://api.test.local/api/v1/customers/507f1f77bcf86cd799439011/deactivate \
+  -b cookies.txt
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Customer deactivated successfully",
+  "data": {
+    "customer": {
+      "_id": "507f1f77bcf86cd799439011",
+      "status": "inactive"
+    }
+  }
+}
+```
+
+**Notes:**
+
+- This is a soft deactivation; customer data is preserved
+- Can be used to temporarily disable a customer without blacklisting
+
 ---
 
 #### POST /customers/:id/blacklist
 
-Blacklists a customer.
+Blacklists a customer (changes status to `blacklisted`).
+
+**Authentication Required:** Yes
+
+**Permission Required:** `customers:update`
+
+**Example Request:**
+
+```bash
+curl -X POST https://api.test.local/api/v1/customers/507f1f77bcf86cd799439011/blacklist \
+  -b cookies.txt
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Customer blacklisted successfully",
+  "data": {
+    "customer": {
+      "_id": "507f1f77bcf86cd799439011",
+      "status": "blacklisted"
+    }
+  }
+}
+```
+
+**Notes:**
+
+- Should be used for customers who violated terms or have payment issues
+- Blacklisted customers cannot create new loans or transactions
+- Can be reactivated using the activate endpoint if needed
 
 ---
 
 #### DELETE /customers/:id
 
-Soft deletes a customer (sets status to inactive).
+Soft deletes a customer (sets status to inactive). Validates that customer has no active loans.
+
+**Authentication Required:** Yes
+
+**Permission Required:** `customers:delete`
+
+**Example Request:**
+
+```bash
+curl -X DELETE https://api.test.local/api/v1/customers/507f1f77bcf86cd799439011 \
+  -b cookies.txt
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Customer deleted successfully"
+}
+```
+
+**Error Response:** `400 Bad Request` (if customer has active loans)
+
+```json
+{
+  "status": "error",
+  "message": "Cannot delete customer with active loans"
+}
+```
+
+**Notes:**
+
+- Cannot delete customers with active or overdue loans
+- This is a soft delete (status becomes `inactive`), not a permanent deletion
+- Customer data is preserved and can be reactivated
 
 ---
 
