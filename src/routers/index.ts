@@ -14,6 +14,7 @@ import subscriptionTypeRouter from "../modules/subscription_type/subscription_ty
 import userRouter from "../modules/user/user.router.ts";
 import { adminRouter } from "../modules/super_admin/super_admin.router.ts";
 import permissionsRouter from "../modules/permissions/permission.router.ts";
+import transferRouter from "../modules/transfer/transfer.router.ts";
 
 export {
   authRouter,
@@ -32,4 +33,5 @@ export {
   userRouter,
   adminRouter,
   permissionsRouter,
+  transferRouter,
 };

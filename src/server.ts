@@ -104,6 +104,9 @@ app.use(`${apiV1}/materials`, routers.materialRouter);
 // Location routes (physical locations / sedes)
 app.use(`${apiV1}/locations`, routers.locationRouter);
 
+// Transfer routes
+app.use(`${apiV1}/transfers`, routers.transferRouter);
+
 // Package routes
 app.use(`${apiV1}/packages`, routers.packageRouter);
 
