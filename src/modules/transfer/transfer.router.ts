@@ -53,18 +53,33 @@ transferRouter.post(
   },
 );
 
+const listRequestsQuerySchema = z.object({
+  status: z.enum(["requested", "approved", "rejected", "fulfilled"]).optional(),
+  fulfilled: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
+});
+
 /**
  * GET /transfers/requests
  * List all transfer requests for organization
+ * By default, excludes fulfilled requests unless fulfilled=true is provided
  */
 transferRouter.get(
   "/requests",
   requirePermission("transfers:read"),
+  validateQuery(listRequestsQuerySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { status } = req.query;
+      const { status, fulfilled } = (req as any).query;
       const filters: any = {};
-      if (status) filters.status = status;
+      if (status) {
+        filters.status = status;
+      } else if (!fulfilled) {
+        // Exclude fulfilled requests by default
+        filters.status = { $ne: "fulfilled" };
+      }
 
       const data = await transferService.listRequests(getOrgId(req), filters);
       res.status(200).json({ status: "success", data });

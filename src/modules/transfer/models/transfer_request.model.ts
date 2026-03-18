@@ -15,6 +15,7 @@ export const TransferRequestStatusEnum = z.enum([
   "requested",
   "approved",
   "rejected",
+  "fulfilled",
 ]);
 
 export type TransferRequestStatus = z.infer<typeof TransferRequestStatusEnum>;
@@ -33,6 +34,7 @@ export const TransferRequestZodSchema = z.object({
           message: "Invalid Model ID format",
         }),
         quantity: z.number().int().min(1, "Quantity must be at least 1"),
+        fulfilledQuantity: z.number().int().default(0),
       }),
     )
     .min(1, "At least one item must be requested"),
@@ -61,7 +63,7 @@ const transferRequestSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["requested", "approved", "rejected"],
+      enum: ["requested", "approved", "rejected", "fulfilled"],
       default: "requested",
       index: true,
     },
@@ -88,6 +90,11 @@ const transferRequestSchema = new Schema(
           type: Number,
           required: true,
           min: 1,
+        },
+        fulfilledQuantity: {
+          type: Number,
+          required: true,
+          default: 0,
         },
       },
     ],

@@ -2678,11 +2678,12 @@ Creates a new transfer request to move materials between locations. Items are sp
 
 #### GET /transfers/requests
 
-Lists all transfer requests for the organization.
+Lists all transfer requests for the organization. By default, **fulfilled** requests are excluded from the results unless `fulfilled=true` is provided.
 
-| Parameter | Location | Type   | Required | Description                                      |
-| --------- | -------- | ------ | -------- | ------------------------------------------------ |
-| status    | query    | string | No       | Filter by `requested`, `approved`, or `rejected` |
+| Parameter | Location | Type    | Required | Description                                                   |
+| --------- | -------- | ------- | -------- | ------------------------------------------------------------- |
+| status    | query    | string  | No       | Filter by `requested`, `approved`, `rejected`, or `fulfilled` |
+| fulfilled | query    | boolean | No       | If `true`, includes fulfilled requests. Default: `false`.     |
 
 **Permission Required:** `transfers:read`
 

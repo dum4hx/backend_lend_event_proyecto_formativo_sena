@@ -132,9 +132,9 @@ class TransferService {
         organizationId,
       });
       if (!request) throw AppError.notFound("Transfer request not found");
-      if (request.status !== "approved") {
+      if (request.status !== "approved" && request.status !== "requested") {
         throw AppError.badRequest(
-          "Can only initiate a transfer for an approved request",
+          "Can only initiate a transfer for a requested or approved request",
         );
       }
     }
@@ -192,6 +192,49 @@ class TransferService {
         ],
         { session },
       );
+
+      // 5. Update request fulfillment if requestId is provided
+      if (payload.requestId) {
+        const tr = await TransferRequest.findOne({
+          _id: payload.requestId,
+          organizationId,
+        }).session(session);
+
+        if (tr) {
+          // Count shipped instances by modelId
+          const shippedCounts: Record<string, number> = {};
+          instances.forEach((inst) => {
+            const mId = inst.modelId.toString();
+            shippedCounts[mId] = (shippedCounts[mId] || 0) + 1;
+          });
+
+          // Update fulfilledQuantity for each matching item in the request
+          tr.items.forEach((reqItem) => {
+            const mId = reqItem.modelId.toString();
+            if (shippedCounts[mId]) {
+              (reqItem as any).fulfilledQuantity =
+                ((reqItem as any).fulfilledQuantity || 0) + shippedCounts[mId];
+            }
+          });
+
+          // Determine if all targets are met
+          const allMet = tr.items.every(
+            (reqItem) =>
+              ((reqItem as any).fulfilledQuantity || 0) >= reqItem.quantity,
+          );
+
+          if (allMet) {
+            tr.status = "fulfilled";
+          } else if (tr.status === "requested") {
+            // If it was just requested, start fulfilling it moves it to 'approved' or similar
+            // though staying in 'approved' is fine too.
+            // But let's keep it 'approved' if not fully fulfilled yet.
+            tr.status = "approved";
+          }
+
+          await tr.save({ session });
+        }
+      }
 
       return transfer;
     });
