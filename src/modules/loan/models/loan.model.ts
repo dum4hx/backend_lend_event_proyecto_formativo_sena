@@ -13,6 +13,34 @@ export const loanStatusOptions = [
 
 export type LoanStatus = (typeof loanStatusOptions)[number];
 
+// Zod enum for loan status
+export const LoanStatusZod = z.enum(loanStatusOptions);
+export type LoanStatusZodType = z.infer<typeof LoanStatusZod>;
+
+/* ---------- Condition Option Enums & Zod Schemas ---------- */
+
+export const conditionAtCheckoutOptions = [
+  "excellent",
+  "good",
+  "fair",
+  "poor",
+] as const;
+
+export const conditionAtReturnOptions = [
+  "excellent",
+  "good",
+  "fair",
+  "poor",
+  "damaged",
+  "lost",
+] as const;
+
+export const ConditionAtCheckoutZod = z.enum(conditionAtCheckoutOptions);
+export type ConditionAtCheckoutZodType = z.infer<typeof ConditionAtCheckoutZod>;
+
+export const ConditionAtReturnZod = z.enum(conditionAtReturnOptions);
+export type ConditionAtReturnZodType = z.infer<typeof ConditionAtReturnZod>;
+
 /* ---------- Material Instance in Loan ---------- */
 
 const loanMaterialInstanceZodSchema = z.object({
@@ -64,11 +92,15 @@ const loanMaterialInstanceSchema = new Schema(
     // Condition tracking
     conditionAtCheckout: {
       type: String,
-      enum: ["excellent", "good", "fair", "poor"],
+      enum: (() => {
+        return conditionAtCheckoutOptions as unknown as string[];
+      })(),
     },
     conditionAtReturn: {
       type: String,
-      enum: ["excellent", "good", "fair", "poor", "damaged", "lost"],
+      enum: (() => {
+        return conditionAtReturnOptions as unknown as string[];
+      })(),
     },
     notes: String,
   },
