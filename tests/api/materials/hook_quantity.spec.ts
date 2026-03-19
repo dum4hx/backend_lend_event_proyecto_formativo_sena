@@ -109,8 +109,9 @@ test.describe("Material Instance Location Quantity Hook", () => {
         locationId: locationId,
       },
     });
+    expect(resCreate.status()).toBe(201);
     const instanceBody = await resCreate.json();
-    const instanceId = instanceBody.data._id;
+    const instanceId = instanceBody.data.instance._id;
 
     // Verify loc1 has 2 (from previous test + this one)
     const loc1ResBefore = await request.get(`locations/${locationId}`);

@@ -118,17 +118,10 @@ materialInstanceSchema.index(
   { unique: true },
 );
 
-export type MaterialInstanceDocument = InferSchemaType<
-  typeof materialInstanceSchema
->;
-export const MaterialInstance = model<MaterialInstanceDocument>(
-  "MaterialInstance",
-  materialInstanceSchema,
-);
-
 /**
  * ============================================================================
  * MIDDLEWARE / HOOKS
+ * Must be registered BEFORE model() is compiled so Mongoose includes them.
  * ============================================================================
  */
 
@@ -152,47 +145,6 @@ async function updateLocationQuantity(
     },
   );
 }
-
-/**
- * Post-save hook to increment quantity when a new instance is created
- */
-materialInstanceSchema.post("save", async function (doc) {
-  try {
-    console.log(
-      `[HOOK] Post-save: ${doc._id}, status: ${doc.status}, location: ${doc.locationId}`,
-    );
-    if (doc.status !== "retired") {
-      await updateLocationQuantity(doc.locationId, doc.modelId, 1);
-    }
-  } catch (error) {
-    console.error("Error in MaterialInstance post-save hook:", error);
-  }
-});
-
-/**
- * Pre-save hook to capture original state for saves
- */
-materialInstanceSchema.pre("save", async function () {
-  if (!this.isNew) {
-    const original = await (this.constructor as any)
-      .findById(this._id)
-      .select("locationId modelId status");
-    (this as any)._originalDoc = original;
-  }
-});
-
-/**
- * Pre-findOneAndUpdate hook to capture the original document state
- */
-materialInstanceSchema.pre("findOneAndUpdate", async function () {
-  const query = this.getQuery();
-  const docToUpdate = await this.model
-    .findOne(query)
-    .select("locationId modelId status");
-  if (docToUpdate) {
-    (this as any)._originalDoc = docToUpdate.toObject();
-  }
-});
 
 /**
  * Handle quantity updates after a change
@@ -225,7 +177,35 @@ async function handleUpdateQuantity(original: any, updated: any) {
 }
 
 /**
- * Post-save hook for updates
+ * Pre-save hook to capture original state for non-new saves
+ */
+materialInstanceSchema.pre("save", async function () {
+  if (!this.isNew) {
+    const original = await (this.constructor as any)
+      .findById(this._id)
+      .select("locationId modelId status");
+    (this as any)._originalDoc = original;
+  }
+});
+
+/**
+ * Post-save hook to increment quantity when a new instance is created.
+ * Skipped for updates (identified by the presence of _originalDoc).
+ */
+materialInstanceSchema.post("save", async function (doc) {
+  // Skip for updates — handled by the update hook below
+  if ((this as any)._originalDoc) return;
+  try {
+    if (doc.status !== "retired") {
+      await updateLocationQuantity(doc.locationId, doc.modelId, 1);
+    }
+  } catch (error) {
+    console.error("Error in MaterialInstance post-save new hook:", error);
+  }
+});
+
+/**
+ * Post-save hook to adjust quantities when an existing instance is updated.
  */
 materialInstanceSchema.post("save", async function (doc) {
   if (!(this as any)._originalDoc) return;
@@ -233,6 +213,19 @@ materialInstanceSchema.post("save", async function (doc) {
     await handleUpdateQuantity((this as any)._originalDoc, doc);
   } catch (error) {
     console.error("Error in MaterialInstance post-save update hook:", error);
+  }
+});
+
+/**
+ * Pre-findOneAndUpdate hook to capture the original document state
+ */
+materialInstanceSchema.pre("findOneAndUpdate", async function () {
+  const query = this.getQuery();
+  const docToUpdate = await this.model
+    .findOne(query)
+    .select("locationId modelId status");
+  if (docToUpdate) {
+    (this as any)._originalDoc = docToUpdate.toObject();
   }
 });
 
@@ -255,4 +248,12 @@ materialInstanceSchema.post(
       );
     }
   },
+);
+
+export type MaterialInstanceDocument = InferSchemaType<
+  typeof materialInstanceSchema
+>;
+export const MaterialInstance = model<MaterialInstanceDocument>(
+  "MaterialInstance",
+  materialInstanceSchema,
 );
