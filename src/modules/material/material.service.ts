@@ -1,4 +1,4 @@
-import type { Types } from "mongoose";
+import { Types } from "mongoose";
 import { Category } from "./models/category.model.ts";
 import { MaterialModel } from "./models/material_type.model.ts";
 import { MaterialAttribute } from "./models/material_attribute.model.ts";
@@ -394,6 +394,7 @@ export const materialService = {
     materialTypeId?: string | undefined;
     search?: string | undefined;
     organizationId?: Types.ObjectId | string | undefined;
+    byLocation?: boolean | undefined;
   }) {
     const {
       page = 1,
@@ -402,37 +403,98 @@ export const materialService = {
       materialTypeId,
       search,
       organizationId,
+      byLocation = false,
     } = opts;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const query: Record<string, unknown> = {};
-    if (organizationId) query.organizationId = organizationId;
-
-    if (status) {
-      query.status = status;
+    const match: Record<string, unknown> = {};
+    if (organizationId) {
+      match.organizationId = new Types.ObjectId(String(organizationId));
     }
-
+    if (status) match.status = status;
     if (materialTypeId) {
-      query.modelId = materialTypeId;
+      match.modelId = new Types.ObjectId(String(materialTypeId));
+    }
+    if (search) match.serialNumber = { $regex: search, $options: "i" };
+
+    if (!byLocation) {
+      const [instances, total] = await Promise.all([
+        MaterialInstance.find(match)
+          .skip(skip)
+          .limit(Number(limit))
+          .populate("modelId", "name description pricePerDay")
+          .populate("locationId", "name")
+          .sort({ createdAt: -1 }),
+        MaterialInstance.countDocuments(match),
+      ]);
+
+      return {
+        instances,
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / Number(limit)),
+      };
     }
 
-    if (search) {
-      query.serialNumber = { $regex: search, $options: "i" };
-    }
+    const pipeline = [
+      { $match: match },
+      { $sort: { createdAt: -1 as const } },
+      {
+        $facet: {
+          totalCount: [{ $count: "count" }],
+          paginatedData: [
+            { $skip: skip },
+            { $limit: Number(limit) },
+            {
+              $lookup: {
+                from: "materialtypes",
+                localField: "modelId",
+                foreignField: "_id",
+                as: "model",
+              },
+            },
+            { $unwind: { path: "$model", preserveNullAndEmptyArrays: true } },
+            {
+              $lookup: {
+                from: "locations",
+                localField: "locationId",
+                foreignField: "_id",
+                as: "location",
+              },
+            },
+            {
+              $unwind: { path: "$location", preserveNullAndEmptyArrays: true },
+            },
+            {
+              $group: {
+                _id: "$location._id",
+                location: {
+                  $first: {
+                    $ifNull: ["$location", { _id: "unknown", name: "Unknown" }],
+                  },
+                },
+                instances: { $push: "$$ROOT" },
+              },
+            },
+            {
+              $project: {
+                "instances.locationId": 0,
+                "instances.modelId": 0,
+                "instances.location": 0,
+              },
+            },
+          ],
+        },
+      },
+    ];
 
-    const [instancesDocs, total] = await Promise.all([
-      MaterialInstance.find(query)
-        .skip(skip)
-        .limit(Number(limit))
-        .populate("modelId", "name pricePerDay")
-        .sort({ createdAt: -1 }),
-      MaterialInstance.countDocuments(query),
-    ]);
+    const [result] = await MaterialInstance.aggregate(pipeline);
 
-    const instances = renameProperty(instancesDocs, "modelId", "model");
+    const total = result.totalCount[0]?.count ?? 0;
+    const groupedData = result.paginatedData;
 
     return {
-      instances,
+      byLocation: groupedData,
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),

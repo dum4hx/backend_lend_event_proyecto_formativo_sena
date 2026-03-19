@@ -49,6 +49,10 @@ const listMaterialsQuerySchema = paginationSchema.extend({
   categoryId: z.string().optional(),
   materialTypeId: z.string().optional(),
   search: z.string().optional(),
+  byLocation: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 });
 
 const updateStatusSchema = z.object({
@@ -410,7 +414,8 @@ materialRouter.get(
         status,
         materialTypeId,
         search,
-      } = req.query;
+        byLocation,
+      } = req.query as any;
 
       const result = await materialService.listInstances({
         page: page as string | number,
@@ -419,6 +424,7 @@ materialRouter.get(
         materialTypeId: materialTypeId as string | undefined,
         search: search as string | undefined,
         organizationId: getOrgId(req),
+        byLocation: byLocation as boolean | undefined,
       });
 
       res.json({ status: "success", data: result });

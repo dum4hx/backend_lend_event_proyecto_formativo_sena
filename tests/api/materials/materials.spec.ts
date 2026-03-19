@@ -74,4 +74,41 @@ test.describe.serial("Materials Module", () => {
   });
 
   // GET /materials/types, GET /materials/instances, PATCH /instances/:id/status
+  test("GET /materials/instances - should return flat list of instances by default", async ({
+    request,
+  }) => {
+    const res = await request.get("materials/instances");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data).toHaveProperty("instances");
+    expect(Array.isArray(body.data.instances)).toBe(true);
+    expect(body.data).toHaveProperty("total");
+
+    if (body.data.instances.length > 0) {
+      const instance = body.data.instances[0];
+      expect(instance).toHaveProperty("modelId");
+      expect(instance).toHaveProperty("locationId");
+      expect(instance).toHaveProperty("serialNumber");
+    }
+  });
+
+  test("GET /materials/instances - should return instances grouped by location when byLocation=true", async ({
+    request,
+  }) => {
+    const res = await request.get("materials/instances?byLocation=true");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data).toHaveProperty("byLocation");
+    expect(Array.isArray(body.data.byLocation)).toBe(true);
+    expect(body.data).toHaveProperty("total");
+
+    // Each group must have a location object and an instances array
+    for (const group of body.data.byLocation) {
+      expect(group).toHaveProperty("location");
+      expect(group.location).toHaveProperty("_id");
+      expect(Array.isArray(group.instances)).toBe(true);
+    }
+  });
 });

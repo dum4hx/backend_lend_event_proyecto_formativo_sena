@@ -2564,7 +2564,7 @@ Deletes a material type. Fails if any material instances of this type exist.
 
 #### GET /materials/instances
 
-Lists all material instances.
+Lists all material instances. By default, returns a flat list of instances. If `byLocation=true` is provided, returns instances grouped by location.
 
 **Permission Required:** `materials:read`
 
@@ -2575,6 +2575,68 @@ Lists all material instances.
 | status         | query    | string  | No       | `available`, `reserved`, `loaned`, `returned`, `maintenance`, `damaged`, `lost`, `retired` |
 | materialTypeId | query    | string  | No       | Filter by material type                                                                    |
 | search         | query    | string  | No       | Search by serial number                                                                    |
+| byLocation     | query    | boolean | No       | If `true`, groups instances on the current page by location. Default: `false`.             |
+
+**Success Response (200) - Default (Flat List):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "instances": [
+      {
+        "_id": "<instanceId>",
+        "serialNumber": "SN-001",
+        "status": "available",
+        "model": {
+          "_id": "<typeId>",
+          "name": "Canon EOS",
+          "pricePerDay": 1000
+        },
+        "location": {
+          "_id": "<locationId>",
+          "name": "Warehouse A"
+        }
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+**Success Response (200) - With `byLocation=true`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "byLocation": [
+      {
+        "location": { "_id": "<locationId>", "name": "Warehouse A" },
+        "instances": [
+          {
+            "_id": "<instanceId>",
+            "serialNumber": "SN-001",
+            "status": "available",
+            "model": {
+              "_id": "<typeId>",
+              "name": "Canon EOS",
+              "pricePerDay": 1000
+            }
+          }
+        ]
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+Pagination applies to the total number of instances. When `byLocation=true` is used, the `byLocation` array groups the instances on the current page by their assigned location.
 
 ---
 
