@@ -1,4 +1,8 @@
 import { test, expect } from "@playwright/test";
+import {
+  generateRandomName,
+  generateRandomSerial,
+} from "../../utils/helpers.ts";
 
 test.describe("Location Capacity Module", () => {
   let locationId: string;
@@ -8,7 +12,7 @@ test.describe("Location Capacity Module", () => {
     // 1. Create a category
     const catRes = await request.post("materials/categories", {
       data: {
-        name: `Capacity Test Cat ${Date.now()}`,
+        name: generateRandomName("Capacity Test Cat"),
         description: "Testing capacity",
       },
     });
@@ -18,7 +22,7 @@ test.describe("Location Capacity Module", () => {
     // 2. Create a material type
     const typeRes = await request.post("materials/types", {
       data: {
-        name: `Capacity Material ${Date.now()}`,
+        name: generateRandomName("Capacity Material"),
         categoryId,
         description: "Test Material Type",
         pricePerDay: 100,
@@ -30,7 +34,7 @@ test.describe("Location Capacity Module", () => {
     // 3. Create a location with capacity for 1 of this material type
     const locRes = await request.post("locations", {
       data: {
-        name: `Capacity Warehouse ${Date.now()}`,
+        name: generateRandomName("Capacity Warehouse"),
         address: {
           streetType: "Calle",
           primaryNumber: "10",
@@ -58,7 +62,7 @@ test.describe("Location Capacity Module", () => {
     const res1 = await request.post("materials/instances", {
       data: {
         modelId: materialTypeId,
-        serialNumber: `SN-1-${Date.now()}`,
+        serialNumber: generateRandomSerial("SN-1"),
         locationId: locationId,
       },
     });
@@ -68,7 +72,7 @@ test.describe("Location Capacity Module", () => {
     const res2 = await request.post("materials/instances", {
       data: {
         modelId: materialTypeId,
-        serialNumber: `SN-2-${Date.now()}`,
+        serialNumber: generateRandomSerial("SN-2"),
         locationId: locationId,
       },
     });
@@ -81,7 +85,7 @@ test.describe("Location Capacity Module", () => {
     const res3 = await request.post("materials/instances", {
       data: {
         modelId: materialTypeId,
-        serialNumber: `SN-2-${Date.now()}`,
+        serialNumber: generateRandomSerial("SN-2"),
         locationId: locationId,
         force: true,
       },

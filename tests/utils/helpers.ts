@@ -66,3 +66,9 @@ export const defaultOrgData = () => ({
     password: "Password123!",
   },
 });
+
+export const generateRandomName = (prefix: string) =>
+  `${prefix} ${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+export const generateRandomSerial = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
