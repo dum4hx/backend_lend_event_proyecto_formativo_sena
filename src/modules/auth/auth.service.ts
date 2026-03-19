@@ -212,7 +212,7 @@ export const authService = {
         // the SubscriptionType record is later deleted or disabled.
         orgData.subscription = {
           plan: defaultPlan.plan,
-          seatCount: defaultPlan.maxSeats === -1 ? 1 : defaultPlan.maxSeats,
+          seatCount: 1,
           catalogItemCount: 0,
           maxSeats: defaultPlan.maxSeats,
           maxCatalogItems: defaultPlan.maxCatalogItems,
