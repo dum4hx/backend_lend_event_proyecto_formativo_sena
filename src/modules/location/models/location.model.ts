@@ -152,7 +152,11 @@ const locationSchema = new Schema(
               default: 0,
             },
           },
-          { _id: false },
+          {
+            _id: false,
+            toJSON: { virtuals: true },
+            toObject: { virtuals: true },
+          },
         ),
       ],
       default: [],
@@ -170,8 +174,20 @@ const locationSchema = new Schema(
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
 );
+
+/**
+ * Virtual field for each capacity entry to calculate occupancy percentage
+ */
+(locationSchema.path("materialCapacities") as any).schema
+  .virtual("occupancyPercentage")
+  .get(function (this: any) {
+    if (!this.maxQuantity || this.maxQuantity === 0) return 0;
+    return Math.round((this.currentQuantity / this.maxQuantity) * 100);
+  });
 
 /**
  * Unique compound index

@@ -91,5 +91,13 @@ test.describe("Location Capacity Module", () => {
       },
     });
     expect(res3.status()).toBe(201);
+
+    // 4. Verify occupancyPercentage is 200% (2 items in capacity of 1)
+    const locRes = await request.get(`locations/${locationId}`);
+    const locBody = await locRes.json();
+    const capacity = locBody.data.materialCapacities.find(
+      (c: any) => c.materialTypeId === materialTypeId,
+    );
+    expect(capacity.occupancyPercentage).toBe(200);
   });
 });

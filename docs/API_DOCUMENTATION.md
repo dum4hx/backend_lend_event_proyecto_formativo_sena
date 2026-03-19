@@ -2285,6 +2285,8 @@ Creates a new location in the organization.
 | materialCapacities[].materialTypeId | string   | Yes      | Valid ObjectId     | ID of the material type to set capacity for                                                           |
 | materialCapacities[].maxQuantity    | number   | Yes      | Min 0              | Maximum number of items of this type allowed here                                                     |
 
+**Note:** `currentQuantity` for each capacity entry is managed automatically by the inventory system and cannot be provided via the API.
+
 #### Example Request
 
 ```json
