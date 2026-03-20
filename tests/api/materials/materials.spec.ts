@@ -40,6 +40,21 @@ test.describe.serial("Materials Module", () => {
     materialTypeId = body.data.materialType._id;
   });
 
+  test("GET /materials/types - should list material types with counts", async ({
+    request,
+  }) => {
+    if (!materialTypeId) test.skip();
+    const res = await request.get("materials/types");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.data.materialTypes).toBeDefined();
+    expect(body.data.total).toBeDefined();
+    expect(body.data.organizationTotal).toBeDefined();
+    expect(body.data.count).toBeDefined();
+    expect(body.data.organizationTotal).toBeGreaterThanOrEqual(body.data.total);
+    expect(body.data.count).toBe(body.data.materialTypes.length);
+  });
+
   // Dependent on type
   test("POST /materials/instances - should create instance", async ({
     request,

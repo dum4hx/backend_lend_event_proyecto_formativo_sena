@@ -53,6 +53,10 @@ const listMaterialsQuerySchema = paginationSchema.extend({
     .string()
     .optional()
     .transform((val) => val === "true"),
+  byUserAccessibleLocation: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
 });
 
 const updateStatusSchema = z.object({
@@ -401,6 +405,11 @@ materialRouter.delete(
 /**
  * GET /api/v1/materials/instances
  * Lists all material instances.
+ *
+ * When byUserAccessibleLocation=true, returns instances split into:
+ *   - currentUserLocations: instances at locations assigned to the requesting user
+ *   - otherLocations: instances at all other locations
+ * Requires: materials:read
  */
 materialRouter.get(
   "/instances",
@@ -415,7 +424,20 @@ materialRouter.get(
         materialTypeId,
         search,
         byLocation,
+        byUserAccessibleLocation,
       } = req.query as any;
+
+      if (byUserAccessibleLocation) {
+        const result = await materialService.listInstancesByUserLocation({
+          status: status as string | undefined,
+          materialTypeId: materialTypeId as string | undefined,
+          search: search as string | undefined,
+          organizationId: getOrgId(req),
+          userId: req.user!.userId,
+        });
+
+        return res.json({ status: "success", data: result });
+      }
 
       const result = await materialService.listInstances({
         page: page as string | number,

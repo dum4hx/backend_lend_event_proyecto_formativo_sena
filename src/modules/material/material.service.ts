@@ -8,6 +8,7 @@ import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import { renameProperty } from "../../utils/renameProperty.ts";
 import { organizationService } from "../organization/organization.service.ts";
+import { User } from "../user/models/user.model.ts";
 
 /* ---------- Internal helpers ---------- */
 
@@ -234,18 +235,21 @@ export const materialService = {
       ];
     }
 
-    const [materialTypes, total] = await Promise.all([
+    const [materialTypes, total, organizationTotal] = await Promise.all([
       MaterialModel.find(query)
         .skip(skip)
         .limit(Number(limit))
         .populate("categoryId", "name")
         .sort({ name: 1 }),
       MaterialModel.countDocuments(query),
+      MaterialModel.countDocuments({ organizationId }),
     ]);
 
     return {
       materialTypes,
       total,
+      organizationTotal,
+      count: materialTypes.length,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
     };
@@ -498,6 +502,125 @@ export const materialService = {
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
+    };
+  },
+
+  /**
+   * Returns all material instances for the organization split into two groups:
+   * - currentUserLocations: instances whose locationId is in the user's assigned locations
+   * - otherLocations: all remaining instances
+   */
+  async listInstancesByUserLocation(opts: {
+    status?: string | undefined;
+    materialTypeId?: string | undefined;
+    search?: string | undefined;
+    organizationId?: Types.ObjectId | string | undefined;
+    userId: Types.ObjectId | string;
+  }) {
+    const { status, materialTypeId, search, organizationId, userId } = opts;
+
+    const user = await User.findById(userId).select("locations").lean();
+    if (!user) {
+      throw AppError.notFound("User not found");
+    }
+
+    const userLocationIds: Types.ObjectId[] = (user.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+
+    const match: Record<string, unknown> = {};
+    if (organizationId) {
+      match.organizationId = new Types.ObjectId(String(organizationId));
+    }
+    if (status) match.status = status;
+    if (materialTypeId) {
+      match.modelId = new Types.ObjectId(String(materialTypeId));
+    }
+    if (search) match.serialNumber = { $regex: search, $options: "i" };
+
+    const pipeline = [
+      { $match: match },
+      { $sort: { createdAt: -1 as const } },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "modelId",
+          foreignField: "_id",
+          as: "model",
+        },
+      },
+      { $unwind: { path: "$model", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location",
+        },
+      },
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          isUserLocation: {
+            $in: ["$locationId", userLocationIds],
+          },
+        },
+      },
+      {
+        $facet: {
+          currentUserLocations: [
+            { $match: { isUserLocation: true } },
+            {
+              $group: {
+                _id: "$location._id",
+                location: {
+                  $first: {
+                    $ifNull: ["$location", { _id: "unknown", name: "Unknown" }],
+                  },
+                },
+                instances: { $push: "$$ROOT" },
+              },
+            },
+            {
+              $project: {
+                "instances.locationId": 0,
+                "instances.modelId": 0,
+                "instances.location": 0,
+                "instances.isUserLocation": 0,
+              },
+            },
+          ],
+          otherLocations: [
+            { $match: { isUserLocation: false } },
+            {
+              $group: {
+                _id: "$location._id",
+                location: {
+                  $first: {
+                    $ifNull: ["$location", { _id: "unknown", name: "Unknown" }],
+                  },
+                },
+                instances: { $push: "$$ROOT" },
+              },
+            },
+            {
+              $project: {
+                "instances.locationId": 0,
+                "instances.modelId": 0,
+                "instances.location": 0,
+                "instances.isUserLocation": 0,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const [result] = await MaterialInstance.aggregate(pipeline);
+
+    return {
+      currentUserLocations: result.currentUserLocations,
+      otherLocations: result.otherLocations,
     };
   },
 

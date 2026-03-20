@@ -2516,6 +2516,34 @@ Lists all material types (catalog items).
 | categoryId | query    | string  | No       | Filter by category            |
 | search     | query    | string  | No       | Search by name or description |
 
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "materialTypes": [
+      {
+        "_id": "60d5f49f1c7d2e001f8e4b1a",
+        "name": "Tripod",
+        "description": "Standard tripod",
+        "categoryId": {
+          "_id": "60d5f48f1c7d2e001f8e4b19",
+          "name": "Accessories"
+        },
+        "pricePerDay": 1500,
+        "attributes": []
+      }
+    ],
+    "total": 1,
+    "organizationTotal": 5,
+    "count": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
 ---
 
 #### GET /materials/types/:id
@@ -2566,18 +2594,23 @@ Deletes a material type. Fails if any material instances of this type exist.
 
 #### GET /materials/instances
 
-Lists all material instances. By default, returns a flat list of instances. If `byLocation=true` is provided, returns instances grouped by location.
+Lists all material instances. Supports three display modes controlled by query parameters:
+
+- **Default**: flat paginated list.
+- **`byLocation=true`**: paginated list grouped by location.
+- **`byUserAccessibleLocation=true`**: all instances split into two groups based on the requesting user's assigned locations (no pagination — returns all matching instances).
 
 **Permission Required:** `materials:read`
 
-| Parameter      | Location | Type    | Required | Description                                                                                |
-| -------------- | -------- | ------- | -------- | ------------------------------------------------------------------------------------------ |
-| page           | query    | integer | No       | Page number (default: 1)                                                                   |
-| limit          | query    | integer | No       | Items per page (default: 20)                                                               |
-| status         | query    | string  | No       | `available`, `reserved`, `loaned`, `returned`, `maintenance`, `damaged`, `lost`, `retired` |
-| materialTypeId | query    | string  | No       | Filter by material type                                                                    |
-| search         | query    | string  | No       | Search by serial number                                                                    |
-| byLocation     | query    | boolean | No       | If `true`, groups instances on the current page by location. Default: `false`.             |
+| Parameter                | Location | Type    | Required | Description                                                                                                                                     |
+| ------------------------ | -------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| page                     | query    | integer | No       | Page number (default: 1). Ignored when `byUserAccessibleLocation=true`.                                                                         |
+| limit                    | query    | integer | No       | Items per page (default: 20). Ignored when `byUserAccessibleLocation=true`.                                                                     |
+| status                   | query    | string  | No       | `available`, `reserved`, `loaned`, `returned`, `maintenance`, `damaged`, `lost`, `retired`                                                      |
+| materialTypeId           | query    | string  | No       | Filter by material type                                                                                                                         |
+| search                   | query    | string  | No       | Search by serial number                                                                                                                         |
+| byLocation               | query    | boolean | No       | If `true`, groups instances on the current page by location. Default: `false`. Ignored when `byUserAccessibleLocation=true`.                    |
+| byUserAccessibleLocation | query    | boolean | No       | If `true`, returns all matching instances split into `currentUserLocations` (user's assigned locations) and `otherLocations`. Default: `false`. |
 
 **Success Response (200) - Default (Flat List):**
 
@@ -2639,6 +2672,57 @@ Lists all material instances. By default, returns a flat list of instances. If `
 ```
 
 Pagination applies to the total number of instances. When `byLocation=true` is used, the `byLocation` array groups the instances on the current page by their assigned location.
+
+**Success Response (200) - With `byUserAccessibleLocation=true`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "currentUserLocations": [
+      {
+        "location": { "_id": "<locationId>", "name": "Warehouse A" },
+        "instances": [
+          {
+            "_id": "<instanceId>",
+            "serialNumber": "SN-001",
+            "status": "available",
+            "model": {
+              "_id": "<typeId>",
+              "name": "Canon EOS",
+              "pricePerDay": 1000
+            }
+          }
+        ]
+      }
+    ],
+    "otherLocations": [
+      {
+        "location": { "_id": "<locationId2>", "name": "Warehouse B" },
+        "instances": [
+          {
+            "_id": "<instanceId2>",
+            "serialNumber": "SN-002",
+            "status": "available",
+            "model": {
+              "_id": "<typeId>",
+              "name": "Canon EOS",
+              "pricePerDay": 1000
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+When `byUserAccessibleLocation=true`:
+
+- `currentUserLocations` — instances whose `locationId` matches one of the locations assigned to the authenticated user (`user.locations`), grouped by location.
+- `otherLocations` — instances at all other locations in the organization, grouped by location.
+- Pagination parameters are ignored; all matching instances are returned.
+- The same `status`, `materialTypeId`, and `search` filters apply to both groups.
 
 ---
 
