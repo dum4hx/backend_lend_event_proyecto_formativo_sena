@@ -613,6 +613,40 @@ requestRouter.post(
 );
 
 /**
+ * POST /api/v1/requests/:id/record-payment
+ * Records the deposit payment for a request (manual confirmation).
+ * Use when payment is made outside of Stripe (e.g., cash, bank transfer).
+ * Requires: requests:update
+ */
+requestRouter.post(
+  "/:id/record-payment",
+  requirePermission("requests:update"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
+
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
+      }
+
+      const request = await requestService.recordDepositPayment(
+        requestId,
+        organizationId,
+      );
+
+      res.json({
+        status: "success",
+        data: { request },
+        message: "Deposit payment recorded successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * POST /api/v1/requests/:id/cancel
  * Cancels a request (Manager/Owner or original creator action).
  */

@@ -14,6 +14,7 @@ export interface CreateLoanFromRequestInput {
 export const loanService = {
   /**
    * Creates a loan from a ready request (pickup action by Warehouse Operator).
+   * Requires that the deposit has been paid when depositAmount > 0.
    */
   async createLoanFromRequest({
     requestId,
@@ -31,14 +32,16 @@ export const loanService = {
       throw AppError.notFound("Request not found or not ready for pickup");
     }
 
+    // Enforce payment precondition: deposit must be paid when amount > 0
+    const depositAmount = request.depositAmount ?? 0;
+    if (depositAmount > 0 && !request.depositPaidAt) {
+      throw AppError.badRequest(
+        "Cannot create a loan: the deposit for this request has not been paid yet",
+      );
+    }
+
     // Update material instances to loaned status
-    const instanceIds = request.assignedMaterials.map(
-      (am) => am.materialInstanceId,
-    );
-    await MaterialInstance.updateMany(
-      { _id: { $in: instanceIds } },
-      { $set: { status: "loaned" } },
-    );
+    const instanceIds = await request.markAssignedMaterialsLoaned();
 
     // Create the loan
     const loan = await Loan.create({
@@ -47,20 +50,20 @@ export const loanService = {
       requestId: request._id,
       materialInstances: instanceIds.map((id) => ({
         materialInstanceId: id,
-        materialTypeId: id, // Mapping to materialTypeId, initially same as instanceId for reference
+        materialTypeId: id,
       })),
       startDate: new Date(),
       endDate: request.endDate,
-      depositAmount: request.depositAmount ?? 0,
+      depositAmount,
       totalAmount: request.totalAmount ?? 0,
       checkedOutBy: new Types.ObjectId(userId),
       status: "active",
     });
 
-    // Update request - using "cancelled" since no "completed" status exists in current schema
+    // Mark the request as shipped (materials dispatched) and link the loan
     await LoanRequest.updateOne(
       { _id: request._id },
-      { $set: { status: "cancelled" } },
+      { $set: { status: "shipped", loanId: loan._id } },
     );
 
     const populatedLoan = await Loan.findById(loan._id)
@@ -96,7 +99,9 @@ export const loanService = {
     }
 
     // Update material instances to returned status (pending inspection)
-    const instanceIds = loan.materialInstances.map((mi) => mi.materialInstanceId);
+    const instanceIds = loan.materialInstances.map(
+      (mi) => mi.materialInstanceId,
+    );
     await MaterialInstance.updateMany(
       { _id: { $in: instanceIds } },
       { $set: { status: "returned" } },
@@ -130,7 +135,8 @@ export const loanService = {
     }
 
     // Check if inspection exists and is completed
-    const { Inspection } = await import("../inspection/models/inspection.model.ts");
+    const { Inspection } =
+      await import("../inspection/models/inspection.model.ts");
     const inspection = await Inspection.findOne({
       loanId: loan._id,
     });
@@ -269,7 +275,10 @@ export const loanService = {
       organizationId,
     })
       .populate("customerId", "email name phone address")
-      .populate("materialInstances.materialInstanceId", "serialNumber status modelId")
+      .populate(
+        "materialInstances.materialInstanceId",
+        "serialNumber status modelId",
+      )
       .populate("requestId", "startDate endDate");
 
     if (!loan) {

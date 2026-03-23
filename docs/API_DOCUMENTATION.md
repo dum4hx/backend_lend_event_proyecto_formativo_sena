@@ -3083,11 +3083,11 @@ Creates a new package (bundle of materials).
 
 Lists all loan requests in the organization.
 
-| Parameter  | Location | Type   | Required | Description                                             |
-| ---------- | -------- | ------ | -------- | ------------------------------------------------------- |
-| status     | query    | string | No       | `pending`, `approved`, `rejected`, `ready`, `cancelled` |
-| customerId | query    | string | No       | Filter by customer                                      |
-| packageId  | query    | string | No       | Filter by package                                       |
+| Parameter  | Location | Type   | Required | Description                                                                                                               |
+| ---------- | -------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| status     | query    | string | No       | `pending`, `approved`, `deposit_pending`, `assigned`, `ready`, `shipped`, `completed`, `cancelled`, `rejected`, `expired` |
+| customerId | query    | string | No       | Filter by customer                                                                                                        |
+| packageId  | query    | string | No       | Filter by package                                                                                                         |
 
 ---
 
@@ -3180,6 +3180,27 @@ Legacy compatibility remains available through:
 
 ---
 
+#### POST /requests/:id/record-payment
+
+Records that the deposit for a request has been paid manually (cash, bank transfer, etc.).
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:update`
+
+Valid request states: `approved`, `deposit_pending`, `assigned`, `ready`
+
+- Requires `depositAmount > 0`; returns `400` if the request has no deposit.
+- Returns `409 CONFLICT` if the deposit was already recorded as paid.
+
+**Errors:**
+
+| Code              | Condition                                     |
+| ----------------- | --------------------------------------------- |
+| `400 BAD_REQUEST` | `depositAmount` is `0` — no deposit to record |
+| `404 NOT_FOUND`   | Request not found or not in a payable status  |
+| `409 CONFLICT`    | Deposit already recorded as paid              |
+
+---
+
 #### GET /requests/:id/available-materials
 
 Returns material instances that can fulfil the request's material-type needs, classified by availability and split by the requesting user's accessible locations.
@@ -3254,7 +3275,27 @@ Gets a specific loan with full details.
 
 #### POST /loans/from-request/:requestId
 
-Creates a loan from a ready request (pickup action).
+Creates a loan from a ready request (pickup / checkout action).
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:create`
+
+**Preconditions (enforced server-side):**
+
+1. The request must be in `ready` status.
+2. If `depositAmount > 0`, the deposit must have been recorded as paid (`depositPaidAt` is set). Use `POST /requests/:id/record-payment` to record manual payments first.
+
+On success:
+
+- A new `Loan` is created with `status: "active"`.
+- The source request transitions to `status: "shipped"` and its `loanId` field is populated with the new loan's ID.
+- All assigned material instances are marked as `loaned`.
+
+**Errors:**
+
+| Code              | Condition                                         |
+| ----------------- | ------------------------------------------------- |
+| `400 BAD_REQUEST` | Deposit has not been paid and `depositAmount > 0` |
+| `404 NOT_FOUND`   | Request not found or not in `ready` status        |
 
 ---
 

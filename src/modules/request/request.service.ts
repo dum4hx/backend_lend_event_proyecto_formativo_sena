@@ -408,6 +408,46 @@ export const requestService = {
   },
 
   /**
+   * Records that the deposit for a request has been paid.
+   * For manual payment confirmation (cash, bank transfer, etc.).
+   * Only allowed when the request is in a pre-checkout status and
+   * has a deposit amount greater than zero.
+   */
+  async recordDepositPayment(
+    requestId: string | Types.ObjectId,
+    organizationId: string | Types.ObjectId,
+  ): Promise<LoanRequestDocument> {
+    const request = await LoanRequest.findOne({
+      _id: requestId,
+      organizationId,
+      status: { $in: ["approved", "deposit_pending", "assigned", "ready"] },
+    });
+
+    if (!request) {
+      throw AppError.notFound("Request not found or not in a payable status");
+    }
+
+    if ((request.depositAmount ?? 0) === 0) {
+      throw AppError.badRequest(
+        "This request has no deposit amount; payment recording is not required",
+      );
+    }
+
+    if (request.depositPaidAt) {
+      throw AppError.conflict("Deposit has already been recorded as paid");
+    }
+
+    request.depositPaidAt = new Date();
+    await request.save();
+
+    logger.info("Deposit payment recorded for request", {
+      requestId: request._id.toString(),
+    });
+
+    return request as unknown as LoanRequestDocument;
+  },
+
+  /**
    * Cancels a request and releases any reserved materials.
    */
   async cancelRequest(

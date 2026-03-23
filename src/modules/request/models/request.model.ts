@@ -1,5 +1,16 @@
 import { z } from "zod";
-import { Schema, model, type InferSchemaType, Types } from "mongoose";
+import {
+  Schema,
+  model,
+  type InferSchemaType,
+  Types,
+  type ClientSession,
+} from "mongoose";
+import {
+  MaterialInstance,
+  type MaterialInstanceDocument,
+} from "../../material/models/material_instance.model.ts";
+import { required } from "zod/mini";
 
 /* ---------- Request Status ---------- */
 
@@ -8,7 +19,9 @@ export const requestStatusOptions = [
   "approved", // Approved, waiting for deposit
   "deposit_pending", // Approved, deposit payment initiated
   "assigned", // Materials assigned
-  "ready", // Ready for checkout
+  "ready", // Ready for checkout — payment must be recorded before checkout
+  "shipped", // Materials dispatched / handed off — a loan has been created
+  "completed", // Request fulfilled — linked loan is active
   "expired", // Deposit not paid in time
   "rejected", // Request rejected
   "cancelled", // Cancelled by user
@@ -152,23 +165,38 @@ const loanRequestSchema = new Schema(
       min: 0,
       default: 0,
     },
-    depositDueDate: Date,
-    depositPaidAt: Date,
-    depositPaymentIntentId: String, // Stripe Payment Intent ID
+    depositDueDate: {
+      type: Date,
+      required: true,
+    },
+    depositPaidAt: {
+      type: Date,
+    },
+    depositPaymentIntentId: {
+      type: String,
+    }, // Stripe Payment Intent ID
+
     // Assignment fields
     assignedMaterials: [assignedMaterialSchema],
     assignedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    assignedAt: Date,
+    assignedAt: {
+      type: Date,
+    },
     // Calculated totals
     totalDays: { type: Number, min: 1 },
     subtotal: { type: Number, min: 0 },
     discountAmount: { type: Number, min: 0, default: 0 },
     totalAmount: { type: Number, min: 0 },
     // Expiration
-    expiresAt: Date,
+    expiresAt: { type: Date },
+    // Fulfillment — set when a loan is created from this request
+    loanId: {
+      type: Schema.Types.ObjectId,
+      ref: "Loan",
+    },
   },
   {
     timestamps: true,
@@ -199,9 +227,40 @@ loanRequestSchema.pre("save", function () {
   }
 });
 
+// Instance helper: mark all currently assigned material instances as 'loaned'
+loanRequestSchema.methods.markAssignedMaterialsLoaned = async function (
+  this: any,
+  session?: ClientSession,
+): Promise<Types.ObjectId[]> {
+  const assigned: InferSchemaType<typeof assignedMaterialSchema>[] =
+    this.assignedMaterials ?? [];
+  const instanceIds = assigned
+    .map((am) => am.materialInstanceId as unknown as Types.ObjectId)
+    .filter(Boolean);
+
+  if (instanceIds.length === 0) {
+    return [];
+  }
+
+  const filter = { _id: { $in: instanceIds } };
+  const update = { $set: { status: "loaned" } };
+  const opts = session ? { session } : undefined;
+
+  await MaterialInstance.updateMany(filter, update, opts as any);
+  return instanceIds;
+};
+
 /* ---------- Export ---------- */
 
-export type LoanRequestDocument = InferSchemaType<typeof loanRequestSchema>;
+export interface LoanRequestMethods {
+  markAssignedMaterialsLoaned(
+    session?: ClientSession,
+  ): Promise<Types.ObjectId[]>;
+}
+
+export type LoanRequestDocument = InferSchemaType<typeof loanRequestSchema> &
+  LoanRequestMethods;
+
 export const LoanRequest = model<LoanRequestDocument>(
   "LoanRequest",
   loanRequestSchema,
