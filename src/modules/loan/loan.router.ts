@@ -6,13 +6,8 @@ import {
 } from "express";
 import { z } from "zod";
 import { Types } from "mongoose";
-import {
-  Loan,
-  LoanZodSchema,
-  loanStatusOptions,
-} from "../loan/models/loan.model.ts";
-import { LoanRequest } from "../request/models/request.model.ts";
-import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { Loan, loanStatusOptions } from "../loan/models/loan.model.ts";
+import { loanService } from "./loan.service.ts";
 import {
   validateBody,
   validateQuery,
@@ -41,6 +36,8 @@ const listLoansQuerySchema = paginationSchema.extend({
     (val) => (val === "true" ? true : val === "false" ? false : undefined),
     z.boolean().optional(),
   ),
+  sortBy: z.string().optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
 const extendLoanSchema = z.object({
@@ -65,51 +62,13 @@ loanRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        customerId,
-        overdue,
-        sortBy,
-        sortOrder,
-      } = req.query as unknown as z.infer<typeof listLoansQuerySchema>;
-      const skip = (page - 1) * limit;
+      const query = req.query as any;
 
-      const query: Record<string, unknown> = { organizationId };
-
-      if (status) {
-        query.status = status;
-      }
-      if (customerId) {
-        query.customerId = customerId;
-      }
-      if (overdue === true) {
-        query.status = "overdue";
-      }
-
-      const sortField = sortBy ?? "createdAt";
-      const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-      const [loans, total] = await Promise.all([
-        Loan.find(query)
-          .skip(skip)
-          .limit(limit)
-          .populate("customerId", "email name")
-          .populate("requestId", "packageId")
-          .populate("materialInstances", "serialNumber modelId")
-          .sort({ [sortField]: sortDirection }),
-        Loan.countDocuments(query),
-      ]);
+      const result = await loanService.listLoans(organizationId, query);
 
       res.json({
         status: "success",
-        data: {
-          loans,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: result,
       });
     } catch (err) {
       next(err);
@@ -139,17 +98,15 @@ loanRouter.get(
         { $set: { status: "overdue" } },
       );
 
-      const overdueLoans = await Loan.find({
-        organizationId,
-        status: "overdue",
-      })
-        .populate("customerId", "email name phone")
-        .populate("materialInstances", "serialNumber modelId")
-        .sort({ endDate: 1 });
+      const result = await loanService.listLoans(organizationId, {
+        overdue: true,
+        sortBy: "endDate",
+        sortOrder: "asc",
+      });
 
       res.json({
         status: "success",
-        data: { loans: overdueLoans },
+        data: { loans: result.loans },
       });
     } catch (err) {
       next(err);
@@ -166,17 +123,14 @@ loanRouter.get(
   requirePermission("loans:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const loan = await Loan.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      })
-        .populate("customerId", "email name phone address")
-        .populate("requestId")
-        .populate("materialInstances", "serialNumber status modelId");
+      const organizationId = getOrgId(req);
+      const loanId = req.params.id;
 
-      if (!loan) {
-        throw AppError.notFound("Loan not found");
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("Invalid loan ID");
       }
+
+      const loan = await loanService.getLoanById(loanId, organizationId);
 
       res.json({
         status: "success",
@@ -199,57 +153,21 @@ loanRouter.post(
     try {
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
+      const requestId = req.params.requestId;
 
-      // Find and validate request
-      const request = await LoanRequest.findOne({
-        _id: req.params.requestId,
-        organizationId,
-        status: "ready",
-      }).populate("packageId");
-
-      if (!request) {
-        throw AppError.notFound("Request not found or not ready for pickup");
+      if (!requestId || typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
       }
 
-      // Update material instances to loaned status
-      const instanceIds = request.assignedMaterials.map(
-        (am) => am.materialInstanceId,
-      );
-      await MaterialInstance.updateMany(
-        { _id: { $in: instanceIds } },
-        { $set: { status: "loaned" } },
-      );
-
-      // Create the loan
-      const loan = await Loan.create({
+      const loan = await loanService.createLoanFromRequest({
+        requestId: requestId,
         organizationId,
-        customerId: request.customerId,
-        requestId: request._id,
-        materialInstances: instanceIds.map((id) => ({
-          materialInstanceId: id,
-          materialTypeId: id, // Will be populated properly
-        })),
-        startDate: new Date(),
-        endDate: request.endDate,
-        depositAmount: request.depositAmount ?? 0,
-        totalAmount: request.totalAmount ?? 0,
-        checkedOutBy: new Types.ObjectId(user.id),
-        status: "active",
+        userId: user.id,
       });
-
-      // Update request - use a valid request status value
-      await LoanRequest.updateOne(
-        { _id: request._id },
-        { $set: { status: "cancelled" } }, // No "completed" status in request, closest is cancelled or we add handling
-      );
-
-      const populatedLoan = await Loan.findById(loan._id)
-        .populate("customerId", "email name")
-        .populate("materialInstances", "serialNumber modelId");
 
       res.status(201).json({
         status: "success",
-        data: { loan: populatedLoan },
+        data: { loan },
         message: "Loan created successfully - materials picked up",
       });
     } catch (err) {
@@ -268,31 +186,21 @@ loanRouter.post(
   validateBody(extendLoanSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const loan = await Loan.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: { $in: ["active", "overdue"] },
-      });
+      const organizationId = getOrgId(req);
+      const loanId = req.params.id;
 
-      if (!loan) {
-        throw AppError.notFound("Loan not found or cannot be extended");
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("Invalid loan ID");
       }
 
       const newEndDate = new Date(req.body.newEndDate);
-      const currentEndDate = loan.endDate;
 
-      if (newEndDate <= currentEndDate) {
-        throw AppError.badRequest(
-          "New end date must be after current end date",
-        );
-      }
-
-      loan.endDate = newEndDate;
-      loan.status = "active"; // Reset from overdue if applicable
-      if (req.body.notes) {
-        loan.notes = (loan.notes ?? "") + `\nExtension: ${req.body.notes}`;
-      }
-      await loan.save();
+      const loan = await loanService.extendLoan(
+        loanId,
+        organizationId,
+        newEndDate,
+        req.body.notes,
+      );
 
       res.json({
         status: "success",
@@ -315,28 +223,18 @@ loanRouter.post(
   validateBody(returnLoanSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const loan = await Loan.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: { $in: ["active", "overdue"] },
-      });
+      const organizationId = getOrgId(req);
+      const loanId = req.params.id;
 
-      if (!loan) {
-        throw AppError.notFound("Loan not found or already returned");
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("Invalid loan ID");
       }
 
-      // Update material instances to returned status (pending inspection)
-      await MaterialInstance.updateMany(
-        { _id: { $in: loan.materialInstances } },
-        { $set: { status: "returned" } },
+      const loan = await loanService.returnLoan(
+        loanId,
+        organizationId,
+        req.body.notes,
       );
-
-      loan.status = "returned";
-      loan.returnedAt = new Date();
-      if (req.body.notes) {
-        loan.notes = (loan.notes ?? "") + `\nReturn notes: ${req.body.notes}`;
-      }
-      await loan.save();
 
       res.json({
         status: "success",
@@ -358,50 +256,14 @@ loanRouter.post(
   requirePermission("loans:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const loan = await Loan.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "returned",
-      });
+      const organizationId = getOrgId(req);
+      const loanId = req.params.id;
 
-      if (!loan) {
-        throw AppError.notFound("Loan not found or not in returned status");
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("Invalid loan ID");
       }
 
-      // Check if inspection exists and is completed
-      const { Inspection } =
-        await import("../inspection/models/inspection.model.ts");
-      const inspection = await Inspection.findOne({
-        loanId: loan._id,
-      });
-
-      if (!inspection) {
-        throw AppError.badRequest("Loan must be inspected before completion");
-      }
-
-      // Update materials to available (or damaged based on inspection)
-      for (const instance of loan.materialInstances) {
-        const inspectionItem = inspection.items.find(
-          (item) =>
-            item.materialInstanceId.toString() ===
-            instance.materialInstanceId.toString(),
-        );
-
-        const newStatus =
-          inspectionItem?.conditionAfter === "damaged"
-            ? "damaged"
-            : inspectionItem?.conditionAfter === "lost"
-              ? "lost"
-              : "available";
-
-        await MaterialInstance.updateOne(
-          { _id: instance.materialInstanceId },
-          { $set: { status: newStatus } },
-        );
-      }
-
-      loan.status = "closed";
-      await loan.save();
+      const loan = await loanService.completeLoan(loanId, organizationId);
 
       res.json({
         status: "success",
@@ -415,3 +277,4 @@ loanRouter.post(
 );
 
 export default loanRouter;
+
