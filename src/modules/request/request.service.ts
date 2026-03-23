@@ -8,6 +8,8 @@ import { Package } from "../package/models/package.model.ts";
 import { MaterialModel } from "../material/models/material_type.model.ts";
 import { Customer } from "../customer/models/customer.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { Loan } from "../loan/models/loan.model.ts";
+import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 
@@ -441,5 +443,252 @@ export const requestService = {
     });
 
     return request as unknown as LoanRequestDocument;
+  },
+
+  /**
+   * Returns material instances that could fulfil a request's needs,
+   * classified by current availability and split by user-accessible locations.
+   *
+   * Availability categories per instance:
+   * - "available"  – status is currently "available" (can be assigned now)
+   * - "upcoming"   – status is "reserved" or "loaned" but the holding
+   *                   loan/request ends before this request's startDate
+   * - excluded     – instances that are damaged/maintenance/retired/lost
+   *                   or won't be free in time are omitted
+   */
+  async getAvailableMaterials(
+    requestId: string | Types.ObjectId,
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+  ) {
+    // 1. Load the request
+    const request = await LoanRequest.findOne({
+      _id: requestId,
+      organizationId,
+    });
+
+    if (!request) {
+      throw AppError.notFound("Request not found");
+    }
+
+    // 2. Collect required material type IDs (resolve packages into their item types)
+    const materialTypeIds: Types.ObjectId[] = [];
+
+    for (const item of request.items) {
+      if (item.type === "material") {
+        materialTypeIds.push(new Types.ObjectId(item.referenceId));
+      } else if (item.type === "package") {
+        const pkg = await Package.findById(item.referenceId).lean();
+        if (pkg?.items) {
+          for (const pkgItem of pkg.items) {
+            materialTypeIds.push(new Types.ObjectId(pkgItem.materialTypeId));
+          }
+        }
+      }
+    }
+
+    if (materialTypeIds.length === 0) {
+      return { currentUserLocations: [], otherLocations: [] };
+    }
+
+    // Deduplicate
+    const uniqueTypeIds = [
+      ...new Set(materialTypeIds.map((id) => id.toString())),
+    ].map((id) => new Types.ObjectId(id));
+
+    // 3. Fetch all non-retired/non-lost instances of needed types
+    const candidateStatuses = ["available", "reserved", "loaned"];
+    const instances = await MaterialInstance.find({
+      organizationId,
+      modelId: { $in: uniqueTypeIds },
+      status: { $in: candidateStatuses },
+    }).lean();
+
+    if (instances.length === 0) {
+      return { currentUserLocations: [], otherLocations: [] };
+    }
+
+    // 4. For reserved/loaned instances, check whether they'll be free before startDate
+    const reservedOrLoaned = instances.filter(
+      (i) => i.status === "reserved" || i.status === "loaned",
+    );
+
+    const busyInstanceIds = new Set<string>();
+
+    if (reservedOrLoaned.length > 0) {
+      const instanceIdsToCheck = reservedOrLoaned.map((i) =>
+        new Types.ObjectId(i._id).toString(),
+      );
+
+      // Check active loans whose endDate overlaps the request startDate
+      const blockingLoans = await Loan.find({
+        organizationId,
+        "materialInstances.materialInstanceId": {
+          $in: instanceIdsToCheck.map((id) => new Types.ObjectId(id)),
+        },
+        status: { $in: ["active", "overdue"] },
+        endDate: { $gte: request.startDate },
+      }).lean();
+
+      for (const loan of blockingLoans) {
+        for (const mi of loan.materialInstances) {
+          busyInstanceIds.add(
+            new Types.ObjectId(mi.materialInstanceId).toString(),
+          );
+        }
+      }
+
+      // Check requests (approved/assigned/ready) whose endDate overlaps
+      const blockingRequests = await LoanRequest.find({
+        organizationId,
+        _id: { $ne: new Types.ObjectId(String(requestId)) },
+        status: { $in: ["approved", "assigned", "ready"] },
+        "assignedMaterials.materialInstanceId": {
+          $in: instanceIdsToCheck.map((id) => new Types.ObjectId(id)),
+        },
+        endDate: { $gte: request.startDate },
+      }).lean();
+
+      for (const req of blockingRequests) {
+        for (const am of req.assignedMaterials ?? []) {
+          busyInstanceIds.add(
+            new Types.ObjectId(am.materialInstanceId).toString(),
+          );
+        }
+      }
+    }
+
+    // 5. Classify each instance
+    type AvailabilityTag = "available" | "upcoming";
+    const classifiedIds: { id: string; availability: AvailabilityTag }[] = [];
+
+    for (const instance of instances) {
+      const instanceId = new Types.ObjectId(instance._id).toString();
+
+      if (instance.status === "available") {
+        classifiedIds.push({ id: instanceId, availability: "available" });
+      } else {
+        // reserved or loaned
+        if (!busyInstanceIds.has(instanceId)) {
+          classifiedIds.push({ id: instanceId, availability: "upcoming" });
+        }
+        // else: won't be free in time → excluded
+      }
+    }
+
+    if (classifiedIds.length === 0) {
+      return { currentUserLocations: [], otherLocations: [] };
+    }
+
+    // 6. Resolve user locations for the split
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds: Types.ObjectId[] = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+
+    // 7. Aggregation pipeline: enrich and split by user locations
+    const availabilityMap = new Map(
+      classifiedIds.map((c) => [c.id, c.availability]),
+    );
+    const qualifiedIds = classifiedIds.map((c) => new Types.ObjectId(c.id));
+
+    const pipeline = [
+      { $match: { _id: { $in: qualifiedIds } } },
+      { $sort: { createdAt: -1 as const } },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "modelId",
+          foreignField: "_id",
+          as: "model",
+        },
+      },
+      { $unwind: { path: "$model", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location",
+        },
+      },
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          isUserLocation: {
+            $in: ["$locationId", userLocationIds],
+          },
+        },
+      },
+      {
+        $facet: {
+          currentUserLocations: [
+            { $match: { isUserLocation: true } },
+            {
+              $group: {
+                _id: "$location._id",
+                location: {
+                  $first: {
+                    $ifNull: ["$location", { _id: "unknown", name: "Unknown" }],
+                  },
+                },
+                instances: { $push: "$$ROOT" },
+              },
+            },
+            {
+              $project: {
+                "instances.locationId": 0,
+                "instances.modelId": 0,
+                "instances.location": 0,
+                "instances.isUserLocation": 0,
+              },
+            },
+          ],
+          otherLocations: [
+            { $match: { isUserLocation: false } },
+            {
+              $group: {
+                _id: "$location._id",
+                location: {
+                  $first: {
+                    $ifNull: ["$location", { _id: "unknown", name: "Unknown" }],
+                  },
+                },
+                instances: { $push: "$$ROOT" },
+              },
+            },
+            {
+              $project: {
+                "instances.locationId": 0,
+                "instances.modelId": 0,
+                "instances.location": 0,
+                "instances.isUserLocation": 0,
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const [result] = await MaterialInstance.aggregate(pipeline);
+
+    // 8. Inject the availability tag into each instance
+    const injectAvailability = (
+      groups: Array<{ location: any; instances: any[] }>,
+    ) =>
+      groups.map((group) => ({
+        ...group,
+        instances: group.instances.map((inst) => ({
+          ...inst,
+          availability: availabilityMap.get(
+            new Types.ObjectId(inst._id).toString(),
+          ),
+        })),
+      }));
+
+    return {
+      currentUserLocations: injectAvailability(result.currentUserLocations),
+      otherLocations: injectAvailability(result.otherLocations),
+    };
   },
 };

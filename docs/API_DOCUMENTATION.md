@@ -3180,6 +3180,52 @@ Legacy compatibility remains available through:
 
 ---
 
+#### GET /requests/:id/available-materials
+
+Returns material instances that can fulfil the request's material-type needs, classified by availability and split by the requesting user's accessible locations.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:read`
+
+Each returned instance carries an `availability` tag:
+
+| Tag         | Meaning                                                                              |
+| ----------- | ------------------------------------------------------------------------------------ |
+| `available` | Instance status is currently `available` — can be assigned immediately               |
+| `upcoming`  | Instance is `reserved` or `loaned` but will be free before the request's `startDate` |
+
+Instances that are `damaged`, `maintenance`, `retired`, `lost`, or won't be free in time are excluded.
+
+**Response shape** (same split as `GET /materials/instances?byUserAccessibleLocation=true`):
+
+```json
+{
+  "status": "success",
+  "data": {
+    "currentUserLocations": [
+      {
+        "location": { "_id": "...", "name": "Warehouse A" },
+        "instances": [
+          { "_id": "...", "serialNumber": "SN-001", "status": "available", "availability": "available", "model": { ... } },
+          { "_id": "...", "serialNumber": "SN-002", "status": "reserved", "availability": "upcoming", "model": { ... } }
+        ]
+      }
+    ],
+    "otherLocations": [
+      {
+        "location": { "_id": "...", "name": "Warehouse B" },
+        "instances": [ ... ]
+      }
+    ]
+  }
+}
+```
+
+**Common errors:**
+
+- `404 NOT_FOUND`: request does not exist in the organization
+
+---
+
 ### Loan Endpoints
 
 #### GET /loans

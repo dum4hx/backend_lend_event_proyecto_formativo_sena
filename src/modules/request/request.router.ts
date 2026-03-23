@@ -226,6 +226,43 @@ requestRouter.get(
 );
 
 /**
+ * GET /api/v1/requests/:id/available-materials
+ * Returns material instances that can fulfil the request's needs,
+ * split by user-accessible locations. Each instance includes an
+ * `availability` tag: "available" (free now) or "upcoming" (will be
+ * free before the request's start date).
+ * Requires: requests:read
+ */
+requestRouter.get(
+  "/:id/available-materials",
+  requirePermission("requests:read"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
+      const requestId = req.params.id;
+
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
+      }
+
+      const result = await requestService.getAvailableMaterials(
+        requestId,
+        organizationId,
+        user.id,
+      );
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * POST /api/v1/requests
  * Creates a new loan request (Commercial Advisor action).
  */

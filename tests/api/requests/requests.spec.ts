@@ -634,4 +634,119 @@ test.describe("Requests Module", () => {
 
     expect(availableInstanceBody.data?.instance?.status).toBe("available");
   });
+
+  /* ---------- GET /requests/:id/available-materials ---------- */
+
+  test("GET /requests/:id/available-materials - returns available instances for a request", async ({
+    request,
+  }) => {
+    const { requestId, materialTypeId, locationId } =
+      await createApprovedRequestForMaterial(request);
+
+    // Create an available instance of the requested material type
+    await createMaterialInstance(
+      request,
+      materialTypeId,
+      locationId,
+      "available",
+    );
+
+    const res = await request.get(`requests/${requestId}/available-materials`);
+
+    expect(res.status()).toBe(200);
+
+    const body = (await res.json()) as {
+      status?: string;
+      data?: {
+        currentUserLocations?: Array<{
+          location?: Record<string, unknown>;
+          instances?: Array<{
+            availability?: string;
+            status?: string;
+          }>;
+        }>;
+        otherLocations?: Array<{
+          location?: Record<string, unknown>;
+          instances?: Array<{
+            availability?: string;
+            status?: string;
+          }>;
+        }>;
+      };
+    };
+
+    expect(body.status).toBe("success");
+    expect(body.data).toHaveProperty("currentUserLocations");
+    expect(body.data).toHaveProperty("otherLocations");
+
+    // At least one group should contain the instance
+    const allInstances = [
+      ...(body.data?.currentUserLocations ?? []).flatMap(
+        (g) => g.instances ?? [],
+      ),
+      ...(body.data?.otherLocations ?? []).flatMap((g) => g.instances ?? []),
+    ];
+
+    expect(allInstances.length).toBeGreaterThanOrEqual(1);
+    expect(
+      allInstances.some((i) => i.availability === "available"),
+    ).toBeTruthy();
+  });
+
+  test("GET /requests/:id/available-materials - excludes maintenance and damaged instances", async ({
+    request,
+  }) => {
+    const { requestId, materialTypeId, locationId } =
+      await createApprovedRequestForMaterial(request);
+
+    // Create a maintenance instance — should be excluded
+    await createMaterialInstance(
+      request,
+      materialTypeId,
+      locationId,
+      "maintenance",
+    );
+
+    const res = await request.get(`requests/${requestId}/available-materials`);
+
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as {
+      status?: string;
+      data?: {
+        currentUserLocations?: Array<{
+          instances?: Array<{ availability?: string }>;
+        }>;
+        otherLocations?: Array<{
+          instances?: Array<{ availability?: string }>;
+        }>;
+      };
+    };
+
+    const allInstances = [
+      ...(body.data?.currentUserLocations ?? []).flatMap(
+        (g) => g.instances ?? [],
+      ),
+      ...(body.data?.otherLocations ?? []).flatMap((g) => g.instances ?? []),
+    ];
+
+    // Maintenance instances should not appear
+    expect(
+      allInstances.every(
+        (i) => i.availability === "available" || i.availability === "upcoming",
+      ),
+    ).toBeTruthy();
+  });
+
+  test("GET /requests/:id/available-materials - returns 404 for non-existent request", async ({
+    request,
+  }) => {
+    const res = await request.get(
+      "requests/507f1f77bcf86cd799439011/available-materials",
+    );
+
+    expect(res.status()).toBe(404);
+
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe("NOT_FOUND");
+  });
 });
