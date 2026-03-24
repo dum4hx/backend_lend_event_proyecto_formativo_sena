@@ -4,6 +4,7 @@ import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
+import { pricingService } from "../pricing/pricing.service.ts";
 
 export interface CreateLoanFromRequestInput {
   requestId: string;
@@ -56,6 +57,7 @@ export const loanService = {
       endDate: request.endDate,
       depositAmount,
       totalAmount: request.totalAmount ?? 0,
+      pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
       checkedOutBy: new Types.ObjectId(userId),
       status: "active",
     });

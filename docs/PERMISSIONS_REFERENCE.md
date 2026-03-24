@@ -660,3 +660,27 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows editing user roles, profiles, and account status.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Users
+
+---
+
+## Pricing
+
+### `pricing:read`
+
+- **Display Name:** View Pricing Configurations
+- **Category:** Pricing
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing pricing strategies and configurations for the organization.
+- **Allowed Action:** View/list pricing configs and preview prices.
+- **Resource Target:** Pricing Configurations
+
+### `pricing:manage`
+
+- **Display Name:** Manage Pricing Configurations
+- **Category:** Pricing
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating, updating, and deleting pricing configurations for the organization.
+- **Allowed Action:** Create, modify, and delete pricing configurations.
+- **Resource Target:** Pricing Configurations

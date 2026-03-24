@@ -77,6 +77,55 @@ export type LoanInput = z.infer<typeof LoanZodSchema>;
 
 /* ---------- Mongoose Sub-Schemas ---------- */
 
+/* ---------- Pricing Snapshot Sub-Schema ---------- */
+
+const loanPricingSnapshotSchema = new Schema(
+  {
+    itemType: {
+      type: String,
+      enum: ["material", "package"],
+      required: true,
+    },
+    referenceId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    strategyType: {
+      type: String,
+      required: true,
+    },
+    configId: {
+      type: Schema.Types.ObjectId,
+    },
+    durationInDays: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    basePricePerDay: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    totalPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false },
+);
+
 const loanMaterialInstanceSchema = new Schema(
   {
     materialInstanceId: {
@@ -155,6 +204,11 @@ const loanSchema = new Schema(
     materialInstances: {
       type: [loanMaterialInstanceSchema],
       required: true,
+    },
+    // Pricing snapshot — frozen at checkout time; never updated retroactively
+    pricingSnapshot: {
+      type: [loanPricingSnapshotSchema],
+      default: [],
     },
     // Financial
     depositAmount: {

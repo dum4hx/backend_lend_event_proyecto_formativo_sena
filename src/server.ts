@@ -134,6 +134,9 @@ app.use(`${apiV1}/roles`, routers.rolesRouter);
 // Permission management routes
 app.use(`${apiV1}/permissions`, routers.permissionsRouter);
 
+// Pricing configuration routes
+app.use(`${apiV1}/pricing`, routers.pricingRouter);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {

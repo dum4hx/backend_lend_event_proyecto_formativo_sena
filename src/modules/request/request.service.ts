@@ -12,6 +12,7 @@ import { Loan } from "../loan/models/loan.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
+import { pricingService } from "../pricing/pricing.service.ts";
 
 interface RequestItemInput {
   type?: string;
@@ -281,6 +282,8 @@ export const requestService = {
     if (notes) {
       request.notes = (request.notes ?? "") + `\nApproval notes: ${notes}`;
     }
+
+    await pricingService.calculateRequestPricing(request);
 
     await request.save();
 

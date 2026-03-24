@@ -93,6 +93,9 @@ const requestItemMongooseSchema = new Schema(
     // Calculated fields (populated on approval)
     pricePerDay: { type: Number, min: 0 },
     totalPrice: { type: Number, min: 0 },
+    // Pricing metadata — stored for snapshot building at loan creation time
+    pricingConfigId: { type: Schema.Types.ObjectId },
+    pricingStrategyType: { type: String },
   },
   { _id: false },
 );

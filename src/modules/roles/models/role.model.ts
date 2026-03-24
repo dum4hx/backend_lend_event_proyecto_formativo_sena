@@ -97,6 +97,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "transfers:create",
     "transfers:read",
     "transfers:update",
+    "pricing:read",
+    "pricing:manage",
   ],
   owner: [
     // Full organization access except platform management
@@ -158,6 +160,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "transfers:create",
     "transfers:read",
     "transfers:update",
+    "pricing:read",
+    "pricing:manage",
   ],
   manager: [
     "organization:read",
@@ -185,6 +189,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "transfers:create",
     "transfers:read",
     "transfers:update",
+    "pricing:read",
+    "pricing:manage",
   ],
   warehouse_operator: [
     "organization:read",
@@ -200,6 +206,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "transfers:create",
     "transfers:read",
     "transfers:update",
+    "pricing:read",
   ],
   commercial_advisor: [
     "organization:read",
@@ -214,6 +221,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "loans:create",
     "loans:read",
     "invoices:read",
+    "pricing:read",
   ],
 };
 

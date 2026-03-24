@@ -453,5 +453,19 @@
     "description": "Allows responding to transfer requests and marking transfers as received.",
     "category": "Transfers",
     "isPlatformPermission": false
+  },
+  {
+    "_id": "pricing:read",
+    "displayName": "View Pricing Configurations",
+    "description": "Allows viewing pricing strategies and configurations for the organization.",
+    "category": "Pricing",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "pricing:manage",
+    "displayName": "Manage Pricing Configurations",
+    "description": "Allows creating, updating, and deleting pricing configurations for the organization.",
+    "category": "Pricing",
+    "isPlatformPermission": false
   }
 ]

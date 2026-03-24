@@ -12,6 +12,7 @@
     "seed:admin": "node --env-file=.env src/modules/super_admin/seeders/super_admin.seeder.ts",
     "seed:stripe-prices": "node --env-file=.env src/scripts/seeders/seed_stripe_prices.ts",
     "seed:permissions": "node --env-file=.env src/modules/roles/seeders/permissions.seeder.ts",
+    "seed:loan-request": "npx tsx --env-file=.env src/modules/request/seeders/loan_request.seeder.ts",
     "fix:owner-perms": "npx tsx --env-file=.env scripts/fix_owner_role_permissions.ts",
     "test": "npx playwright test",
     "test:all": "npx playwright test",
