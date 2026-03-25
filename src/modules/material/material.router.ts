@@ -62,6 +62,7 @@ const listMaterialsQuerySchema = paginationSchema.extend({
 const updateStatusSchema = z.object({
   status: z.enum(materialStatusOptions),
   notes: z.string().max(500).optional(),
+  source: z.enum(["manual", "scanner", "system"]).optional().default("manual"),
 });
 
 /* ---------- Category Routes ---------- */
@@ -457,6 +458,28 @@ materialRouter.get(
 );
 
 /**
+ * GET /api/v1/materials/instances/scan/:code
+ * Scans a material instance by barcode (exact match) with fallback to serialNumber.
+ * Requires: materials:read
+ */
+materialRouter.get(
+  "/instances/scan/:code",
+  requirePermission("materials:read"),
+  async (req: Request<{ code: string }>, res: Response, next: NextFunction) => {
+    try {
+      const { instance, matchedBy } = await materialService.scanInstance(
+        getOrgId(req),
+        req.params.code,
+      );
+
+      res.json({ status: "success", data: { instance, matchedBy } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * GET /api/v1/materials/instances/:id
  * Gets a specific material instance.
  */
@@ -514,12 +537,14 @@ materialRouter.patch(
   validateBody(updateStatusSchema),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const { status, notes } = req.body;
+      const { status, notes, source } = req.body;
       const updated = await materialService.updateInstanceStatus(
         getOrgId(req),
         req.params.id,
         status,
         notes,
+        req.user!.userId,
+        source,
       );
 
       res.json({ status: "success", data: { instance: updated } });

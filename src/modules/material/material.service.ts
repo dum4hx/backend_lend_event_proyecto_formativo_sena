@@ -3,6 +3,7 @@ import { Category } from "./models/category.model.ts";
 import { MaterialModel } from "./models/material_type.model.ts";
 import { MaterialAttribute } from "./models/material_attribute.model.ts";
 import { MaterialInstance } from "./models/material_instance.model.ts";
+import { InventoryMovement } from "./models/inventory_movement.model.ts";
 import { LocationService } from "../location/location.service.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
@@ -676,7 +677,28 @@ export const materialService = {
     }
 
     const toCreate = { ...payload, organizationId } as Record<string, unknown>;
-    const instance = await MaterialInstance.create(toCreate);
+    let instance;
+    try {
+      instance = await MaterialInstance.create(toCreate);
+    } catch (err: unknown) {
+      if (
+        err !== null &&
+        typeof err === "object" &&
+        "code" in err &&
+        (err as { code: number }).code === 11000
+      ) {
+        const keyPattern = (err as any).keyPattern ?? {};
+        if (keyPattern.barcode) {
+          throw AppError.conflict(
+            "Barcode already exists in this organization",
+          );
+        }
+        throw AppError.conflict(
+          "A material instance with that serial number already exists in this organization",
+        );
+      }
+      throw err;
+    }
     // Populate the model field before returning
     await instance.populate(
       "modelId",
@@ -685,11 +707,48 @@ export const materialService = {
     return renameProperty(instance, "modelId", "model");
   },
 
+  /**
+   * Scans for a material instance by barcode (exact) then by serialNumber (exact).
+   * Scoped to the authenticated user's organization.
+   */
+  async scanInstance(
+    organizationId: Types.ObjectId | string,
+    code: string,
+  ): Promise<{ instance: unknown; matchedBy: "barcode" | "serialNumber" }> {
+    const orgFilter = { organizationId: new Types.ObjectId(String(organizationId)) };
+
+    let instance = await MaterialInstance.findOne({
+      ...orgFilter,
+      barcode: code,
+    })
+      .populate("modelId", "name description pricePerDay categoryId")
+      .populate("locationId", "name");
+
+    if (instance) {
+      return { instance: renameProperty(instance, "modelId", "model"), matchedBy: "barcode" };
+    }
+
+    instance = await MaterialInstance.findOne({
+      ...orgFilter,
+      serialNumber: code,
+    })
+      .populate("modelId", "name description pricePerDay categoryId")
+      .populate("locationId", "name");
+
+    if (instance) {
+      return { instance: renameProperty(instance, "modelId", "model"), matchedBy: "serialNumber" };
+    }
+
+    throw AppError.notFound("No material instance found for scanned code");
+  },
+
   async updateInstanceStatus(
     organizationId: Types.ObjectId | string,
     id: string,
     status: string,
     notes?: string,
+    actorUserId?: Types.ObjectId | string,
+    source: "manual" | "scanner" | "system" = "manual",
   ) {
     const instance = await MaterialInstance.findOne({
       _id: id,
@@ -711,6 +770,12 @@ export const materialService = {
     };
 
     const currentStatus = instance.status;
+
+    // Idempotent: same status requested → return success without recording movement
+    if (currentStatus === status) {
+      return renameProperty(instance, "modelId", "model");
+    }
+
     const allowedTransitions = validTransitions[currentStatus] ?? [];
 
     if (!allowedTransitions.includes(status)) {
@@ -724,6 +789,21 @@ export const materialService = {
     if (notes) instance.notes = notes;
 
     await instance.save();
+
+    // Record audit movement
+    if (actorUserId) {
+      const movementDoc: Record<string, unknown> = {
+        organizationId,
+        materialInstanceId: instance._id,
+        movementType: "status_change",
+        previousStatus: currentStatus,
+        newStatus: status,
+        source,
+        actorUserId,
+        ...(notes ? { notes } : {}),
+      };
+      await InventoryMovement.create(movementDoc);
+    }
 
     return renameProperty(instance, "modelId", "model");
   },

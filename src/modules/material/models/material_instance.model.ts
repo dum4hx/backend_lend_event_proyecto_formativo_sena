@@ -42,6 +42,12 @@ export const MaterialInstanceZodSchema = z.object({
       }),
     )
     .optional(),
+  barcode: z
+    .string()
+    .trim()
+    .max(120, "Maximum 120 characters")
+    .refine((val) => val.length > 0, { message: "Barcode cannot be blank" })
+    .optional(),
   /**
    * Optional flag to ignore capacity warnings
    * If true, allows the operation even if the location is at full capacity
@@ -86,6 +92,11 @@ const materialInstanceSchema = new Schema(
       ref: "Location",
       required: true,
     },
+    barcode: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
     attributes: [
       {
         attributeId: {
@@ -116,6 +127,15 @@ materialInstanceSchema.index({ status: 1 });
 materialInstanceSchema.index(
   { organizationId: 1, serialNumber: 1 },
   { unique: true },
+);
+
+// Ensure barcodes are unique within an organization (allow null / empty for legacy records)
+materialInstanceSchema.index(
+  { organizationId: 1, barcode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { barcode: { $type: "string", $gt: "" } },
+  },
 );
 
 /**
