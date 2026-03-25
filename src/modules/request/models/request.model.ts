@@ -49,6 +49,7 @@ export const LoanRequestZodSchema = z.object({
     message: "Invalid Customer ID format",
   }),
   items: z.array(requestItemZodSchema).min(1, "At least one item is required"),
+  depositDueDate: z.coerce.date(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   notes: z.string().max(1000).trim().optional(),
@@ -58,6 +59,7 @@ export const LoanRequestUpdateZodSchema = z.object({
   items: z.array(requestItemZodSchema).min(1).optional(),
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
+  depositDueDate: z.coerce.date(),
   notes: z.string().max(1000).trim().optional(),
 });
 

@@ -3095,13 +3095,14 @@ Lists all loan requests in the organization.
 
 Creates a new loan request (commercial advisor action).
 
-| Parameter  | Location | Type   | Required | Description                |
-| ---------- | -------- | ------ | -------- | -------------------------- |
-| customerId | body     | string | Yes      | Customer ID                |
-| items      | body     | array  | Yes      | Array of request items     |
-| startDate  | body     | string | Yes      | Loan start date (ISO 8601) |
-| endDate    | body     | string | Yes      | Loan end date (ISO 8601)   |
-| notes      | body     | string | No       | Additional notes           |
+| Parameter      | Location | Type   | Required | Description                                                                 |
+| -------------- | -------- | ------ | -------- | --------------------------------------------------------------------------- |
+| customerId     | body     | string | Yes      | Customer ID                                                                 |
+| items          | body     | array  | Yes      | Array of request items                                                      |
+| startDate      | body     | string | Yes      | Loan start date (ISO 8601)                                                  |
+| endDate        | body     | string | Yes      | Loan end date (ISO 8601). Must be after `startDate`.                        |
+| depositDueDate | body     | string | Yes      | Date by which deposit must be paid (ISO 8601). Cannot be after `startDate`. |
+| notes          | body     | string | No       | Additional notes                                                            |
 
 `items[]` contract (recommended):
 
@@ -3296,6 +3297,160 @@ On success:
 | ----------------- | ------------------------------------------------- |
 | `400 BAD_REQUEST` | Deposit has not been paid and `depositAmount > 0` |
 | `404 NOT_FOUND`   | Request not found or not in `ready` status        |
+
+---
+
+### Inspection Endpoints
+
+Manage material inspections for returned loans.
+
+#### GET /inspections
+
+Lists all inspections for the organization.
+
+| Parameter | Location | Type   | Required | Description                |
+| --------- | -------- | ------ | -------- | -------------------------- |
+| page      | query    | number | No       | Page number (default: 1)   |
+| limit     | query    | number | No       | Page size (default: 20)    |
+| loanId    | query    | string | No       | Filter inspections by loan |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `inspections:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "inspections": [
+      {
+        "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+        "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+        "loanId": {
+          "_id": "65e2f3c0e1a2b3c4d5e6f7c3",
+          "customerId": "65e2f3c0e1a2b3c4d5e6f7d4",
+          "startDate": "2026-03-01T10:00:00.000Z",
+          "endDate": "2026-03-05T10:00:00.000Z"
+        },
+        "inspectedBy": {
+          "email": "operator@example.com",
+          "profile": { "firstName": "John" }
+        },
+        "status": "completed",
+        "createdAt": "2026-03-10T14:20:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+#### GET /inspections/:id
+
+Gets a specific inspection by ID with full item details.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `inspections:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "inspection": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "loanId": { ... },
+      "items": [
+        {
+          "materialInstanceId": {
+            "_id": "65e2f3c0e1a2b3c4d5e6f7e5",
+            "serialNumber": "SN-001",
+            "modelId": "MOD-123"
+          },
+          "conditionBefore": "good",
+          "conditionAfter": "damaged",
+          "damageDescription": "Scratched screen",
+          "chargeToCustomer": 50000,
+          "repairRequired": true
+        }
+      ],
+      "notes": "Customer reported accidental drop",
+      "status": "completed"
+    }
+  }
+}
+```
+
+---
+
+#### POST /inspections
+
+Creates an inspection for a returned loan. If damages or lost items are reported with a cost, a "damage" invoice is automatically generated for the customer.
+
+| Parameter                | Location | Type     | Required | Description                                                                |
+| ------------------------ | -------- | -------- | -------- | -------------------------------------------------------------------------- |
+| loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)              |
+| overallNotes             | body     | string   | No       | General notes about the inspection                                         |
+| items                    | body     | object[] | Yes      | Array of inspected items                                                   |
+| items.materialInstanceId | body     | string   | Yes      | ID of the material instance                                                |
+| items.condition          | body     | string   | Yes      | `good`, `damaged`, `lost`                                                  |
+| items.notes              | body     | string   | No       | Notes for this specific item                                               |
+| items.damageDescription  | body     | string   | No       | Description of the damage                                                  |
+| items.damageCost         | body     | number   | No       | Cost in cents to be charged to the customer (e.g., 150000 = $1,500.00 COP) |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `inspections:create`
+
+**Preconditions:**
+
+1. The loan must exist and be in `returned` status.
+2. All material instances associated with the loan must be included in the `items` array.
+3. An inspection must not already exist for the loan.
+
+**Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": { "inspection": { ... } },
+  "message": "Inspection created. Damage invoice generated for $500.00"
+}
+```
+
+---
+
+#### GET /inspections/pending-loans
+
+Lists all loans that have been returned but have not yet been inspected. This endpoint is used by warehouse operators to see their pending task list.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `inspections:create`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "pendingLoans": [
+      {
+        "_id": "65e2f3c0e1a2b3c4d5e6f7c3",
+        "customerId": { "email": "client@example.com", "name": "Event Co" },
+        "materialInstances": [
+          { "_id": "65e2f3c0e1a2b3c4d5e6f7e5", "serialNumber": "SN-001" }
+        ],
+        "startDate": "2026-03-01T10:00:00.000Z",
+        "endDate": "2026-03-05T10:00:00.000Z",
+        "status": "returned"
+      }
+    ]
+  }
+}
+```
+
+---
 
 ---
 
@@ -4035,8 +4190,9 @@ Creates a new pricing configuration. Only one config per (organizationId, scope,
 `
 
 **Errors:**
-- `400` — Missing required params for chosen strategy (e.g. `fixed` without `flatPrice`).
-- `409` — A config already exists for this (scope, referenceId) combination.
+
+- `400` ï¿½ Missing required params for chosen strategy (e.g. `fixed` without `flatPrice`).
+- `409` ï¿½ A config already exists for this (scope, referenceId) combination.
 
 ---
 
@@ -4047,7 +4203,8 @@ Creates a new pricing configuration. Only one config per (organizationId, scope,
 Returns a single pricing configuration by ID.
 
 **Errors:**
-- `404` — Config not found or belongs to a different organization.
+
+- `404` ï¿½ Config not found or belongs to a different organization.
 
 ---
 
@@ -4060,8 +4217,9 @@ Updates an existing pricing configuration. `scope` and `referenceId` cannot be c
 **Request Body:** Same fields as POST but all optional.
 
 **Errors:**
-- `404` — Config not found.
-- `409` — Update would create a duplicate (scope, referenceId).
+
+- `404` ï¿½ Config not found.
+- `409` ï¿½ Update would create a duplicate (scope, referenceId).
 
 ---
 
@@ -4072,8 +4230,9 @@ Updates an existing pricing configuration. `scope` and `referenceId` cannot be c
 Deletes a pricing configuration.
 
 **Errors:**
-- `400` — Cannot delete the organization-level default config.
-- `404` — Config not found.
+
+- `400` ï¿½ Cannot delete the organization-level default config.
+- `404` ï¿½ Config not found.
 
 ---
 
@@ -4109,4 +4268,5 @@ Calculates and returns the estimated price for a given item without persisting a
 `
 
 **Errors:**
-- `404` — The referenced materialType or package was not found.
+
+- `404` ï¿½ The referenced materialType or package was not found.

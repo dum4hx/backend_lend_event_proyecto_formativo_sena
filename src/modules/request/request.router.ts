@@ -64,6 +64,7 @@ const createRequestSchema = LoanRequestZodSchema.pick({
   startDate: true,
   endDate: true,
   notes: true,
+  depositDueDate: true,
 })
   .extend({
     items: z
@@ -73,7 +74,17 @@ const createRequestSchema = LoanRequestZodSchema.pick({
   .refine((data) => data.endDate > data.startDate, {
     message: "End date must be after start date",
     path: ["endDate"],
-  });
+  })
+  .refine(
+    (data) => {
+      if (!data.depositDueDate) return true;
+      return data.depositDueDate <= data.startDate;
+    },
+    {
+      message: "Deposit due date cannot be after start date",
+      path: ["depositDueDate"],
+    },
+  );
 
 const assignMaterialsSchema = z.object({
   assignments: z

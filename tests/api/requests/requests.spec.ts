@@ -233,12 +233,14 @@ const buildRequestBody = (
 ) => {
   const startDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const endDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const depositDueDate = new Date(Date.now() + 12 * 60 * 60 * 1000);
 
   return {
     customerId,
     items,
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
+    depositDueDate: depositDueDate.toISOString(),
     notes: "Request tests",
   };
 };
