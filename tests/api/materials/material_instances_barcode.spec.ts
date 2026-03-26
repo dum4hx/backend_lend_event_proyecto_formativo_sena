@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, request as baseRequest } from "@playwright/test";
+import { defaultOrgData } from "../../utils/helpers.ts";
 
 /**
  * Tests for barcode support on material instances:
@@ -21,6 +22,36 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
   const uniqueBarcode = `BC-${Date.now()}`;
   const uniqueSerial = `SN-${Date.now()}`;
   const uniqueSerialNoBarcode = `SN-NOB-${Date.now()}`;
+
+  const createSecondaryOrgContext = async (baseURL: string) => {
+    const ctx = await baseRequest.newContext({
+      baseURL,
+      ignoreHTTPSErrors: true,
+      storageState: { cookies: [], origins: [] },
+    });
+
+    const payload = defaultOrgData();
+    const registerRes = await ctx.post("auth/register", { data: payload });
+    expect(registerRes.status()).toBe(202);
+
+    const verifyRes = await ctx.post("auth/verify-email", {
+      data: {
+        email: payload.owner.email,
+        code: "123456",
+      },
+    });
+    expect(verifyRes.status()).toBe(201);
+
+    const loginRes = await ctx.post("auth/login", {
+      data: {
+        email: payload.owner.email,
+        password: payload.owner.password,
+      },
+    });
+    expect(loginRes.status()).toBe(200);
+
+    return ctx;
+  };
 
   // ─── Prerequisites ────────────────────────────────────────────────────────
 
@@ -67,7 +98,7 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
 
   // ─── Create with barcode ──────────────────────────────────────────────────
 
-  test("POST /instances – creates instance with barcode", async ({
+  test("POST /instances – creates instance with useBarcodeAsSerial=true", async ({
     request,
   }) => {
     if (!materialTypeId || !locationId) test.skip();
@@ -75,9 +106,10 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     const res = await request.post("materials/instances", {
       data: {
         modelId: materialTypeId,
-        serialNumber: uniqueSerial,
+        serialNumber: "IGNORED-SERIAL-WHEN-SWITCH-TRUE",
         locationId,
         barcode: uniqueBarcode,
+        useBarcodeAsSerial: true,
       },
     });
     expect(res.status()).toBe(201);
@@ -85,7 +117,47 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     expect(body.status).toBe("success");
     expect(body.data.instance).toBeDefined();
     expect(body.data.instance.barcode).toBe(uniqueBarcode);
+    expect(body.data.instance.serialNumber).toBe(uniqueBarcode);
     instanceIdWithBarcode = body.data.instance._id;
+  });
+
+  test("POST /instances – rejects useBarcodeAsSerial=true with empty barcode", async ({
+    request,
+  }) => {
+    if (!materialTypeId || !locationId) test.skip();
+
+    const res = await request.post("materials/instances", {
+      data: {
+        modelId: materialTypeId,
+        locationId,
+        useBarcodeAsSerial: true,
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("BAD_REQUEST");
+    expect(body.message).toMatch(/barcode/i);
+  });
+
+  test("POST /instances – rejects useBarcodeAsSerial=false with empty serial", async ({
+    request,
+  }) => {
+    if (!materialTypeId || !locationId) test.skip();
+
+    const res = await request.post("materials/instances", {
+      data: {
+        modelId: materialTypeId,
+        locationId,
+        barcode: `BC-ONLY-${Date.now()}`,
+        useBarcodeAsSerial: false,
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("BAD_REQUEST");
+    expect(body.message).toMatch(/serialNumber/i);
   });
 
   // ─── Create without barcode (legacy) ─────────────────────────────────────
@@ -129,6 +201,93 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     const body = await res.json();
     expect(body.status).toBe("error");
     expect(body.message).toMatch(/barcode already exists/i);
+  });
+
+  test("POST /instances – rejects duplicate serial in same organization (409)", async ({
+    request,
+  }) => {
+    if (!materialTypeId || !locationId) test.skip();
+
+    const first = await request.post("materials/instances", {
+      data: {
+        modelId: materialTypeId,
+        serialNumber: uniqueSerial,
+        locationId,
+      },
+    });
+    expect(first.status()).toBe(201);
+
+    const second = await request.post("materials/instances", {
+      data: {
+        modelId: materialTypeId,
+        serialNumber: uniqueSerial,
+        locationId,
+      },
+    });
+    expect(second.status()).toBe(409);
+    const body = await second.json();
+    expect(body.code).toBe("CONFLICT");
+    expect(body.message).toMatch(/serial number/i);
+  });
+
+  test("POST /instances – allows same serial and barcode in a different organization", async ({
+    baseURL,
+  }) => {
+    if (!baseURL) test.skip();
+
+    const secondOrgCtx = await createSecondaryOrgContext(baseURL);
+    try {
+      const categoryRes = await secondOrgCtx.post("materials/categories", {
+        data: {
+          name: `SecondOrgCat ${Date.now()}`,
+          description: "Second org barcode tests",
+        },
+      });
+      expect(categoryRes.status()).toBe(201);
+      const secondCategoryId = (await categoryRes.json()).data.category._id;
+
+      const typeRes = await secondOrgCtx.post("materials/types", {
+        data: {
+          name: `SecondOrgType ${Date.now()}`,
+          categoryId: secondCategoryId,
+          description: "Second org type",
+          pricePerDay: 1000,
+        },
+      });
+      expect(typeRes.status()).toBe(201);
+      const secondTypeId = (await typeRes.json()).data.materialType._id;
+
+      const locationRes = await secondOrgCtx.post("locations", {
+        data: {
+          name: `SecondOrgLoc ${Date.now()}`,
+          address: {
+            streetType: "Calle",
+            primaryNumber: "100",
+            secondaryNumber: "20",
+            complementaryNumber: "5",
+            department: "Antioquia",
+            city: "Medellín",
+          },
+        },
+      });
+      expect(locationRes.status()).toBe(201);
+      const secondLocationBody = await locationRes.json();
+      const secondLocationId =
+        secondLocationBody.data._id ?? secondLocationBody.data.location?._id;
+
+      const createWithSameKeys = await secondOrgCtx.post("materials/instances", {
+        data: {
+          modelId: secondTypeId,
+          locationId: secondLocationId,
+          serialNumber: uniqueBarcode,
+          barcode: uniqueBarcode,
+        },
+      });
+
+      expect(createWithSameKeys.status()).toBe(201);
+    } finally {
+      await secondOrgCtx.dispose();
+    }
   });
 
   // ─── List includes barcode ────────────────────────────────────────────────
@@ -217,6 +376,60 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     const body = await res.json();
     expect(body.status).toBe("success");
     expect(body.data.instance.status).toBe("maintenance");
+  });
+
+  test("PATCH /instances/:id – can switch to useBarcodeAsSerial=true and sync serial", async ({
+    request,
+  }) => {
+    if (!instanceIdNoBarcode) test.skip();
+
+    const barcodeToMirror = `BC-SYNC-${Date.now()}`;
+    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
+      data: {
+        barcode: barcodeToMirror,
+        useBarcodeAsSerial: true,
+      },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data.instance.barcode).toBe(barcodeToMirror);
+    expect(body.data.instance.serialNumber).toBe(barcodeToMirror);
+  });
+
+  test("PATCH /instances/:id – can switch to useBarcodeAsSerial=false with manual serial", async ({
+    request,
+  }) => {
+    if (!instanceIdNoBarcode) test.skip();
+
+    const manualSerial = `SN-MANUAL-${Date.now()}`;
+    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
+      data: {
+        serialNumber: manualSerial,
+        useBarcodeAsSerial: false,
+      },
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data.instance.serialNumber).toBe(manualSerial);
+  });
+
+  test("PATCH /instances/:id – rejects useBarcodeAsSerial=true without barcode", async ({
+    request,
+  }) => {
+    if (!instanceIdNoBarcode) test.skip();
+
+    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
+      data: {
+        barcode: "   ",
+        useBarcodeAsSerial: true,
+      },
+    });
+
+    expect(res.status()).toBe(400);
   });
 
   // ─── Patch status – idempotent same-status returns success without error ──

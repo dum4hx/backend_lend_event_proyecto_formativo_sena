@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { defaultOrgData, validateAuthCookies } from "../../utils/helpers.ts";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 test.describe.serial("Auth Module", () => {
   let createdUserEmail: string;
@@ -58,8 +60,10 @@ test.describe.serial("Auth Module", () => {
       validateAuthCookies(response, ["access_token", "refresh_token"]);
 
       // Save authentication state for subsequent tests
+      const storageStatePath = "tests/utils/auth/storageState.json";
+      mkdirSync(dirname(storageStatePath), { recursive: true });
       await request.storageState({
-        path: "tests/utils/auth/storageState.json",
+        path: storageStatePath,
       });
     });
   });

@@ -11,6 +11,96 @@ import { renameProperty } from "../../utils/renameProperty.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { User } from "../user/models/user.model.ts";
 
+type MaterialInstanceWritePayload = {
+  modelId?: string;
+  locationId?: string;
+  serialNumber?: string;
+  barcode?: string;
+  useBarcodeAsSerial?: boolean;
+  notes?: string;
+  attributes?: Array<{ attributeId: string; value: string }>;
+  force?: boolean;
+};
+
+const normalizeOptionalString = (
+  value: unknown,
+): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseDuplicateKeyError = (
+  err: unknown,
+): "serialNumber" | "barcode" | null => {
+  if (
+    err === null ||
+    typeof err !== "object" ||
+    !("code" in err) ||
+    (err as { code: number }).code !== 11000
+  ) {
+    return null;
+  }
+
+  const keyPattern = (err as { keyPattern?: Record<string, unknown> }).keyPattern;
+  const keyValue = (err as { keyValue?: Record<string, unknown> }).keyValue;
+
+  if (keyPattern?.barcode || keyValue?.barcode) return "barcode";
+  if (keyPattern?.serialNumber || keyValue?.serialNumber) return "serialNumber";
+
+  return "serialNumber";
+};
+
+const resolveEffectiveSerialAndBarcode = (opts: {
+  useBarcodeAsSerial?: boolean | undefined;
+  payloadSerial?: string | undefined;
+  payloadBarcode?: string | undefined;
+  currentSerial?: string | undefined;
+  currentBarcode?: string | undefined;
+  isCreate: boolean;
+}): { serialNumber: string; barcode: string | undefined } => {
+  const {
+    useBarcodeAsSerial,
+    payloadSerial,
+    payloadBarcode,
+    currentSerial,
+    currentBarcode,
+    isCreate,
+  } = opts;
+
+  const barcode = payloadBarcode ?? currentBarcode;
+
+  if (useBarcodeAsSerial === true) {
+    if (!barcode) {
+      throw AppError.badRequest(
+        "barcode is required when useBarcodeAsSerial is true",
+      );
+    }
+    return { serialNumber: barcode, barcode };
+  }
+
+  if (useBarcodeAsSerial === false) {
+    const serialNumber = payloadSerial ?? currentSerial;
+    if (!serialNumber) {
+      throw AppError.badRequest(
+        "serialNumber is required when useBarcodeAsSerial is false",
+      );
+    }
+    return { serialNumber, barcode };
+  }
+
+  // Backward-compatible mode: when the switch is omitted, preserve existing behavior.
+  const serialNumber = payloadSerial ?? currentSerial;
+  if (!serialNumber) {
+    if (isCreate) {
+      throw AppError.badRequest("serialNumber is required");
+    }
+    throw AppError.badRequest("serialNumber is required to update this record");
+  }
+
+  return { serialNumber, barcode };
+};
+
 /* ---------- Internal helpers ---------- */
 
 /**
@@ -645,6 +735,8 @@ export const materialService = {
     organizationId: Types.ObjectId | string,
     payload: Record<string, unknown>,
   ) {
+    const writePayload = payload as MaterialInstanceWritePayload;
+
     if (!payload.modelId) {
       throw AppError.badRequest("Material type (modelId) is required");
     }
@@ -676,23 +768,33 @@ export const materialService = {
       );
     }
 
-    const toCreate = { ...payload, organizationId } as Record<string, unknown>;
+    const payloadSerial = normalizeOptionalString(writePayload.serialNumber);
+    const payloadBarcode = normalizeOptionalString(writePayload.barcode);
+    const { serialNumber, barcode } = resolveEffectiveSerialAndBarcode({
+      useBarcodeAsSerial: writePayload.useBarcodeAsSerial,
+      payloadSerial,
+      payloadBarcode,
+      currentSerial: undefined,
+      currentBarcode: undefined,
+      isCreate: true,
+    });
+
+    const toCreate = {
+      ...payload,
+      serialNumber,
+      ...(barcode ? { barcode } : { barcode: undefined }),
+      organizationId,
+    } as Record<string, unknown>;
+
     let instance;
     try {
       instance = await MaterialInstance.create(toCreate);
     } catch (err: unknown) {
-      if (
-        err !== null &&
-        typeof err === "object" &&
-        "code" in err &&
-        (err as { code: number }).code === 11000
-      ) {
-        const keyPattern = (err as any).keyPattern ?? {};
-        if (keyPattern.barcode) {
-          throw AppError.conflict(
-            "Barcode already exists in this organization",
-          );
-        }
+      const duplicateField = parseDuplicateKeyError(err);
+      if (duplicateField === "barcode") {
+        throw AppError.conflict("Barcode already exists in this organization");
+      }
+      if (duplicateField === "serialNumber") {
         throw AppError.conflict(
           "A material instance with that serial number already exists in this organization",
         );
@@ -705,6 +807,104 @@ export const materialService = {
       "name description pricePerDay categoryId",
     );
     return renameProperty(instance, "modelId", "model");
+  },
+
+  async updateInstance(
+    organizationId: Types.ObjectId | string,
+    id: string,
+    payload: Record<string, unknown>,
+  ) {
+    const writePayload = payload as MaterialInstanceWritePayload;
+
+    const instance = await MaterialInstance.findOne({
+      _id: id,
+      organizationId,
+    });
+
+    if (!instance) {
+      throw AppError.notFound("Material instance not found");
+    }
+
+    if (writePayload.modelId) {
+      const materialType = await MaterialModel.findById(String(writePayload.modelId));
+      if (!materialType) {
+        throw AppError.notFound("Material type not found");
+      }
+    }
+
+    if (writePayload.locationId) {
+      const locationActive = await LocationService.locationExists(
+        String(writePayload.locationId),
+        String(organizationId),
+        true,
+      );
+      if (!locationActive) {
+        throw AppError.badRequest(
+          "Target location is either not found or inactive",
+          { locationId: writePayload.locationId },
+        );
+      }
+
+      await LocationService.validateCapacity(
+        String(writePayload.locationId),
+        String(writePayload.modelId ?? instance.modelId),
+        String(organizationId),
+        writePayload.force === true,
+      );
+    }
+
+    const payloadSerial = normalizeOptionalString(writePayload.serialNumber);
+    const payloadBarcode = normalizeOptionalString(writePayload.barcode);
+    const currentSerial = normalizeOptionalString(instance.serialNumber);
+    const currentBarcode = normalizeOptionalString(instance.barcode);
+
+    const { serialNumber, barcode } = resolveEffectiveSerialAndBarcode({
+      useBarcodeAsSerial: writePayload.useBarcodeAsSerial,
+      payloadSerial,
+      payloadBarcode,
+      currentSerial,
+      currentBarcode,
+      isCreate: false,
+    });
+
+    const updatePayload: Record<string, unknown> = {
+      ...(writePayload.modelId ? { modelId: writePayload.modelId } : {}),
+      ...(writePayload.locationId ? { locationId: writePayload.locationId } : {}),
+      ...(writePayload.notes !== undefined ? { notes: writePayload.notes } : {}),
+      ...(writePayload.attributes !== undefined
+        ? { attributes: writePayload.attributes }
+        : {}),
+      serialNumber,
+      barcode,
+    };
+
+    let updated;
+    try {
+      updated = await MaterialInstance.findOneAndUpdate(
+        { _id: id, organizationId },
+        updatePayload,
+        { new: true, runValidators: true },
+      )
+        .populate("modelId", "name description pricePerDay categoryId")
+        .populate("locationId", "name");
+    } catch (err: unknown) {
+      const duplicateField = parseDuplicateKeyError(err);
+      if (duplicateField === "barcode") {
+        throw AppError.conflict("Barcode already exists in this organization");
+      }
+      if (duplicateField === "serialNumber") {
+        throw AppError.conflict(
+          "A material instance with that serial number already exists in this organization",
+        );
+      }
+      throw err;
+    }
+
+    if (!updated) {
+      throw AppError.notFound("Material instance not found");
+    }
+
+    return renameProperty(updated, "modelId", "model");
   },
 
   /**
