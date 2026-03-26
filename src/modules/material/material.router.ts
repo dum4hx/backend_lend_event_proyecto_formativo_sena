@@ -6,7 +6,10 @@ import {
 } from "express";
 import { z } from "zod";
 import { MaterialModelZodSchema } from "./models/material_type.model.ts";
-import { MaterialInstanceZodSchema } from "./models/material_instance.model.ts";
+import {
+  MaterialInstanceCreateZodSchema,
+  MaterialInstanceUpdateZodSchema,
+} from "./models/material_instance.model.ts";
 import { CategoryZodSchema } from "./models/category.model.ts";
 import { MaterialAttributeZodSchema } from "./models/material_attribute.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
@@ -62,6 +65,7 @@ const listMaterialsQuerySchema = paginationSchema.extend({
 const updateStatusSchema = z.object({
   status: z.enum(materialStatusOptions),
   notes: z.string().max(500).optional(),
+  source: z.enum(["manual", "scanner", "system"]).optional().default("manual"),
 });
 
 /* ---------- Category Routes ---------- */
@@ -457,6 +461,28 @@ materialRouter.get(
 );
 
 /**
+ * GET /api/v1/materials/instances/scan/:code
+ * Scans a material instance by barcode (exact match) with fallback to serialNumber.
+ * Requires: materials:read
+ */
+materialRouter.get(
+  "/instances/scan/:code",
+  requirePermission("materials:read"),
+  async (req: Request<{ code: string }>, res: Response, next: NextFunction) => {
+    try {
+      const { instance, matchedBy } = await materialService.scanInstance(
+        getOrgId(req),
+        req.params.code,
+      );
+
+      res.json({ status: "success", data: { instance, matchedBy } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * GET /api/v1/materials/instances/:id
  * Gets a specific material instance.
  */
@@ -488,7 +514,7 @@ materialRouter.get(
 materialRouter.post(
   "/instances",
   requirePermission("materials:create"),
-  validateBody(MaterialInstanceZodSchema.omit({ organizationId: true })),
+  validateBody(MaterialInstanceCreateZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
@@ -505,6 +531,34 @@ materialRouter.post(
 );
 
 /**
+ * PATCH /api/v1/materials/instances/:id
+ * Updates editable data of a material instance.
+ *
+ * Supports serial/barcode rules:
+ * - useBarcodeAsSerial=true  => serialNumber is persisted as barcode
+ * - useBarcodeAsSerial=false => serialNumber must be provided manually
+ * - omitted switch keeps backward-compatible behavior
+ */
+materialRouter.patch(
+  "/instances/:id",
+  requirePermission("materials:update"),
+  validateBody(MaterialInstanceUpdateZodSchema),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const instance = await materialService.updateInstance(
+        getOrgId(req),
+        req.params.id,
+        req.body,
+      );
+
+      res.json({ status: "success", data: { instance } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * PATCH /api/v1/materials/instances/:id/status
  * Updates a material instance's status (warehouse operator action).
  */
@@ -514,12 +568,14 @@ materialRouter.patch(
   validateBody(updateStatusSchema),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      const { status, notes } = req.body;
+      const { status, notes, source } = req.body;
       const updated = await materialService.updateInstanceStatus(
         getOrgId(req),
         req.params.id,
         status,
         notes,
+        req.user!.userId,
+        source,
       );
 
       res.json({ status: "success", data: { instance: updated } });

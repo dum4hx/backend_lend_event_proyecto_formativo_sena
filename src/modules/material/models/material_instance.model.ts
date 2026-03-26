@@ -42,12 +42,121 @@ export const MaterialInstanceZodSchema = z.object({
       }),
     )
     .optional(),
+  barcode: z
+    .string()
+    .trim()
+    .max(120, "Maximum 120 characters")
+    .refine((val) => val.length > 0, { message: "Barcode cannot be blank" })
+    .optional(),
+  useBarcodeAsSerial: z.boolean().optional(),
   /**
    * Optional flag to ignore capacity warnings
    * If true, allows the operation even if the location is at full capacity
    */
   force: z.boolean().optional().default(false),
 });
+
+const serialNumberSchema = z
+  .string()
+  .trim()
+  .max(100, "Maximum 100 characters")
+  .refine((val) => val.length > 0, {
+    message: "Serial number cannot be blank",
+  });
+
+const barcodeSchema = z
+  .string()
+  .trim()
+  .max(120, "Maximum 120 characters")
+  .refine((val) => val.length > 0, { message: "Barcode cannot be blank" });
+
+export const MaterialInstanceCreateZodSchema = z
+  .object({
+    modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid Material Model ID format",
+    }),
+    locationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+      message: "Invalid Location ID format",
+    }),
+    serialNumber: serialNumberSchema.optional(),
+    barcode: barcodeSchema.optional(),
+    useBarcodeAsSerial: z.boolean().optional(),
+    notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+    status: z
+      .enum(["available", "in_use", "maintenance", "damaged", "retired"])
+      .default("available"),
+    attributes: z
+      .array(
+        z.object({
+          attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+            message: "Invalid Attribute ID format",
+          }),
+          value: z.string().max(100, "Maximum 100 characters").trim(),
+        }),
+      )
+      .optional(),
+    force: z.boolean().optional().default(false),
+  })
+  .superRefine((data, ctx) => {
+    if (data.useBarcodeAsSerial === true && !data.barcode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["barcode"],
+        message: "barcode is required when useBarcodeAsSerial is true",
+      });
+    }
+
+    if (data.useBarcodeAsSerial === false && !data.serialNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["serialNumber"],
+        message: "serialNumber is required when useBarcodeAsSerial is false",
+      });
+    }
+
+    // Backward compatibility: when the switch is not sent, preserve existing behavior.
+    if (data.useBarcodeAsSerial === undefined && !data.serialNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["serialNumber"],
+        message: "serialNumber is required",
+      });
+    }
+  });
+
+export const MaterialInstanceUpdateZodSchema = z
+  .object({
+    modelId: z
+      .string()
+      .refine((val) => Types.ObjectId.isValid(val), {
+        message: "Invalid Material Model ID format",
+      })
+      .optional(),
+    locationId: z
+      .string()
+      .refine((val) => Types.ObjectId.isValid(val), {
+        message: "Invalid Location ID format",
+      })
+      .optional(),
+    serialNumber: serialNumberSchema.optional(),
+    barcode: barcodeSchema.optional(),
+    useBarcodeAsSerial: z.boolean().optional(),
+    notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+    attributes: z
+      .array(
+        z.object({
+          attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+            message: "Invalid Attribute ID format",
+          }),
+          value: z.string().max(100, "Maximum 100 characters").trim(),
+        }),
+      )
+      .optional(),
+    force: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field is required to update the material instance",
+  });
 
 export type MaterialInstanceInput = z.infer<typeof MaterialInstanceZodSchema>;
 
@@ -86,6 +195,11 @@ const materialInstanceSchema = new Schema(
       ref: "Location",
       required: true,
     },
+    barcode: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
     attributes: [
       {
         attributeId: {
@@ -116,6 +230,15 @@ materialInstanceSchema.index({ status: 1 });
 materialInstanceSchema.index(
   { organizationId: 1, serialNumber: 1 },
   { unique: true },
+);
+
+// Ensure barcodes are unique within an organization (allow null / empty for legacy records)
+materialInstanceSchema.index(
+  { organizationId: 1, barcode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { barcode: { $type: "string", $gt: "" } },
+  },
 );
 
 /**

@@ -2740,16 +2740,50 @@ Creates a new material instance.
 
 **Permission Required:** `materials:create`
 
-| Parameter    | Location | Type    | Required | Description                                                                       |
-| ------------ | -------- | ------- | -------- | --------------------------------------------------------------------------------- |
-| modelId      | body     | string  | Yes      | Material type ID                                                                  |
-| serialNumber | body     | string  | Yes      | Unique serial number (max 100 chars)                                              |
-| locationId   | body     | string  | Yes      | Location ID                                                                       |
-| status       | body     | string  | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`) |
-| force        | body     | boolean | No       | If true, bypasses capacity warnings at the location.                              |
+| Parameter          | Location | Type    | Required | Description                                                                                 |
+| ------------------ | -------- | ------- | -------- | ------------------------------------------------------------------------------------------- |
+| modelId            | body     | string  | Yes      | Material type ID                                                                            |
+| locationId         | body     | string  | Yes      | Location ID                                                                                 |
+| serialNumber       | body     | string  | Cond.    | Max 100 chars. Required when `useBarcodeAsSerial=false` or when switch is omitted (legacy). |
+| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true`.                                    |
+| useBarcodeAsSerial | body     | boolean | No       | If `true`, backend persists `serialNumber = barcode`. If omitted, legacy behavior is used. |
+| status             | body     | string  | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`)           |
+| force              | body     | boolean | No       | If true, bypasses capacity warnings at the location.                                       |
 
 **Capacity Management Behavior:**
 If the target `locationId` has a defined capacity for the `modelId` and it is already at full capacity, the API will return a **409 Conflict** error with a warning message. To proceed, the client must resubmit the request including `"force": true` in the body.
+
+**Validation and uniqueness rules:**
+
+- `serialNumber` and `barcode` are trimmed by backend before persistence.
+- `serialNumber` is unique per organization (`organizationId + serialNumber`).
+- `barcode` is unique per organization when present (`organizationId + barcode`).
+- Duplicate values return **409 Conflict** with a field-specific message.
+
+---
+
+#### PATCH /materials/instances/:id
+
+Updates editable material instance data (model/location/serial/barcode/notes/attributes).
+
+**Permission Required:** `materials:update`
+
+| Parameter          | Location | Type    | Required | Description                                                                                         |
+| ------------------ | -------- | ------- | -------- | --------------------------------------------------------------------------------------------------- |
+| modelId            | body     | string  | No       | New material type ID                                                                                |
+| locationId         | body     | string  | No       | New location ID                                                                                     |
+| serialNumber       | body     | string  | Cond.    | Max 100 chars. Required when `useBarcodeAsSerial=false` and no existing serial can be reused.       |
+| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true` and no existing barcode can be reused.      |
+| useBarcodeAsSerial | body     | boolean | No       | If `true`, backend persists `serialNumber = barcode`. If omitted, backward-compatible behavior applies. |
+| notes              | body     | string  | No       | Notes (max 500 chars)                                                                               |
+| attributes         | body     | array   | No       | Updated attributes array                                                                            |
+| force              | body     | boolean | No       | If true and location changes, bypasses capacity warning                                             |
+
+**Common errors:**
+
+- **400 Bad Request**: validation error or missing required conditional field.
+- **404 Not Found**: instance does not exist in organization scope.
+- **409 Conflict**: duplicate serial or barcode in the same organization.
 
 ---
 

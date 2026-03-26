@@ -1,4 +1,6 @@
 import { test } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 const ADMIN_STORAGE_STATE = "tests/utils/auth/adminStorageState.json";
 
@@ -17,5 +19,6 @@ test("Login as super admin and save storage state", async ({ request }) => {
     );
   }
 
+  mkdirSync(dirname(ADMIN_STORAGE_STATE), { recursive: true });
   await request.storageState({ path: ADMIN_STORAGE_STATE });
 });

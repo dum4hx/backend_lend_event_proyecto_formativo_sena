@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.test" });
 
+const PLAYWRIGHT_BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://api.test.local/api/v1/";
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -20,7 +23,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await request.get('/')`. */
-    baseURL: "https://api.test.local/api/v1/",
+    baseURL: PLAYWRIGHT_BASE_URL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -28,8 +31,8 @@ export default defineConfig({
     /* Use storage state for httpOnly cookie authentication */
     storageState: "tests/utils/auth/storageState.json",
 
-    /* Ignore HTTPS errors for test environment */
-    ignoreHTTPSErrors: process.env.NODE_ENV === "test",
+    /* Ignore HTTPS errors for local/staging API certificates in test infrastructure */
+    ignoreHTTPSErrors: true,
   },
 
   /* Configure projects for major browsers */
