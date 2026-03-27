@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Types, startSession } from "mongoose";
 import { Inspection } from "./models/inspection.model.ts";
 import { Loan } from "../loan/models/loan.model.ts";
 import { Invoice } from "../invoice/models/invoice.model.ts";
@@ -108,106 +108,132 @@ export const inspectionService = {
   }) {
     const { organizationId, userId, loanId, items, overallNotes } = params;
 
-    // Validate loan exists and is in returned status
-    const loan = await Loan.findOne({
-      _id: loanId,
-      organizationId,
-      status: "returned",
-    });
+    const session = await startSession();
+    let result: { inspection: any; totalDamageCost: number } | undefined;
 
-    if (!loan) {
-      throw AppError.notFound("Loan not found or not in returned status");
-    }
+    try {
+      await session.withTransaction(async () => {
+        // Validate loan exists and is in returned status
+        const loan = await Loan.findOne({
+          _id: loanId,
+          organizationId,
+          status: "returned",
+        }).session(session);
 
-    // Check if inspection already exists
-    const existingInspection = await Inspection.findOne({ loanId: loan._id });
-    if (existingInspection) {
-      throw AppError.conflict("Inspection already exists for this loan");
-    }
+        if (!loan) {
+          throw AppError.notFound("Loan not found or not in returned status");
+        }
 
-    // Validate all items match loan materials
-    const loanMaterialIds = loan.materialInstances.map((mi: any) =>
-      mi.materialInstanceId.toString(),
-    );
-    const inspectionMaterialIds = items.map((item) => item.materialInstanceId);
+        // Check if inspection already exists
+        const existingInspection = await Inspection.findOne({
+          loanId: loan._id,
+        }).session(session);
+        if (existingInspection) {
+          throw AppError.conflict("Inspection already exists for this loan");
+        }
 
-    const missingMaterials = loanMaterialIds.filter(
-      (id) => !inspectionMaterialIds.includes(id),
-    );
+        // Validate all items match loan materials
+        const loanMaterialIds = loan.materialInstances.map((mi: any) =>
+          mi.materialInstanceId.toString(),
+        );
+        const inspectionMaterialIds = items.map(
+          (item) => item.materialInstanceId,
+        );
 
-    if (missingMaterials.length > 0) {
-      throw AppError.badRequest("All loan materials must be inspected", {
-        missingMaterialIds: missingMaterials,
+        const missingMaterials = loanMaterialIds.filter(
+          (id) => !inspectionMaterialIds.includes(id),
+        );
+
+        if (missingMaterials.length > 0) {
+          throw AppError.badRequest("All loan materials must be inspected", {
+            missingMaterialIds: missingMaterials,
+          });
+        }
+
+        // Calculate total damage cost
+        const totalDamageCost = items.reduce(
+          (sum, item) => sum + (item.damageCost ?? 0),
+          0,
+        );
+
+        // Create inspection with proper items format
+        const inspectionItems = items.map((item) => ({
+          materialInstanceId: new Types.ObjectId(item.materialInstanceId),
+          conditionBefore: "good", // Default, would be populated from loan data in real impl
+          conditionAfter: item.condition,
+          damageDescription: item.damageDescription,
+          chargeToCustomer: item.damageCost ?? 0,
+          repairRequired: item.condition === "damaged",
+        }));
+
+        const [inspection]: any = await (Inspection as any).create(
+          [
+            {
+              organizationId,
+              loanId: new Types.ObjectId(loanId),
+              inspectedBy: new Types.ObjectId(userId),
+              items: inspectionItems,
+              notes: overallNotes || null,
+              status: "completed",
+            },
+          ],
+          { session },
+        );
+
+        // If there are damages, create an invoice
+        const damagedItems = items.filter(
+          (item) => item.condition === "damaged" || item.condition === "lost",
+        );
+
+        if (damagedItems.length > 0 && totalDamageCost > 0) {
+          const invoiceLineItems = damagedItems.map((item) => ({
+            description:
+              item.damageDescription ??
+              `${item.condition === "lost" ? "Lost" : "Damaged"} material`,
+            quantity: 1,
+            unitPrice: item.damageCost ?? 0,
+            totalPrice: item.damageCost ?? 0,
+            referenceId: new Types.ObjectId(item.materialInstanceId),
+            referenceType: "MaterialInstance" as const,
+          }));
+
+          await Invoice.create(
+            [
+              {
+                organizationId,
+                customerId: loan.customerId,
+                loanId: loan._id,
+                inspectionId: inspection._id,
+                type: "damage",
+                lineItems: invoiceLineItems,
+                subtotal: totalDamageCost,
+                taxRate: 0.19, // 19% tax (Colombian IVA)
+                taxAmount: totalDamageCost * 0.19,
+                totalAmount: totalDamageCost * 1.19,
+                status: "pending",
+                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                createdBy: new Types.ObjectId(userId),
+                invoiceNumber: `INV-${Date.now()}`,
+              },
+            ],
+            { session },
+          );
+        }
+
+        const populatedInspection = await Inspection.findById(inspection._id)
+          .session(session)
+          .populate("loanId", "customerId startDate endDate")
+          .populate("items.materialInstanceId", "serialNumber modelId");
+
+        result = {
+          inspection: populatedInspection,
+          totalDamageCost,
+        };
       });
+
+      return result;
+    } finally {
+      await session.endSession();
     }
-
-    // Calculate total damage cost
-    const totalDamageCost = items.reduce(
-      (sum, item) => sum + (item.damageCost ?? 0),
-      0,
-    );
-
-    // Create inspection with proper items format
-    const inspectionItems = items.map((item) => ({
-      materialInstanceId: new Types.ObjectId(item.materialInstanceId),
-      conditionBefore: "good", // Default, would be populated from loan data in real impl
-      conditionAfter: item.condition,
-      damageDescription: item.damageDescription,
-      chargeToCustomer: item.damageCost ?? 0,
-      repairRequired: item.condition === "damaged",
-    }));
-
-    const inspection: any = await (Inspection as any).create({
-      organizationId,
-      loanId: new Types.ObjectId(loanId),
-      inspectedBy: new Types.ObjectId(userId),
-      items: inspectionItems,
-      notes: overallNotes || null,
-      status: "completed",
-    });
-
-    // If there are damages, create an invoice
-    const damagedItems = items.filter(
-      (item) => item.condition === "damaged" || item.condition === "lost",
-    );
-
-    if (damagedItems.length > 0 && totalDamageCost > 0) {
-      const invoiceLineItems = damagedItems.map((item) => ({
-        description:
-          item.damageDescription ??
-          `${item.condition === "lost" ? "Lost" : "Damaged"} material`,
-        quantity: 1,
-        unitPrice: item.damageCost ?? 0,
-        totalPrice: item.damageCost ?? 0,
-        referenceId: new Types.ObjectId(item.materialInstanceId),
-        referenceType: "MaterialInstance" as const,
-      }));
-
-      await Invoice.create({
-        organizationId,
-        customerId: loan.customerId,
-        loanId: loan._id,
-        inspectionId: inspection._id,
-        type: "damage",
-        lineItems: invoiceLineItems,
-        subtotal: totalDamageCost,
-        taxRate: 0.19, // 19% tax (Colombian IVA)
-        taxAmount: totalDamageCost * 0.19,
-        totalAmount: totalDamageCost * 1.19,
-        status: "pending",
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        createdBy: new Types.ObjectId(userId),
-        invoiceNumber: `INV-${Date.now()}`,
-      });
-    }
-
-    const populatedInspection = await Inspection.findById(inspection._id)
-      .populate("loanId", "customerId startDate endDate")
-      .populate("items.materialInstanceId", "serialNumber modelId");
-
-    return {
-      inspection: populatedInspection,
-      totalDamageCost,
-    };
   },
 };

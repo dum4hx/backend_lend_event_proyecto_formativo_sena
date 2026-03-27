@@ -32,6 +32,8 @@ const app = express();
 
 /* ---------- Security Middleware ---------- */
 
+app.set("trust proxy", 1);
+
 // Helmet for security headers
 const helmetConfig =
   NODE_ENV === "production" ? {} : { contentSecurityPolicy: false };

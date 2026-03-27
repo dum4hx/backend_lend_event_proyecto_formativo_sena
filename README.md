@@ -42,30 +42,57 @@ Copy the example environment file and configure it:
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Edit `.env` with your values (ensure `DB_CONNECTION_STRING` is set).
 
-```dotenv
-PORT=8080
+### 4. Provide JWT keys
 
-# Database
+The backend uses asymmetric RS256 keys for JWT signing. These keys must be placed in the `keys/` directory:
+
+```bash
+mkdir -p keys
+# Place private.pem and public.pem in keys/
+```
+
+### 5. Start the API
+
+```bash
+# Development mode with hot-reload
+npm run dev
+
+# Build for production
+npm run build
+npm start
+```
+
+## Running with Docker (Recommended)
+
+Refer to the root [SETUP.md](../SETUP.md) for full stack orchestration using Docker Compose and Nginx.
+
+## Project Structure
+
 DB_CONNECTION_STRING=mongodb://localhost:27017/lendevent
 
 # JWT Configuration
+
 JWT_ASYMMETRIC_KEY_ALG='RS256'
 JWT_ENC='A256GCM'
 JWT_ISSUER='https://api.test.local/'
 JWT_AUDIENCE='https://app.test.local/'
 
 # Cookie domain (must match your local domain)
+
 COOKIE_DOMAIN=test.local
 
 # Stripe (get keys from https://dashboard.stripe.com/apikeys)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+
+STRIPE*SECRET_KEY=sk_test*...
+STRIPE*WEBHOOK_SECRET=whsec*...
 
 # Environment
+
 NODE_ENV=development
-```
+
+````
 
 ### 4. Generate JWT Keys
 
@@ -73,7 +100,7 @@ Generate RSA key pairs for JWT signing:
 
 ```bash
 npm run generate-keys
-```
+````
 
 This creates key files in the `keys/` directory.
 

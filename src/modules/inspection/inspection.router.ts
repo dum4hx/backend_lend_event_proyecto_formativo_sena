@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Types } from "mongoose";
 import { InspectionZodSchema } from "./models/inspection.model.ts";
 import { inspectionService } from "./inspection.service.ts";
+import { AppError } from "../../errors/AppError.ts";
 import {
   validateBody,
   validateQuery,
@@ -153,21 +154,24 @@ inspectionRouter.post(
       const user = getAuthUser(req);
       const { loanId, items, overallNotes } = req.body;
 
-      const { inspection, totalDamageCost } =
-        await inspectionService.createInspection({
-          organizationId,
-          userId: user.id,
-          loanId,
-          items,
-          overallNotes,
-        });
+      const result = await inspectionService.createInspection({
+        organizationId,
+        userId: user.id,
+        loanId,
+        items,
+        overallNotes,
+      });
+
+      if (!result) {
+        throw AppError.internal("Failed to create inspection");
+      }
 
       res.status(201).json({
         status: "success",
-        data: { inspection },
+        data: { inspection: result.inspection },
         message:
-          totalDamageCost > 0
-            ? `Inspection created. Damage invoice generated for $${totalDamageCost.toFixed(2)}`
+          result.totalDamageCost > 0
+            ? `Inspection created. Damage invoice generated for $${result.totalDamageCost.toFixed(2)}`
             : "Inspection created. No damages found.",
       });
     } catch (err) {
