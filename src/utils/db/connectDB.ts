@@ -9,6 +9,7 @@ export const connectDB = async () => {
 
     // Throw error if no connection string stablished
     if (!connectionString) {
+      logger.error(connectionString);
       throw AppError.internal("No database connection string set");
     }
 

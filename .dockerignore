@@ -22,13 +22,17 @@ docker-compose.yml
 docker
 
 # Test files
+tests/
+playwright-report/
+test-results/
 *.test.ts
 *.spec.ts
 __tests__
 coverage
 
-# Logs
-logs
+# Logs and secrets
+logs/
+keys/
 *.log
 
 # OS files

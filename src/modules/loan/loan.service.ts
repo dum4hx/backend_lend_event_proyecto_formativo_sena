@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Types, startSession } from "mongoose";
 import { Loan, type LoanDocument } from "./models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
@@ -22,64 +22,87 @@ export const loanService = {
     organizationId,
     userId,
   }: CreateLoanFromRequestInput): Promise<LoanDocument> {
-    // Find and validate request
-    const request = await LoanRequest.findOne({
-      _id: requestId,
-      organizationId,
-      status: "ready",
-    });
+    const session = await startSession();
+    let result: LoanDocument | undefined;
 
-    if (!request) {
-      throw AppError.notFound("Request not found or not ready for pickup");
+    try {
+      await session.withTransaction(async () => {
+        // Find and validate request
+        const request = await LoanRequest.findOne({
+          _id: requestId,
+          organizationId,
+          status: "ready",
+        }).session(session);
+
+        if (!request) {
+          throw AppError.notFound("Request not found or not ready for pickup");
+        }
+
+        // Enforce payment precondition: deposit must be paid when amount > 0
+        const depositAmount = request.depositAmount ?? 0;
+        if (depositAmount > 0 && !request.depositPaidAt) {
+          throw AppError.badRequest(
+            "Cannot create a loan: the deposit for this request has not been paid yet",
+          );
+        }
+
+        // Update material instances to loaned status
+        const instanceIds = await (request as any).markAssignedMaterialsLoaned(
+          session,
+        );
+
+        // Create the loan
+        const [loan]: any = await (Loan as any).create(
+          [
+            {
+              organizationId,
+              customerId: request.customerId,
+              requestId: request._id,
+              materialInstances: instanceIds.map((id: any) => ({
+                materialInstanceId: id,
+                materialTypeId: id,
+              })),
+              startDate: new Date(),
+              endDate: request.endDate,
+              depositAmount,
+              totalAmount: request.totalAmount ?? 0,
+              pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
+              checkedOutBy: new Types.ObjectId(userId),
+              status: "active",
+            },
+          ],
+          { session },
+        );
+
+        // Mark the request as shipped (materials dispatched) and link the loan
+        await LoanRequest.updateOne(
+          { _id: request._id },
+          { $set: { status: "shipped", loanId: loan._id } },
+          { session },
+        );
+
+        const populatedLoan = await Loan.findById(loan._id)
+          .session(session)
+          .populate("customerId", "email name")
+          .populate(
+            "materialInstances.materialInstanceId",
+            "serialNumber modelId",
+          );
+
+        logger.info("Loan created from request", {
+          loanId: loan._id.toString(),
+          requestId,
+          organizationId: organizationId.toString(),
+          checkedOutBy: userId.toString(),
+        });
+
+        result = populatedLoan as unknown as LoanDocument;
+      });
+
+      return result as LoanDocument;
+    } finally {
+      await session.endSession();
     }
-
-    // Enforce payment precondition: deposit must be paid when amount > 0
-    const depositAmount = request.depositAmount ?? 0;
-    if (depositAmount > 0 && !request.depositPaidAt) {
-      throw AppError.badRequest(
-        "Cannot create a loan: the deposit for this request has not been paid yet",
-      );
-    }
-
-    // Update material instances to loaned status
-    const instanceIds = await request.markAssignedMaterialsLoaned();
-
-    // Create the loan
-    const loan = await Loan.create({
-      organizationId,
-      customerId: request.customerId,
-      requestId: request._id,
-      materialInstances: instanceIds.map((id) => ({
-        materialInstanceId: id,
-        materialTypeId: id,
-      })),
-      startDate: new Date(),
-      endDate: request.endDate,
-      depositAmount,
-      totalAmount: request.totalAmount ?? 0,
-      pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
-      checkedOutBy: new Types.ObjectId(userId),
-      status: "active",
-    });
-
-    // Mark the request as shipped (materials dispatched) and link the loan
-    await LoanRequest.updateOne(
-      { _id: request._id },
-      { $set: { status: "shipped", loanId: loan._id } },
-    );
-
-    const populatedLoan = await Loan.findById(loan._id)
-      .populate("customerId", "email name")
-      .populate("materialInstances.materialInstanceId", "serialNumber modelId");
-
-    logger.info("Loan created from request", {
-      loanId: loan._id.toString(),
-      requestId,
-      organizationId: organizationId.toString(),
-      checkedOutBy: userId.toString(),
-    });
-
-    return populatedLoan as unknown as LoanDocument;
   },
 
   /**
@@ -90,33 +113,45 @@ export const loanService = {
     organizationId: string | Types.ObjectId,
     notes?: string,
   ): Promise<LoanDocument> {
-    const loan = await Loan.findOne({
-      _id: loanId,
-      organizationId,
-      status: { $in: ["active", "overdue"] },
-    });
+    const session = await startSession();
+    let result;
 
-    if (!loan) {
-      throw AppError.notFound("Loan not found or already returned");
+    try {
+      await session.withTransaction(async () => {
+        const loan = await Loan.findOne({
+          _id: loanId,
+          organizationId,
+          status: { $in: ["active", "overdue"] },
+        }).session(session);
+
+        if (!loan) {
+          throw AppError.notFound("Loan not found or already returned");
+        }
+
+        // Update material instances to returned status (pending inspection)
+        const instanceIds = loan.materialInstances.map(
+          (mi) => mi.materialInstanceId,
+        );
+        await MaterialInstance.updateMany(
+          { _id: { $in: instanceIds } },
+          { $set: { status: "returned" } },
+          { session },
+        );
+
+        loan.status = "returned";
+        loan.returnedAt = new Date();
+        if (notes) {
+          loan.notes = (loan.notes ?? "") + `\nReturn notes: ${notes}`;
+        }
+        await loan.save({ session });
+
+        result = loan;
+      });
+
+      return result as unknown as LoanDocument;
+    } finally {
+      await session.endSession();
     }
-
-    // Update material instances to returned status (pending inspection)
-    const instanceIds = loan.materialInstances.map(
-      (mi) => mi.materialInstanceId,
-    );
-    await MaterialInstance.updateMany(
-      { _id: { $in: instanceIds } },
-      { $set: { status: "returned" } },
-    );
-
-    loan.status = "returned";
-    loan.returnedAt = new Date();
-    if (notes) {
-      loan.notes = (loan.notes ?? "") + `\nReturn notes: ${notes}`;
-    }
-    await loan.save();
-
-    return loan as unknown as LoanDocument;
   },
 
   /**

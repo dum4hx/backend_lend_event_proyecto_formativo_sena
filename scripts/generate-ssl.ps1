@@ -5,7 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$SSL_DIR = Join-Path $PSScriptRoot "..\docker\nginx\ssl"
+$SSL_DIR = Join-Path $PSScriptRoot "..\..\docker\nginx\ssl"
 
 # Check if mkcert is installed
 if (-not (Get-Command mkcert -ErrorAction SilentlyContinue)) {
@@ -32,17 +32,17 @@ if (-not (Test-Path $SSL_DIR)) {
 Write-Host "Installing local CA (requires admin privileges on first run)..." -ForegroundColor Cyan
 mkcert -install
 
-# Generate certificate for api.test.local
-Write-Host "Generating SSL certificate for api.test.local..." -ForegroundColor Cyan
+# Generate certificate for api.test.local and app.test.local
+Write-Host "Generating SSL certificate for api.test.local and app.test.local..." -ForegroundColor Cyan
 Push-Location $SSL_DIR
-mkcert api.test.local localhost 127.0.0.1 ::1
+mkcert api.test.local app.test.local localhost 127.0.0.1 ::1
 Pop-Location
 
-# Rename files to match nginx.conf expectations
-$certFile = Join-Path $SSL_DIR "api.test.local+3.pem"
-$keyFile = Join-Path $SSL_DIR "api.test.local+3-key.pem"
-$newCertFile = Join-Path $SSL_DIR "api.test.local.pem"
-$newKeyFile = Join-Path $SSL_DIR "api.test.local-key.pem"
+# Rename files to consistent names expected by nginx.conf
+$certFile = Join-Path $SSL_DIR "api.test.local+4.pem"
+$keyFile = Join-Path $SSL_DIR "api.test.local+4-key.pem"
+$newCertFile = Join-Path $SSL_DIR "test.local.pem"
+$newKeyFile = Join-Path $SSL_DIR "test.local-key.pem"
 
 if (Test-Path $certFile) {
     Move-Item -Path $certFile -Destination $newCertFile -Force
@@ -57,6 +57,6 @@ Write-Host "  Certificate: $newCertFile" -ForegroundColor Gray
 Write-Host "  Key: $newKeyFile" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Add the following to your hosts file (C:\Windows\System32\drivers\etc\hosts):" -ForegroundColor Yellow
-Write-Host "  127.0.0.1 api.test.local" -ForegroundColor Cyan
+Write-Host "  127.0.0.1 api.test.local app.test.local" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Then run: docker-compose up --build" -ForegroundColor Green
+Write-Host "Then run: docker compose up --build" -ForegroundColor Green

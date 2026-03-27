@@ -58,53 +58,61 @@ Copy the example environment file and configure it:
 cp .env.example .env
 ```
 
-Edit `.env` with your values. Here are the essential variables:
+Edit `.env` with your values (ensure `DB_CONNECTION_STRING` is set).
 
-```dotenv
-PORT=8080
+### 4. Provide JWT keys
 
-# Database
-# For local MongoDB:
+The backend uses asymmetric RS256 keys for JWT signing. These keys must be placed in the `keys/` directory:
+
+```bash
+mkdir -p keys
+# Place private.pem and public.pem in keys/
+```
+
+### 5. Start the API
+
+```bash
+# Development mode with hot-reload
+npm run dev
+
+# Build for production
+npm run build
+npm start
+```
+
+## Running with Docker (Recommended)
+
+Refer to the root [SETUP.md](../SETUP.md) for full stack orchestration using Docker Compose and Nginx.
+
+## Project Structure
+
 DB_CONNECTION_STRING=mongodb://localhost:27017/lendevent
+
 # For MongoDB Atlas (cloud):
+
 # DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/lendevent
 
-# JWT Configuration (RSA asymmetric signing)
+# JWT Configuration
+
 JWT_ASYMMETRIC_KEY_ALG='RS256'
 JWT_ENC='A256GCM'
 JWT_ISSUER='https://api.test.local/'
 JWT_AUDIENCE='https://app.test.local/'
 
-# Cookie domain (must match your local domain or use 'localhost' for local dev)
+# Cookie domain (must match your local domain)
+
 COOKIE_DOMAIN=test.local
 
 # Stripe (get keys from https://dashboard.stripe.com/apikeys)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
 
-# SMTP Email Configuration (for password reset, invitations, etc.)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-SMTP_FROM=noreply@yourdomain.com
-
-# Super Admin Credentials (for initial seeding)
-INITIAL_ADMIN_EMAIL=admin@example.com
-INITIAL_ADMIN_PASSWORD=YourSecurePassword123!
-
-# CORS (allowed frontend origins, comma-separated)
-CORS_ORIGIN=https://app.test.local,http://localhost:3000
+STRIPE*SECRET_KEY=sk_test*...
+STRIPE*WEBHOOK_SECRET=whsec*...
 
 # Environment
-NODE_ENV=development
-SKIP_SUBSCRIPTION_CHECK=false
-```
 
-> **Important:** 
-> - Never commit the `.env` file to version control (it's already in `.gitignore`)
-> - For Gmail SMTP, you need to generate an "App Password" in your Google account security settings
-> - Use strong passwords for `INITIAL_ADMIN_PASSWORD` (min 8 chars, uppercase, lowercase, numbers, symbols)
+NODE_ENV=development
+
+````
 
 ### 4. Generate JWT Keys
 
@@ -112,7 +120,7 @@ Generate RSA key pairs for JWT signing:
 
 ```bash
 npm run generate-keys
-```
+````
 
 This creates key files in the `keys/` directory.
 
@@ -403,6 +411,7 @@ docker run -p 8080:8080 --env-file .env lendevent-api
 ```
 
 **Docker Image Features:**
+
 - Multi-stage build (smaller image size)
 - Non-root user for security
 - Health check endpoint
@@ -415,6 +424,7 @@ docker run -p 8080:8080 --env-file .env lendevent-api
 1. **Use Environment Variables** - Never use `.env` files in production. Use your hosting provider's environment variable management.
 
 2. **Required Variables for Production:**
+
    ```bash
    NODE_ENV=production
    DB_CONNECTION_STRING=<mongodb-atlas-uri>
