@@ -1,6 +1,18 @@
 # LendEvent API
 
-Backend API for the LendEvent event rental management platform.
+Backend API for the LendEvent event rental management platform. A complete multi-tenant system for managing equipment rental operations, including inventory management, loan requests, approvals, invoicing, and payment processing with Stripe integration.
+
+## Features
+
+- 🔐 **Secure Authentication** - JWT with HttpOnly cookies and RSA signing
+- 🏢 **Multi-Tenant Architecture** - Complete data isolation per organization
+- 👥 **Role-Based Access Control** - 55+ granular permissions
+- 📦 **Inventory Management** - Categories, types, and individual material instances
+- 📝 **Loan Request Workflow** - Request → Approval → Assignment → Checkout → Return
+- 💰 **Billing & Invoicing** - Automated invoicing with Stripe integration
+- 🔍 **Inspections** - Checkout and return inspections with damage tracking
+- 📊 **Subscription Management** - Multiple plans with configurable limits
+- 🧪 **Comprehensive Testing** - E2E API tests with Playwright
 
 ## Tech Stack
 
@@ -14,10 +26,14 @@ Backend API for the LendEvent event rental management platform.
 
 ## Prerequisites
 
-- [Node.js 22+](https://nodejs.org/)
-- [MongoDB](https://www.mongodb.com/) (local or Atlas)
-- [Nginx](https://nginx.org/) for local HTTPS proxy
-- [mkcert](https://github.com/FiloSottile/mkcert) for generating SSL certificates
+Before you begin, ensure you have the following installed:
+
+- **[Node.js 22+](https://nodejs.org/)** - JavaScript runtime (includes npm)
+- **[MongoDB](https://www.mongodb.com/)** - NoSQL database (local installation or Atlas cloud)
+- **[Nginx](https://nginx.org/)** - Web server for local HTTPS proxy (optional, for testing with HTTPS)
+- **[mkcert](https://github.com/FiloSottile/mkcert)** - Tool for generating local SSL certificates (optional, for HTTPS)
+
+> **Note:** Nginx and mkcert are optional for basic development. You can run the API directly on `http://localhost:8080` without them.
 
 ## Getting Started
 
@@ -42,30 +58,53 @@ Copy the example environment file and configure it:
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Edit `.env` with your values. Here are the essential variables:
 
 ```dotenv
 PORT=8080
 
 # Database
+# For local MongoDB:
 DB_CONNECTION_STRING=mongodb://localhost:27017/lendevent
+# For MongoDB Atlas (cloud):
+# DB_CONNECTION_STRING=mongodb+srv://username:password@cluster.mongodb.net/lendevent
 
-# JWT Configuration
+# JWT Configuration (RSA asymmetric signing)
 JWT_ASYMMETRIC_KEY_ALG='RS256'
 JWT_ENC='A256GCM'
 JWT_ISSUER='https://api.test.local/'
 JWT_AUDIENCE='https://app.test.local/'
 
-# Cookie domain (must match your local domain)
+# Cookie domain (must match your local domain or use 'localhost' for local dev)
 COOKIE_DOMAIN=test.local
 
 # Stripe (get keys from https://dashboard.stripe.com/apikeys)
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
+# SMTP Email Configuration (for password reset, invitations, etc.)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+SMTP_FROM=noreply@yourdomain.com
+
+# Super Admin Credentials (for initial seeding)
+INITIAL_ADMIN_EMAIL=admin@example.com
+INITIAL_ADMIN_PASSWORD=YourSecurePassword123!
+
+# CORS (allowed frontend origins, comma-separated)
+CORS_ORIGIN=https://app.test.local,http://localhost:3000
+
 # Environment
 NODE_ENV=development
+SKIP_SUBSCRIPTION_CHECK=false
 ```
+
+> **Important:** 
+> - Never commit the `.env` file to version control (it's already in `.gitignore`)
+> - For Gmail SMTP, you need to generate an "App Password" in your Google account security settings
+> - Use strong passwords for `INITIAL_ADMIN_PASSWORD` (min 8 chars, uppercase, lowercase, numbers, symbols)
 
 ### 4. Generate JWT Keys
 
@@ -224,38 +263,89 @@ Expected response:
 
 ## Project Structure
 
+The project follows a modular architecture with clear separation of concerns:
+
 ```
 src/
-├── server.ts              # Application entry point
+├── server.ts              # Application entry point - Express setup & middleware configuration
 ├── errors/                # Custom error classes
+│   └── AppError.ts        # Operational error class with factory methods
 ├── middleware/            # Express middleware
-│   ├── auth.ts            # JWT authentication
-│   ├── rate_limiter.ts    # Rate limiting
-│   └── validation.ts      # Request validation
-├── modules/               # Feature modules
-│   ├── auth/              # Authentication
-│   ├── billing/           # Stripe billing
+│   ├── auth.ts            # JWT authentication & RBAC authorization
+│   ├── rate_limiter.ts    # Request rate limiting (per IP/user)
+│   ├── validation.ts      # Zod schema validation
+│   ├── error_logger.ts    # Winston error logging
+│   └── error_responder.ts # Standardized error responses
+├── modules/               # Feature modules (Router → Service → Model pattern)
+│   ├── auth/              # Authentication (register, login, logout, refresh)
+│   ├── billing/           # Stripe billing & webhooks
 │   ├── customer/          # Customer management
-│   ├── inspection/        # Return inspections
-│   ├── invoice/           # Invoicing
-│   ├── loan/              # Rental loans
-│   ├── material/          # Catalog & inventory
-│   ├── organization/      # Multi-tenancy
-│   ├── package/           # Material packages
-│   ├── request/           # Loan requests
-│   ├── subscription_type/ # Subscription plans
-│   ├── super_admin/       # Admin analytics
+│   ├── inspection/        # Material inspections (checkout/return)
+│   ├── invoice/           # Invoicing system
+│   ├── loan/              # Active rental loans
+│   ├── location/          # Physical locations/warehouses
+│   ├── material/          # Catalog & inventory (categories, types, instances)
+│   ├── organization/      # Multi-tenant organizations
+│   ├── package/           # Material packages (bundles)
+│   ├── request/           # Loan requests (request → approval → loan)
+│   ├── roles/             # RBAC roles & permissions
+│   ├── subscription_type/ # Subscription plans configuration
+│   ├── super_admin/       # Platform-wide admin analytics
+│   ├── transfer/          # Inter-location material transfers
 │   └── user/              # User management
-├── routers/               # Express routers
-└── utils/                 # Utilities
-    ├── auth/              # JWT helpers
-    ├── db/                # Database connection
-    └── logger.ts          # Winston logger
+├── routers/               # Express route aggregation
+│   └── index.ts           # Central router export
+├── scripts/               # Utility scripts
+│   ├── generate_keys.ts   # Generate RSA key pairs for JWT
+│   └── export_permissions_doc.ts # Generate permissions documentation
+└── utils/                 # Shared utilities
+    ├── auth/              # JWT signing & verification helpers
+    ├── db/                # MongoDB connection
+    │   └── connectDB.ts
+    ├── logger.ts          # Winston logger configuration
+    └── email.ts           # Nodemailer email service
 ```
+
+### Module Pattern
+
+Each module follows a consistent pattern:
+
+- `*.router.ts` - HTTP routes, authentication, permission checks, validation
+- `*.service.ts` - Business logic, database queries, data transformations
+- `models/` - Mongoose schemas and Zod validation schemas
+
+**Example flow:** Request → Router (validate) → Service (business logic) → Model (database) → Response
 
 ## API Documentation
 
-See [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) for complete API reference.
+See [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) for complete API reference with all endpoints, request/response examples, and error codes.
+
+## Security
+
+### Authentication
+
+- **JWT with RSA (RS256)** - Asymmetric signing with public/private key pairs
+- **JWE (A256GCM)** - Encrypted JWT tokens for sensitive data
+- **HttpOnly Cookies** - Prevents XSS attacks (tokens not accessible via JavaScript)
+- **Access Token** - 15-minute expiration
+- **Refresh Token** - 7-day expiration (restricted to `/auth` endpoints only)
+
+### Authorization (RBAC)
+
+- **55+ Granular Permissions** - Format: `resource:action` (e.g., `materials:read`, `users:delete`)
+- **Custom Roles per Organization** - Each organization can define its own roles
+- **Permission Inheritance** - System roles (Owner, Admin) with predefined permissions
+- **Request-Level Checks** - Every protected endpoint validates user permissions
+
+### Additional Security Measures
+
+- **Argon2 Password Hashing** - More secure than bcrypt
+- **Helmet** - Sets secure HTTP headers (CSP, HSTS, X-Frame-Options, etc.)
+- **CORS** - Strict origin validation with credentials support
+- **Rate Limiting** - Prevents brute-force attacks (configurable per endpoint)
+- **Input Validation** - Zod schema validation for all requests
+- **MongoDB Injection Prevention** - Mongoose query sanitization
+- **Multi-Tenant Isolation** - All queries scoped by `organizationId`
 
 ## Testing
 
@@ -312,6 +402,69 @@ docker build -t lendevent-api .
 docker run -p 8080:8080 --env-file .env lendevent-api
 ```
 
+**Docker Image Features:**
+- Multi-stage build (smaller image size)
+- Non-root user for security
+- Health check endpoint
+- Optimized layer caching
+
+## Production Deployment
+
+### Environment Configuration
+
+1. **Use Environment Variables** - Never use `.env` files in production. Use your hosting provider's environment variable management.
+
+2. **Required Variables for Production:**
+   ```bash
+   NODE_ENV=production
+   DB_CONNECTION_STRING=<mongodb-atlas-uri>
+   JWT_ISSUER=https://api.yourdomain.com/
+   JWT_AUDIENCE=https://app.yourdomain.com/
+   COOKIE_DOMAIN=yourdomain.com
+   CORS_ORIGIN=https://app.yourdomain.com
+   STRIPE_SECRET_KEY=<live-key>
+   STRIPE_WEBHOOK_SECRET=<live-webhook-secret>
+   ```
+
+3. **Security Checklist:**
+   - ✅ Use HTTPS (cookies with `secure` flag)
+   - ✅ Configure MongoDB Atlas IP whitelist
+   - ✅ Rotate JWT keys regularly
+   - ✅ Enable rate limiting
+   - ✅ Set up monitoring and alerts
+   - ✅ Configure CORS for specific domains only
+   - ✅ Use strong passwords for all accounts
+   - ✅ Enable MongoDB authentication
+   - ✅ Set up automated backups
+
+### Recommended Hosting Options
+
+- **API Hosting:** Heroku, Railway, Render, DigitalOcean App Platform, AWS ECS
+- **Database:** MongoDB Atlas (managed, automatic backups, scaling)
+- **Monitoring:** New Relic, Datadog, or built-in Winston logs
+
+### Process Management
+
+For production without Docker, use a process manager:
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start the API
+pm2 start dist/server.js --name lendevent-api
+
+# View logs
+pm2 logs lendevent-api
+
+# Monitor
+pm2 monit
+
+# Auto-restart on reboot
+pm2 startup
+pm2 save
+```
+
 ## Troubleshooting
 
 ### SSL Certificate Errors
@@ -342,8 +495,28 @@ If you see `ERR_CERT_AUTHORITY_INVALID`:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and coding standards.
+
+## Additional Resources
+
+- **API Documentation:** [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)
+- **Permissions Reference:** [docs/PERMISSIONS_REFERENCE.md](docs/PERMISSIONS_REFERENCE.md)
+- **Español:** [README_SPANISH.md](README_SPANISH.md) - Versión en español de esta documentación
+
+## Support
+
+If you encounter issues:
+
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Review logs in the `logs/` directory
+3. Verify all environment variables are correctly set
+4. Ensure MongoDB is accessible
+5. Check that JWT keys exist in `keys/` directory
 
 ## License
 
 ISC
+
+---
+
+**Made with ❤️ for the LendEvent platform**
