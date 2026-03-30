@@ -68,7 +68,7 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     const res = await request.post("materials/types", {
       data: {
         name: `BCScanType ${Date.now()}`,
-        categoryId,
+        categoryId: [categoryId],
         description: "Barcode scan type",
         pricePerDay: 500,
       },
@@ -249,7 +249,7 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
       const typeRes = await secondOrgCtx.post("materials/types", {
         data: {
           name: `SecondOrgType ${Date.now()}`,
-          categoryId: secondCategoryId,
+          categoryId: [secondCategoryId],
           description: "Second org type",
           pricePerDay: 1000,
         },
@@ -275,14 +275,17 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
       const secondLocationId =
         secondLocationBody.data._id ?? secondLocationBody.data.location?._id;
 
-      const createWithSameKeys = await secondOrgCtx.post("materials/instances", {
-        data: {
-          modelId: secondTypeId,
-          locationId: secondLocationId,
-          serialNumber: uniqueBarcode,
-          barcode: uniqueBarcode,
+      const createWithSameKeys = await secondOrgCtx.post(
+        "materials/instances",
+        {
+          data: {
+            modelId: secondTypeId,
+            locationId: secondLocationId,
+            serialNumber: uniqueBarcode,
+            barcode: uniqueBarcode,
+          },
         },
-      });
+      );
 
       expect(createWithSameKeys.status()).toBe(201);
     } finally {
@@ -313,9 +316,7 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
   }) => {
     if (!instanceIdWithBarcode) test.skip();
 
-    const res = await request.get(
-      `materials/instances/scan/${uniqueBarcode}`,
-    );
+    const res = await request.get(`materials/instances/scan/${uniqueBarcode}`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("success");
@@ -384,12 +385,15 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     if (!instanceIdNoBarcode) test.skip();
 
     const barcodeToMirror = `BC-SYNC-${Date.now()}`;
-    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
-      data: {
-        barcode: barcodeToMirror,
-        useBarcodeAsSerial: true,
+    const res = await request.patch(
+      `materials/instances/${instanceIdNoBarcode}`,
+      {
+        data: {
+          barcode: barcodeToMirror,
+          useBarcodeAsSerial: true,
+        },
       },
-    });
+    );
 
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -404,12 +408,15 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     if (!instanceIdNoBarcode) test.skip();
 
     const manualSerial = `SN-MANUAL-${Date.now()}`;
-    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
-      data: {
-        serialNumber: manualSerial,
-        useBarcodeAsSerial: false,
+    const res = await request.patch(
+      `materials/instances/${instanceIdNoBarcode}`,
+      {
+        data: {
+          serialNumber: manualSerial,
+          useBarcodeAsSerial: false,
+        },
       },
-    });
+    );
 
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -422,12 +429,15 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
   }) => {
     if (!instanceIdNoBarcode) test.skip();
 
-    const res = await request.patch(`materials/instances/${instanceIdNoBarcode}`, {
-      data: {
-        barcode: "   ",
-        useBarcodeAsSerial: true,
+    const res = await request.patch(
+      `materials/instances/${instanceIdNoBarcode}`,
+      {
+        data: {
+          barcode: "   ",
+          useBarcodeAsSerial: true,
+        },
       },
-    });
+    );
 
     expect(res.status()).toBe(400);
   });

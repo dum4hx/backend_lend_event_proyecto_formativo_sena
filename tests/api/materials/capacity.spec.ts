@@ -23,7 +23,7 @@ test.describe("Location Capacity Module", () => {
     const typeRes = await request.post("materials/types", {
       data: {
         name: generateRandomName("Capacity Material"),
-        categoryId,
+        categoryId: [categoryId],
         description: "Test Material Type",
         pricePerDay: 100,
       },

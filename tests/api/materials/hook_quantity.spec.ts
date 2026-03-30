@@ -24,7 +24,7 @@ test.describe("Material Instance Location Quantity Hook", () => {
     const typeRes = await request.post("materials/types", {
       data: {
         name: generateRandomName("Hook Material"),
-        categoryId,
+        categoryId: [categoryId],
         description: "Test Material Type",
         pricePerDay: 100,
       },

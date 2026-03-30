@@ -30,7 +30,7 @@ test.describe.serial("Materials Module", () => {
     const res = await request.post("materials/types", {
       data: {
         name: `Canon ${Date.now()}`,
-        categoryId,
+        categoryId: [categoryId],
         description: "A camera material type",
         pricePerDay: 1000,
       },

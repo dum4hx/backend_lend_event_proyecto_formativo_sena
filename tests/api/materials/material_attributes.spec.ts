@@ -26,7 +26,6 @@ test.describe.serial("Material Attributes Module", () => {
       data: {
         name: `Weight ${Date.now()}`,
         unit: "kg",
-        isRequired: false,
       },
     });
     expect(res.status()).toBe(201);
@@ -34,7 +33,6 @@ test.describe.serial("Material Attributes Module", () => {
     expect(body.data.attribute).toMatchObject({
       name: expect.stringContaining("Weight"),
       unit: "kg",
-      isRequired: false,
       allowedValues: [],
     });
     attributeId = body.data.attribute._id;
@@ -48,14 +46,12 @@ test.describe.serial("Material Attributes Module", () => {
         name: `RAM ${Date.now()}`,
         unit: "GB",
         allowedValues: ["4", "8", "16", "32"],
-        isRequired: true,
         categoryId,
       },
     });
     expect(res.status()).toBe(201);
     const body = await res.json();
     expect(body.data.attribute.allowedValues).toEqual(["4", "8", "16", "32"]);
-    expect(body.data.attribute.isRequired).toBe(true);
   });
 
   test("POST /materials/attributes - should create a category-scoped attribute", async ({
