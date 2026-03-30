@@ -16,6 +16,7 @@ import { adminRouter } from "../modules/super_admin/super_admin.router.ts";
 import permissionsRouter from "../modules/permissions/permission.router.ts";
 import transferRouter from "../modules/transfer/transfer.router.ts";
 import pricingRouter from "../modules/pricing/pricing.router.ts";
+import paymentMethodRouter from "../modules/payment/payment_method.router.ts";
 
 export {
   authRouter,
@@ -36,4 +37,5 @@ export {
   permissionsRouter,
   transferRouter,
   pricingRouter,
+  paymentMethodRouter,
 };

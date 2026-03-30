@@ -26,6 +26,7 @@ import { logger } from "../../utils/logger.ts";
 import roleService from "../roles/roles.service.ts";
 import { userService } from "../user/user.service.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
+import { paymentMethodService } from "../payment/payment_method.service.ts";
 
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
@@ -254,6 +255,10 @@ export const authService = {
       // Seed a default per-day pricing config for the new organization so
       // loan pricing is available immediately without manual setup.
       await pricingService.seedDefaultPricingConfig(organization._id, session);
+      await paymentMethodService.seedDefaultPaymentMethods(
+        organization._id,
+        session,
+      );
 
       createdOrg = organization;
       createdUser = user;

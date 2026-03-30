@@ -129,10 +129,13 @@ const paymentRecordMongooseSchema = new Schema(
       default: Date.now,
     },
     stripePaymentIntentId: String,
+    paymentMethodId: {
+      type: Schema.Types.ObjectId,
+      ref: "PaymentMethod",
+    },
     method: {
       type: String,
-      enum: ["stripe", "cash", "bank_transfer", "other"],
-      default: "stripe",
+      default: "other",
     },
     notes: String,
   },

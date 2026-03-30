@@ -2745,10 +2745,10 @@ Creates a new material instance.
 | modelId            | body     | string  | Yes      | Material type ID                                                                            |
 | locationId         | body     | string  | Yes      | Location ID                                                                                 |
 | serialNumber       | body     | string  | Cond.    | Max 100 chars. Required when `useBarcodeAsSerial=false` or when switch is omitted (legacy). |
-| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true`.                                    |
-| useBarcodeAsSerial | body     | boolean | No       | If `true`, backend persists `serialNumber = barcode`. If omitted, legacy behavior is used. |
+| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true`.                                     |
+| useBarcodeAsSerial | body     | boolean | No       | If `true`, backend persists `serialNumber = barcode`. If omitted, legacy behavior is used.  |
 | status             | body     | string  | No       | `available`, `in_use`, `maintenance`, `damaged`, `retired` (default: `available`)           |
-| force              | body     | boolean | No       | If true, bypasses capacity warnings at the location.                                       |
+| force              | body     | boolean | No       | If true, bypasses capacity warnings at the location.                                        |
 
 **Capacity Management Behavior:**
 If the target `locationId` has a defined capacity for the `modelId` and it is already at full capacity, the API will return a **409 Conflict** error with a warning message. To proceed, the client must resubmit the request including `"force": true` in the body.
@@ -2768,16 +2768,16 @@ Updates editable material instance data (model/location/serial/barcode/notes/att
 
 **Permission Required:** `materials:update`
 
-| Parameter          | Location | Type    | Required | Description                                                                                         |
-| ------------------ | -------- | ------- | -------- | --------------------------------------------------------------------------------------------------- |
-| modelId            | body     | string  | No       | New material type ID                                                                                |
-| locationId         | body     | string  | No       | New location ID                                                                                     |
-| serialNumber       | body     | string  | Cond.    | Max 100 chars. Required when `useBarcodeAsSerial=false` and no existing serial can be reused.       |
-| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true` and no existing barcode can be reused.      |
+| Parameter          | Location | Type    | Required | Description                                                                                             |
+| ------------------ | -------- | ------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| modelId            | body     | string  | No       | New material type ID                                                                                    |
+| locationId         | body     | string  | No       | New location ID                                                                                         |
+| serialNumber       | body     | string  | Cond.    | Max 100 chars. Required when `useBarcodeAsSerial=false` and no existing serial can be reused.           |
+| barcode            | body     | string  | Cond.    | Max 120 chars. Required when `useBarcodeAsSerial=true` and no existing barcode can be reused.           |
 | useBarcodeAsSerial | body     | boolean | No       | If `true`, backend persists `serialNumber = barcode`. If omitted, backward-compatible behavior applies. |
-| notes              | body     | string  | No       | Notes (max 500 chars)                                                                               |
-| attributes         | body     | array   | No       | Updated attributes array                                                                            |
-| force              | body     | boolean | No       | If true and location changes, bypasses capacity warning                                             |
+| notes              | body     | string  | No       | Notes (max 500 chars)                                                                                   |
+| attributes         | body     | array   | No       | Updated attributes array                                                                                |
+| force              | body     | boolean | No       | If true and location changes, bypasses capacity warning                                                 |
 
 **Common errors:**
 
@@ -3425,16 +3425,17 @@ Gets a specific inspection by ID with full item details.
 
 Creates an inspection for a returned loan. If damages or lost items are reported with a cost, a "damage" invoice is automatically generated for the customer.
 
-| Parameter                | Location | Type     | Required | Description                                                                |
-| ------------------------ | -------- | -------- | -------- | -------------------------------------------------------------------------- |
-| loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)              |
-| overallNotes             | body     | string   | No       | General notes about the inspection                                         |
-| items                    | body     | object[] | Yes      | Array of inspected items                                                   |
-| items.materialInstanceId | body     | string   | Yes      | ID of the material instance                                                |
-| items.condition          | body     | string   | Yes      | `good`, `damaged`, `lost`                                                  |
-| items.notes              | body     | string   | No       | Notes for this specific item                                               |
-| items.damageDescription  | body     | string   | No       | Description of the damage                                                  |
-| items.damageCost         | body     | number   | No       | Cost in cents to be charged to the customer (e.g., 150000 = $1,500.00 COP) |
+| Parameter                | Location | Type     | Required | Description                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------ | -------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)                                                                                                                                                                                                                                                                                               |
+| overallNotes             | body     | string   | No       | General notes about the inspection                                                                                                                                                                                                                                                                                                                          |
+| items                    | body     | object[] | Yes      | Array of inspected items                                                                                                                                                                                                                                                                                                                                    |
+| items.materialInstanceId | body     | string   | Yes      | ID of the material instance                                                                                                                                                                                                                                                                                                                                 |
+| items.condition          | body     | string   | Yes      | `good`, `damaged`, `lost`                                                                                                                                                                                                                                                                                                                                   |
+| items.notes              | body     | string   | No       | Notes for this specific item                                                                                                                                                                                                                                                                                                                                |
+| items.damageDescription  | body     | string   | No       | Description of the damage                                                                                                                                                                                                                                                                                                                                   |
+| items.damageCost         | body     | number   | No       | Cost in cents to be charged to the customer (e.g., 150000 = $1,500.00 COP)                                                                                                                                                                                                                                                                                  |
+| dueDate                  | body     | string   | No       | Optional ISO datetime for the damage invoice due date. Only allowed when one or more items are `damaged` or `lost` and a damage invoice will be generated. If provided it will be set as the invoice `dueDate`; otherwise the server defaults to 30 days from creation. Supplying `dueDate` when no invoice will be generated results in `400 Bad Request`. |
 
 **Auth:** `authenticate` + `requireActiveOrganization` + `inspections:create`
 
@@ -3443,6 +3444,7 @@ Creates an inspection for a returned loan. If damages or lost items are reported
 1. The loan must exist and be in `returned` status.
 2. All material instances associated with the loan must be included in the `items` array.
 3. An inspection must not already exist for the loan.
+4. If the optional `dueDate` is provided it must be an ISO datetime string and will only be accepted when damages/losses are present (an invoice will be created). Otherwise the server rejects the request with `400 Bad Request`.
 
 **Response:** `201 Created`
 
@@ -4304,3 +4306,129 @@ Calculates and returns the estimated price for a given item without persisting a
 **Errors:**
 
 - `404` � The referenced materialType or package was not found.
+
+---
+
+## Payment Methods
+
+Payment methods are organization-scoped and used for traceability when recording invoice payments. Each organization starts with a default **Efectivo** method, seeded at registration.
+
+**Base URL:** `/api/v1/payment-methods`
+
+All endpoints require authentication and an active organization.
+
+---
+
+### GET /payment-methods
+
+Lists all **active** payment methods for the authenticated organization.
+
+**Permissions:** `payment_methods:read`
+
+**Response `200`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "paymentMethods": [
+      {
+        "id": "664abc123def456789012345",
+        "name": "Efectivo",
+        "description": "Pago en efectivo / Cash payment",
+        "status": "active",
+        "isDefault": true,
+        "createdAt": "2024-01-15T10:00:00.000Z",
+        "updatedAt": "2024-01-15T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### POST /payment-methods
+
+Creates a new payment method for the organization.
+
+**Permissions:** `payment_methods:create`
+
+**Request body:**
+
+| Field       | Type   | Required | Description                          |
+| ----------- | ------ | -------- | ------------------------------------ |
+| name        | string | Yes      | Unique name (max 100 chars)          |
+| description | string | No       | Optional description (max 300 chars) |
+| status      | string | No       | `"active"` (default) or `"inactive"` |
+
+**Response `201`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "paymentMethod": {
+      "id": "664abc123def456789012346",
+      "name": "Transferencia Bancaria",
+      "description": "Pago mediante transferencia bancaria",
+      "status": "active",
+      "isDefault": false
+    }
+  }
+}
+```
+
+**Errors:**
+
+- `409` -- A payment method with that name already exists in this organization.
+
+---
+
+### PATCH /payment-methods/:id
+
+Updates an existing payment method. The `name` of default (seeded) methods cannot be changed.
+
+**Permissions:** `payment_methods:update`
+
+**URL params:** `id` -- ObjectId of the payment method.
+
+**Request body** (all fields optional):
+
+| Field       | Type   | Description                                      |
+| ----------- | ------ | ------------------------------------------------ |
+| name        | string | New name (cannot change name of default methods) |
+| description | string | Updated description                              |
+| status      | string | `"active"` or `"inactive"`                       |
+
+**Errors:**
+
+- `400` -- Attempt to rename a default payment method.
+- `404` -- Payment method not found.
+- `409` -- Name already taken in this organization.
+
+---
+
+### DELETE /payment-methods/:id
+
+Deactivates a payment method (soft delete -- sets status to `"inactive"`).
+
+**Permissions:** `payment_methods:delete`
+
+**URL params:** `id` -- ObjectId of the payment method.
+
+**Response `200`:**
+
+```json
+{
+  "status": "success",
+  "data": { "id": "664abc123def456789012346", "status": "inactive" }
+}
+```
+
+**Errors:**
+
+- `400` -- Payment method is already inactive.
+- `404` -- Payment method not found.
+
+---

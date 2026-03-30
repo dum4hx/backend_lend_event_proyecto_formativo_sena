@@ -105,8 +105,10 @@ export const inspectionService = {
       damageCost?: number;
     }>;
     overallNotes?: string;
+    dueDate?: string | Date;
   }) {
-    const { organizationId, userId, loanId, items, overallNotes } = params;
+    const { organizationId, userId, loanId, items, overallNotes, dueDate } =
+      params;
 
     const session = await startSession();
     let result: { inspection: any; totalDamageCost: number } | undefined;
@@ -185,7 +187,23 @@ export const inspectionService = {
           (item) => item.condition === "damaged" || item.condition === "lost",
         );
 
+        if (dueDate && damagedItems.length === 0) {
+          throw AppError.badRequest(
+            "dueDate provided but no damaged items present; dueDate is only allowed when a damage invoice will be generated",
+          );
+        }
+
         if (damagedItems.length > 0 && totalDamageCost > 0) {
+          // determine invoice due date
+          let invoiceDueDate: Date;
+          if (dueDate) {
+            invoiceDueDate = new Date(dueDate as any);
+            if (isNaN(invoiceDueDate.getTime())) {
+              throw AppError.badRequest("Invalid dueDate format");
+            }
+          } else {
+            invoiceDueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+          }
           const invoiceLineItems = damagedItems.map((item) => ({
             description:
               item.damageDescription ??
@@ -211,7 +229,7 @@ export const inspectionService = {
                 taxAmount: totalDamageCost * 0.19,
                 totalAmount: totalDamageCost * 1.19,
                 status: "pending",
-                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                dueDate: invoiceDueDate,
                 createdBy: new Types.ObjectId(userId),
                 invoiceNumber: `INV-${Date.now()}`,
               },

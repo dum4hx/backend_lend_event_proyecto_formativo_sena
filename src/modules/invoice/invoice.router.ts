@@ -5,11 +5,13 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
+import { Types } from "mongoose";
 import {
   Invoice,
   invoiceStatusOptions,
   invoiceTypeOptions,
 } from "../invoice/models/invoice.model.ts";
+import { PaymentMethod } from "../payment/models/payment_method.model.ts";
 import {
   validateBody,
   validateQuery,
@@ -60,7 +62,9 @@ const createInvoiceSchema = z.object({
 
 const recordPaymentSchema = z.object({
   amount: z.number().positive(),
-  paymentMethodId: z.string(),
+  paymentMethodId: z.string().refine((v) => Types.ObjectId.isValid(v), {
+    message: "paymentMethodId must be a valid ObjectId",
+  }),
   reference: z.string().max(100).optional(),
   notes: z.string().max(500).optional(),
 });
@@ -302,6 +306,18 @@ invoiceRouter.post(
 
       const { amount, paymentMethodId, reference, notes } = req.body;
 
+      // Validate paymentMethodId belongs to this organization and is active
+      const paymentMethod = await PaymentMethod.findOne({
+        _id: paymentMethodId,
+        organizationId: getOrgId(req),
+        status: "active",
+      });
+      if (!paymentMethod) {
+        throw AppError.notFound(
+          "Payment method not found or inactive in this organization",
+        );
+      }
+
       // Validate payment amount
       const remainingAmount = invoice.totalAmount - (invoice.amountPaid ?? 0);
 
@@ -315,7 +331,8 @@ invoiceRouter.post(
       invoice.payments = invoice.payments ?? [];
       invoice.payments.push({
         amount,
-        method: paymentMethodId ?? "other",
+        paymentMethodId: new Types.ObjectId(paymentMethodId),
+        method: paymentMethod.name,
         notes,
         paidAt: new Date(),
       });

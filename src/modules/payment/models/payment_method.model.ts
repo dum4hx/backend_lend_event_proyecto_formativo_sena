@@ -1,18 +1,18 @@
 import { z } from "zod";
-import { Schema, model, type InferSchemaType } from "mongoose";
+import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 // Payment method statuses
-const paymentStatusOptions: string[] = ["active", "inactive", "deprecated"];
+export const paymentMethodStatusOptions = ["active", "inactive"] as const;
 
-// Zod schema for API validation
+// Zod schema for API validation (create / update)
 export const PaymentMethodZodSchema = z.object({
   name: z
     .string()
     .min(1, "Name is required")
     .max(100, "Maximum 100 characters")
     .trim(),
-  apiURL: z.url("Must be a valid URL"),
-  status: z.enum(["active", "inactive", "deprecated"]).default("active"),
+  description: z.string().max(300).trim().optional(),
+  status: z.enum(paymentMethodStatusOptions).default("active"),
 });
 
 export type PaymentMethodInput = z.infer<typeof PaymentMethodZodSchema>;
@@ -20,35 +20,40 @@ export type PaymentMethodInput = z.infer<typeof PaymentMethodZodSchema>;
 // Payment Method mongoose schema
 const paymentMethodSchema = new Schema(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     name: {
       type: String,
       required: true,
       maxlength: 100,
       trim: true,
-      unique: true,
     },
-    apiURL: {
+    description: {
       type: String,
-      required: true,
-      validate: {
-        validator: (v: string) => /^https?:\/\/.+/.test(v),
-        message: "Must be a valid URL",
-      },
+      maxlength: 300,
+      trim: true,
     },
     status: {
       type: String,
-      enum: paymentStatusOptions,
+      enum: paymentMethodStatusOptions,
       default: "active",
     },
-    partneredAt: {
-      type: Date,
-      default: Date.now,
+    isDefault: {
+      type: Boolean,
+      default: false,
     },
   },
   {
     timestamps: true,
   },
 );
+
+// Unique name per organization
+paymentMethodSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 
 export type PaymentMethodDocument = InferSchemaType<typeof paymentMethodSchema>;
 export const PaymentMethod = model<PaymentMethodDocument>(

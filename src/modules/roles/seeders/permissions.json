@@ -467,5 +467,33 @@
     "description": "Allows creating, updating, and deleting pricing configurations for the organization.",
     "category": "Pricing",
     "isPlatformPermission": false
+  },
+  {
+    "_id": "payment_methods:read",
+    "displayName": "View Payment Methods",
+    "description": "Allows viewing the organization's available payment methods.",
+    "category": "Payment Methods",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "payment_methods:create",
+    "displayName": "Create Payment Methods",
+    "description": "Allows adding new payment methods to the organization.",
+    "category": "Payment Methods",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "payment_methods:update",
+    "displayName": "Update Payment Methods",
+    "description": "Allows editing existing payment methods in the organization.",
+    "category": "Payment Methods",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "payment_methods:delete",
+    "displayName": "Deactivate Payment Methods",
+    "description": "Allows deactivating payment methods in the organization.",
+    "category": "Payment Methods",
+    "isPlatformPermission": false
   }
 ]

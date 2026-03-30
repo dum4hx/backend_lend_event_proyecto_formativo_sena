@@ -684,3 +684,51 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows creating, updating, and deleting pricing configurations for the organization.
 - **Allowed Action:** Create, modify, and delete pricing configurations.
 - **Resource Target:** Pricing Configurations
+
+---
+
+## Payment Methods
+
+### `payment_methods:read`
+
+- **Display Name:** View Payment Methods
+- **Category:** Payment Methods
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing the organization's available payment methods.
+- **Allowed Action:** List payment methods.
+- **Resource Target:** PaymentMethod
+- **Roles:** super_admin, owner, manager, warehouse_operator, commercial_advisor
+
+### `payment_methods:create`
+
+- **Display Name:** Create Payment Methods
+- **Category:** Payment Methods
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows adding new payment methods to the organization.
+- **Allowed Action:** Create a new payment method.
+- **Resource Target:** PaymentMethod
+- **Roles:** super_admin, owner, manager
+
+### `payment_methods:update`
+
+- **Display Name:** Update Payment Methods
+- **Category:** Payment Methods
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows editing existing payment methods in the organization.
+- **Allowed Action:** Edit name/description/status of a payment method.
+- **Resource Target:** PaymentMethod
+- **Roles:** super_admin, owner, manager
+
+### `payment_methods:delete`
+
+- **Display Name:** Deactivate Payment Methods
+- **Category:** Payment Methods
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows deactivating payment methods in the organization.
+- **Allowed Action:** Soft-delete (deactivate) a payment method.
+- **Resource Target:** PaymentMethod
+- **Roles:** super_admin, owner

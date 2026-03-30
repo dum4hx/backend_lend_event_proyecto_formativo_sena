@@ -46,6 +46,10 @@ const createInspectionSchema = z.object({
   loanId: z.string(),
   items: z.array(inspectionItemSchema),
   overallNotes: z.string().max(2000).optional(),
+  dueDate: z.preprocess((val) => {
+    if (!val) return undefined;
+    return typeof val === "string" ? new Date(val) : val;
+  }, z.date().optional()),
 });
 
 const inspectionIdParamSchema = z.object({
@@ -152,7 +156,7 @@ inspectionRouter.post(
     try {
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
-      const { loanId, items, overallNotes } = req.body;
+      const { loanId, items, overallNotes, dueDate } = req.body;
 
       const result = await inspectionService.createInspection({
         organizationId,
@@ -160,6 +164,7 @@ inspectionRouter.post(
         loanId,
         items,
         overallNotes,
+        dueDate,
       });
 
       if (!result) {
