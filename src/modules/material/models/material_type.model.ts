@@ -6,9 +6,13 @@ export const MaterialModelZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Organization ID format",
   }),
-  categoryId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Category ID format",
-  }),
+  categoryId: z
+    .array(
+      z.string().refine((val) => Types.ObjectId.isValid(val), {
+        message: "Invalid Category ID format",
+      }),
+    )
+    .default([]),
   name: z
     .string()
     .min(1, "Name is required")
@@ -22,7 +26,8 @@ export const MaterialModelZodSchema = z.object({
   pricePerDay: z.number().positive("Price must be greater than 0"),
   /**
    * Attribute values assigned to this material type.
-   * Each entry references a MaterialAttribute and provides the value for that attribute.
+   * Each entry references a MaterialAttribute, provides the value, and specifies whether
+   * the attribute is required for this material type.
    */
   attributes: z
     .array(
@@ -34,6 +39,7 @@ export const MaterialModelZodSchema = z.object({
           .string()
           .min(1, "Attribute value cannot be empty")
           .max(500, "Maximum 500 characters"),
+        isRequired: z.boolean().default(false),
       }),
     )
     .default([]),
@@ -76,6 +82,7 @@ const materialTypeSchema = new Schema(
     },
     /**
      * Attribute values applied to this material type.
+     * Each attribute can be marked as required or optional for this specific material type.
      * Validated against MaterialAttribute rules at the service layer.
      */
     attributes: {
@@ -92,6 +99,10 @@ const materialTypeSchema = new Schema(
               required: true,
               maxlength: 500,
               trim: true,
+            },
+            isRequired: {
+              type: Boolean,
+              default: false,
             },
           },
           { _id: false },

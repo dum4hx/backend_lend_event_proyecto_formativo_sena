@@ -16,6 +16,21 @@ export const CategoryZodSchema = z.object({
     .min(1, "Description is required")
     .max(500, "Maximum 500 characters")
     .trim(),
+  /**
+   * Attributes that belong to this category.
+   * Each material type in this category should use these attributes.
+   * Allows individual material types to mark them as required or optional.
+   */
+  attributes: z
+    .array(
+      z.object({
+        attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+          message: "Invalid Attribute ID format",
+        }),
+        isRequired: z.boolean().default(false),
+      }),
+    )
+    .default([]),
 });
 
 export type CategoryInput = z.infer<typeof CategoryZodSchema>;
@@ -40,6 +55,30 @@ const categorySchema = new Schema(
       required: true,
       maxlength: 500,
       trim: true,
+    },
+    /**
+     * Attributes that belong to this category.
+     * Material types in this category inherit these attributes.
+     * Each entry contains attributeId and a default isRequired flag.
+     */
+    attributes: {
+      type: [
+        new Schema(
+          {
+            attributeId: {
+              type: Schema.Types.ObjectId,
+              ref: "MaterialAttribute",
+              required: true,
+            },
+            isRequired: {
+              type: Boolean,
+              default: false,
+            },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
   },
   {
