@@ -51,6 +51,24 @@ export const loanService = {
           session,
         );
 
+        // Build deposit object from request.depositAmount
+        const rawDepositAmount = request.depositAmount ?? 0;
+        const deposit =
+          rawDepositAmount > 0
+            ? {
+                amount: rawDepositAmount,
+                status: "held" as const,
+                transactions: [
+                  {
+                    type: "held" as const,
+                    amount: rawDepositAmount,
+                    date: new Date(),
+                    reference: "Deposit held at checkout",
+                  },
+                ],
+              }
+            : { amount: 0, status: "not_required" as const, transactions: [] };
+
         // Create the loan
         const [loan]: any = await (Loan as any).create(
           [
@@ -64,7 +82,7 @@ export const loanService = {
               })),
               startDate: new Date(),
               endDate: request.endDate,
-              depositAmount,
+              deposit,
               totalAmount: request.totalAmount ?? 0,
               pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
               checkedOutBy: new Types.ObjectId(userId),
@@ -143,6 +161,13 @@ export const loanService = {
         if (notes) {
           loan.notes = (loan.notes ?? "") + `\nReturn notes: ${notes}`;
         }
+
+        // Transition deposit from held to refund_pending now that materials are back
+        const loanDeposit = (loan as any).deposit;
+        if (loanDeposit?.amount > 0 && loanDeposit.status === "held") {
+          loanDeposit.status = "refund_pending";
+        }
+
         await loan.save({ session });
 
         result = loan;
@@ -169,6 +194,19 @@ export const loanService = {
 
     if (!loan) {
       throw AppError.notFound("Loan not found or not in returned status");
+    }
+
+    // Guard: deposit must be fully resolved before closing
+    const deposit = (loan as any).deposit;
+    if (deposit && deposit.amount > 0) {
+      const resolved =
+        deposit.status === "applied" || deposit.status === "refunded";
+      if (!resolved) {
+        throw AppError.badRequest(
+          `Cannot close loan: deposit is not fully resolved. Current deposit status: "${deposit.status}". ` +
+            `Resolve the deposit (apply or refund) before closing the loan.`,
+        );
+      }
     }
 
     // Check if inspection exists and is completed
@@ -298,6 +336,61 @@ export const loanService = {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  },
+
+  /**
+   * Refunds the deposit for a loan whose deposit is in refund_pending or partially_applied status.
+   * Records the refund transaction and marks deposit as refunded.
+   */
+  async refundDeposit(params: {
+    loanId: string | Types.ObjectId;
+    organizationId: string | Types.ObjectId;
+    notes?: string;
+  }): Promise<LoanDocument> {
+    const { loanId, organizationId, notes } = params;
+
+    const loan = await Loan.findOne({
+      _id: loanId,
+      organizationId,
+    });
+
+    if (!loan) {
+      throw AppError.notFound("Loan not found");
+    }
+
+    const deposit = (loan as any).deposit;
+    if (!deposit || deposit.amount === 0) {
+      throw AppError.badRequest("This loan has no deposit to refund");
+    }
+
+    if (
+      deposit.status !== "refund_pending" &&
+      deposit.status !== "partially_applied"
+    ) {
+      throw AppError.badRequest(
+        `Deposit cannot be refunded in its current status: "${deposit.status}". ` +
+          `Only deposits in "refund_pending" or "partially_applied" status can be refunded.`,
+      );
+    }
+
+    // Calculate how much was already applied
+    const alreadyApplied: number = (deposit.transactions as any[])
+      .filter((t: any) => t.type === "applied")
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+    const refundAmount = deposit.amount - alreadyApplied;
+
+    deposit.transactions.push({
+      type: "refund",
+      amount: refundAmount,
+      date: new Date(),
+      reference: notes ?? "Deposit refunded",
+    });
+    deposit.status = "refunded";
+
+    await loan.save();
+
+    return loan as unknown as LoanDocument;
   },
 
   /**

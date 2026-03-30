@@ -7,11 +7,10 @@ import {
 import { z } from "zod";
 import { Types } from "mongoose";
 import {
-  Invoice,
   invoiceStatusOptions,
   invoiceTypeOptions,
 } from "../invoice/models/invoice.model.ts";
-import { PaymentMethod } from "../payment/models/payment_method.model.ts";
+import { invoiceService } from "./invoice.service.ts";
 import {
   validateBody,
   validateQuery,
@@ -22,8 +21,8 @@ import {
   requireActiveOrganization,
   requirePermission,
   getOrgId,
+  getAuthUser,
 } from "../../middleware/auth.ts";
-import { AppError } from "../../errors/AppError.ts";
 
 const invoiceRouter = Router();
 
@@ -86,59 +85,26 @@ invoiceRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        type,
-        customerId,
-        loanId,
-        overdue,
-        sortBy,
-        sortOrder,
-      } = req.query as unknown as z.infer<typeof listInvoicesQuerySchema>;
-      const skip = (page - 1) * limit;
+      const params = req.query as unknown as z.infer<
+        typeof listInvoicesQuerySchema
+      >;
 
-      const query: Record<string, unknown> = { organizationId };
-
-      if (status) {
-        query.status = status;
-      }
-      if (type) {
-        query.type = type;
-      }
-      if (customerId) {
-        query.customerId = customerId;
-      }
-      if (loanId) {
-        query.loanId = loanId;
-      }
-      if (overdue === true) {
-        query.status = "pending";
-        query.dueDate = { $lt: new Date() };
-      }
-
-      const sortField = sortBy ?? "createdAt";
-      const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-      const [invoices, total] = await Promise.all([
-        Invoice.find(query)
-          .skip(skip)
-          .limit(limit)
-          .populate("customerId", "email name")
-          .populate("loanId", "startDate endDate")
-          .sort({ [sortField]: sortDirection }),
-        Invoice.countDocuments(query),
-      ]);
+      const result = await invoiceService.listInvoices({
+        organizationId,
+        page: params.page,
+        limit: params.limit,
+        status: params.status,
+        type: params.type,
+        customerId: params.customerId,
+        loanId: params.loanId,
+        overdue: params.overdue,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
+      });
 
       res.json({
         status: "success",
-        data: {
-          invoices,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: result,
       });
     } catch (err) {
       next(err);
@@ -156,48 +122,11 @@ invoiceRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-
-      const [pendingStats, paidStats, overdueCount] = await Promise.all([
-        Invoice.aggregate([
-          { $match: { organizationId, status: "pending" } },
-          {
-            $group: {
-              _id: null,
-              count: { $sum: 1 },
-              total: { $sum: "$total" },
-            },
-          },
-        ]),
-        Invoice.aggregate([
-          { $match: { organizationId, status: "paid" } },
-          {
-            $group: {
-              _id: null,
-              count: { $sum: 1 },
-              total: { $sum: "$total" },
-            },
-          },
-        ]),
-        Invoice.countDocuments({
-          organizationId,
-          status: "pending",
-          dueDate: { $lt: new Date() },
-        }),
-      ]);
+      const summary = await invoiceService.getInvoiceSummary(organizationId);
 
       res.json({
         status: "success",
-        data: {
-          pending: {
-            count: pendingStats[0]?.count ?? 0,
-            total: pendingStats[0]?.total ?? 0,
-          },
-          paid: {
-            count: paidStats[0]?.count ?? 0,
-            total: paidStats[0]?.total ?? 0,
-          },
-          overdueCount,
-        },
+        data: summary,
       });
     } catch (err) {
       next(err);
@@ -214,17 +143,11 @@ invoiceRouter.get(
   requirePermission("invoices:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await Invoice.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      })
-        .populate("customerId", "email name phone address")
-        .populate("loanId")
-        .populate("inspectionId");
-
-      if (!invoice) {
-        throw AppError.notFound("Invoice not found");
-      }
+      const organizationId = getOrgId(req);
+      const invoice = await invoiceService.getInvoiceById(
+        String(req.params.id),
+        organizationId,
+      );
 
       res.json({
         status: "success",
@@ -247,36 +170,17 @@ invoiceRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const { items, taxRate, dueDate, ...rest } = req.body;
-
-      // Calculate totals
-      const subtotal = items.reduce(
-        (sum: number, item: { quantity: number; unitPrice: number }) =>
-          sum + item.quantity * item.unitPrice,
-        0,
-      );
-      const tax = subtotal * taxRate;
-      const total = subtotal + tax;
-
-      const invoice = await Invoice.create({
-        ...rest,
+      const user = getAuthUser(req);
+      const invoice = await invoiceService.createInvoice({
+        ...req.body,
         organizationId,
-        items,
-        subtotal,
-        tax,
-        total,
-        status: "pending",
-        dueDate: dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
+        createdBy: new Types.ObjectId(user.id),
+        invoiceNumber: `INV-${Date.now()}`,
       });
-
-      const populatedInvoice = await Invoice.findById(invoice._id).populate(
-        "customerId",
-        "email name",
-      );
 
       res.status(201).json({
         status: "success",
-        data: { invoice: populatedInvoice },
+        data: { invoice },
       });
     } catch (err) {
       next(err);
@@ -294,68 +198,23 @@ invoiceRouter.post(
   validateBody(recordPaymentSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await Invoice.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: "pending",
+      const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
+
+      const result = await invoiceService.recordPayment({
+        id: String(req.params.id),
+        organizationId,
+        userId: user.id,
+        ...req.body,
       });
-
-      if (!invoice) {
-        throw AppError.notFound("Invoice not found or not pending");
-      }
-
-      const { amount, paymentMethodId, reference, notes } = req.body;
-
-      // Validate paymentMethodId belongs to this organization and is active
-      const paymentMethod = await PaymentMethod.findOne({
-        _id: paymentMethodId,
-        organizationId: getOrgId(req),
-        status: "active",
-      });
-      if (!paymentMethod) {
-        throw AppError.notFound(
-          "Payment method not found or inactive in this organization",
-        );
-      }
-
-      // Validate payment amount
-      const remainingAmount = invoice.totalAmount - (invoice.amountPaid ?? 0);
-
-      if (amount > remainingAmount) {
-        throw AppError.badRequest(
-          `Payment amount exceeds remaining balance of $${remainingAmount.toFixed(2)}`,
-        );
-      }
-
-      // Record payment
-      invoice.payments = invoice.payments ?? [];
-      invoice.payments.push({
-        amount,
-        paymentMethodId: new Types.ObjectId(paymentMethodId),
-        method: paymentMethod.name,
-        notes,
-        paidAt: new Date(),
-      });
-
-      invoice.amountPaid = (invoice.amountPaid ?? 0) + amount;
-
-      // Check if fully paid
-      if (invoice.amountPaid >= invoice.totalAmount) {
-        invoice.status = "paid";
-        invoice.paidAt = new Date();
-      } else {
-        invoice.status = "partially_paid";
-      }
-
-      await invoice.save();
 
       res.json({
         status: "success",
-        data: { invoice },
+        data: { payment: result.payment },
         message:
-          invoice.status === "paid"
+          result.invoice.status === "paid"
             ? "Invoice fully paid"
-            : `Payment recorded. Remaining balance: $${(invoice.totalAmount - invoice.amountPaid).toFixed(2)}`,
+            : `Payment recorded. Remaining balance: $${(result.invoice.totalAmount - result.invoice.amountPaid).toFixed(2)}`,
       });
     } catch (err) {
       next(err);
@@ -373,20 +232,12 @@ invoiceRouter.post(
   validateBody(voidInvoiceSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await Invoice.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-        status: { $in: ["pending", "partially_paid"] },
+      const organizationId = getOrgId(req);
+      const invoice = await invoiceService.voidInvoice({
+        id: String(req.params.id),
+        organizationId,
+        reason: req.body.reason,
       });
-
-      if (!invoice) {
-        throw AppError.notFound("Invoice not found or cannot be voided");
-      }
-
-      invoice.status = "cancelled";
-      invoice.notes =
-        (invoice.notes ?? "") + `\nVoid reason: ${req.body.reason}`;
-      await invoice.save();
 
       res.json({
         status: "success",
@@ -408,21 +259,8 @@ invoiceRouter.post(
   requirePermission("invoices:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const invoice = await Invoice.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      }).populate("customerId", "email name");
-
-      if (!invoice) {
-        throw AppError.notFound("Invoice not found");
-      }
-
-      // TODO: Implement email sending logic
-      // For now, just update status to pending if draft
-      if (invoice.status === "draft") {
-        invoice.status = "pending";
-      }
-      await invoice.save();
+      const organizationId = getOrgId(req);
+      await invoiceService.sendInvoice(String(req.params.id), organizationId);
 
       res.json({
         status: "success",

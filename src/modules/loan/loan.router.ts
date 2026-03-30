@@ -276,5 +276,39 @@ loanRouter.post(
   },
 );
 
-export default loanRouter;
+/**
+ * POST /api/v1/loans/:id/deposit/refund
+ * Refunds the deposit for a loan in refund_pending or partially_applied status.
+ * Requires loans:update permission.
+ */
+loanRouter.post(
+  "/:id/deposit/refund",
+  requirePermission("loans:update"),
+  validateBody(z.object({ notes: z.string().max(500).optional() })),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const loanId = req.params.id;
 
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("Invalid loan ID");
+      }
+
+      const loan = await loanService.refundDeposit({
+        loanId,
+        organizationId,
+        notes: req.body.notes,
+      });
+
+      res.json({
+        status: "success",
+        data: { loan },
+        message: "Deposit refunded successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+export default loanRouter;

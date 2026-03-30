@@ -153,6 +153,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "invoices:create",
     "invoices:read",
     "invoices:update",
+    "invoices:delete",
     "reports:read",
     // Role management
     "roles:create",

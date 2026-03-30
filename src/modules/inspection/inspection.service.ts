@@ -2,6 +2,7 @@ import { Types, startSession } from "mongoose";
 import { Inspection } from "./models/inspection.model.ts";
 import { Loan } from "../loan/models/loan.model.ts";
 import { Invoice } from "../invoice/models/invoice.model.ts";
+import { invoiceService } from "../invoice/invoice.service.ts";
 import { AppError } from "../../errors/AppError.ts";
 
 export const inspectionService = {
@@ -215,7 +216,10 @@ export const inspectionService = {
             referenceType: "MaterialInstance" as const,
           }));
 
-          await Invoice.create(
+          const invoiceNumber = `INV-${Date.now()}`;
+          const invoiceTotal = totalDamageCost * 1.19; // 19% IVA
+
+          const [createdInvoice]: any = await (Invoice as any).create(
             [
               {
                 organizationId,
@@ -225,17 +229,64 @@ export const inspectionService = {
                 type: "damage",
                 lineItems: invoiceLineItems,
                 subtotal: totalDamageCost,
-                taxRate: 0.19, // 19% tax (Colombian IVA)
+                taxRate: 0.19,
                 taxAmount: totalDamageCost * 0.19,
-                totalAmount: totalDamageCost * 1.19,
+                totalAmount: invoiceTotal,
                 status: "pending",
                 dueDate: invoiceDueDate,
                 createdBy: new Types.ObjectId(userId),
-                invoiceNumber: `INV-${Date.now()}`,
+                invoiceNumber,
               },
             ],
             { session },
           );
+
+          // Auto-apply deposit to the invoice if one exists
+          const loanDeposit = (loan as any).deposit;
+          const depositAmt: number = loanDeposit?.amount ?? 0;
+
+          if (depositAmt > 0) {
+            const depositApplied = Math.min(depositAmt, invoiceTotal);
+            const invoiceDoc = await Invoice.findById(
+              createdInvoice._id,
+            ).session(session);
+
+            if (invoiceDoc) {
+              invoiceService.applyDepositPayment(
+                invoiceDoc,
+                depositApplied,
+                `Deposit applied to invoice ${invoiceNumber}`,
+              );
+              await invoiceDoc.save({ session });
+            }
+
+            // Update loan deposit lifecycle
+            const newDepositStatus =
+              depositApplied >= depositAmt ? "applied" : "partially_applied";
+            loanDeposit.transactions.push({
+              type: "applied",
+              amount: depositApplied,
+              date: new Date(),
+              reference: `Applied to invoice ${invoiceNumber}`,
+            });
+            loanDeposit.status = newDepositStatus;
+            await loan.save({ session });
+          }
+        } else if (totalDamageCost === 0) {
+          // No damages — mark deposit as pending physical refund
+          const loanDeposit = (loan as any).deposit;
+          const depositAmt: number = loanDeposit?.amount ?? 0;
+
+          if (depositAmt > 0) {
+            loanDeposit.transactions.push({
+              type: "refund",
+              amount: depositAmt,
+              date: new Date(),
+              reference: "No damages found — deposit pending physical refund",
+            });
+            loanDeposit.status = "refund_pending";
+            await loan.save({ session });
+          }
         }
 
         const populatedInspection = await Inspection.findById(inspection._id)

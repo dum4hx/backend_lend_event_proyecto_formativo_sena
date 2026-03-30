@@ -3129,14 +3129,15 @@ Lists all loan requests in the organization.
 
 Creates a new loan request (commercial advisor action).
 
-| Parameter      | Location | Type   | Required | Description                                                                 |
-| -------------- | -------- | ------ | -------- | --------------------------------------------------------------------------- |
-| customerId     | body     | string | Yes      | Customer ID                                                                 |
-| items          | body     | array  | Yes      | Array of request items                                                      |
-| startDate      | body     | string | Yes      | Loan start date (ISO 8601)                                                  |
-| endDate        | body     | string | Yes      | Loan end date (ISO 8601). Must be after `startDate`.                        |
-| depositDueDate | body     | string | Yes      | Date by which deposit must be paid (ISO 8601). Cannot be after `startDate`. |
-| notes          | body     | string | No       | Additional notes                                                            |
+| Parameter      | Location | Type   | Required | Description                                                                       |
+| -------------- | -------- | ------ | -------- | --------------------------------------------------------------------------------- |
+| customerId     | body     | string | Yes      | Customer ID                                                                       |
+| items          | body     | array  | Yes      | Array of request items                                                            |
+| startDate      | body     | string | Yes      | Loan start date (ISO 8601)                                                        |
+| endDate        | body     | string | Yes      | Loan end date (ISO 8601). Must be after `startDate`.                              |
+| depositDueDate | body     | string | Yes      | Date by which deposit must be paid (ISO 8601). Cannot be after `startDate`.       |
+| depositAmount  | body     | number | Yes      | Deposit amount in the organization's currency. Use `0` if no deposit is required. |
+| notes          | body     | string | No       | Additional notes                                                                  |
 
 `items[]` contract (recommended):
 
@@ -3507,7 +3508,125 @@ Marks a loan as returned.
 
 ---
 
-### Inspection Endpoints
+#### POST /loans/:id/complete
+
+Completes a loan after inspection (transitions to `closed` status).
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:update`
+
+**Preconditions:**
+
+1. The loan must be in `returned` status.
+2. A completed inspection must exist for the loan.
+3. If the loan has a deposit (`deposit.amount > 0`), the deposit must be fully resolved — `deposit.status` must be `"applied"` or `"refunded"`. Attempting to close a loan while its deposit is in any other status (e.g. `"held"`, `"partially_applied"`, `"refund_pending"`) will result in `400 Bad Request`.
+
+**Errors:**
+
+| Code              | Condition                                               |
+| ----------------- | ------------------------------------------------------- |
+| `400 BAD_REQUEST` | Deposit is not fully resolved (`applied` or `refunded`) |
+| `400 BAD_REQUEST` | No inspection exists for the loan                       |
+| `404 NOT_FOUND`   | Loan not found or not in `returned` status              |
+
+---
+
+#### POST /loans/:id/deposit/refund
+
+Refunds the deposit for a loan whose deposit is in `refund_pending` (no damages found) or `partially_applied` (deposit only partially covered damage charges) status.
+
+This endpoint records a `refund` deposit transaction, sets `deposit.status` to `"refunded"`, and allows the loan to subsequently be completed.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:update`
+
+| Parameter | Location | Type   | Required | Description                                    |
+| --------- | -------- | ------ | -------- | ---------------------------------------------- |
+| notes     | body     | string | No       | Notes describing the physical refund (max 500) |
+
+**Preconditions:**
+
+1. Loan must exist for the organization.
+2. `deposit.status` must be `"refund_pending"` or `"partially_applied"`.
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loan": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "deposit": {
+        "amount": 50000,
+        "status": "refunded",
+        "transactions": [
+          {
+            "type": "held",
+            "amount": 50000,
+            "date": "2026-03-01T10:00:00.000Z",
+            "reference": "Deposit held at checkout"
+          },
+          {
+            "type": "refund",
+            "amount": 50000,
+            "date": "2026-03-10T14:20:00.000Z",
+            "reference": "Physical refund handed to customer"
+          }
+        ]
+      }
+    }
+  },
+  "message": "Deposit refunded successfully"
+}
+```
+
+**Errors:**
+
+| Code              | Condition                                                        |
+| ----------------- | ---------------------------------------------------------------- |
+| `400 BAD_REQUEST` | Loan has no deposit (`deposit.amount === 0`)                     |
+| `400 BAD_REQUEST` | Deposit is not in `refund_pending` or `partially_applied` status |
+| `404 NOT_FOUND`   | Loan not found                                                   |
+
+---
+
+### Deposit Schema Reference
+
+Loans that were created from a request with `depositAmount > 0` carry a `deposit` sub-document with the following structure:
+
+```json
+{
+  "deposit": {
+    "amount": 50000,
+    "status": "held",
+    "transactions": [
+      {
+        "type": "held | applied | refund",
+        "amount": 50000,
+        "date": "2026-03-01T10:00:00.000Z",
+        "reference": "Deposit held at checkout"
+      }
+    ]
+  }
+}
+```
+
+**Deposit status lifecycle:**
+
+| Status              | Meaning                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| `not_required`      | No deposit collected (amount = 0)                                        |
+| `held`              | Deposit collected and held — loan active or awaiting return/inspection   |
+| `partially_applied` | Deposit partially covered damage charges; remainder must be refunded     |
+| `applied`           | Full deposit applied to damage invoice (invoice fully or partially paid) |
+| `refund_pending`    | No damages — physical refund must be issued to customer                  |
+| `refunded`          | Deposit returned to customer (physical or digital)                       |
+
+**Deposit transition rules (set automatically by POST /inspections):**
+
+- Damages found AND `depositAmt >= invoiceTotal` → `applied`
+- Damages found AND `depositAmt < invoiceTotal` → `partially_applied`
+- No damages → `refund_pending`
+- Manual refund via `POST /loans/:id/deposit/refund` → `refunded`
 
 ### Package Endpoints
 
@@ -3654,15 +3773,44 @@ Creates a new invoice.
 
 ---
 
-#### POST /invoices/:id/payment
+#### POST /invoices/:id/pay
 
-Records a payment against an invoice.
+Records a payment against an invoice. The endpoint validates the provided `paymentMethodId` belongs to the authenticated organization and is active. On success it returns the newly recorded payment record (not the full invoice document).
 
-| Parameter       | Location | Type   | Required | Description       |
-| --------------- | -------- | ------ | -------- | ----------------- |
-| amount          | body     | number | Yes      | Payment amount    |
-| paymentMethodId | body     | string | Yes      | Payment method ID |
-| reference       | body     | string | No       | Payment reference |
+| Parameter       | Location | Type   | Required | Description                                   |
+| --------------- | -------- | ------ | -------- | --------------------------------------------- |
+| amount          | body     | number | Yes      | Payment amount (same units as invoice totals) |
+| paymentMethodId | body     | string | Yes      | Payment method ObjectId (organization-scoped) |
+| reference       | body     | string | No       | Optional payment reference or transaction id  |
+
+**Response `200`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "payment": {
+      "amount": 50000,
+      "paymentMethodId": "664abc123def456789012346",
+      "method": "Efectivo",
+      "notes": "Received at front desk",
+      "paidAt": "2026-03-29T12:34:56.000Z"
+    }
+  },
+  "message": "Payment recorded. Remaining balance: $250.00"
+}
+```
+
+**Notes:**
+
+- The returned `payment` object is the newly appended payment subdocument stored on the invoice (the last element in the `payments` array).
+- Clients that need the updated invoice should call `GET /invoices/:id` after recording the payment.
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Payment amount invalid or exceeds remaining balance.
+- `404` — `NOT_FOUND`: Invoice not found or not in a payable status.
+- `404` — `NOT_FOUND`: Payment method not found or inactive in this organization.
 
 ---
 

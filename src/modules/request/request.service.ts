@@ -33,6 +33,7 @@ interface CreateRequestInput {
   startDate: Date;
   endDate: Date;
   notes?: string;
+  depositAmount: number;
   items: RequestItemInput[];
 }
 

@@ -69,13 +69,85 @@ export const LoanZodSchema = z.object({
     .min(1, "At least one material is required"),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
-  depositAmount: z.number().min(0).default(0),
+  deposit: z
+    .object({
+      amount: z.number().min(0).default(0),
+    })
+    .optional(),
   totalAmount: z.number().min(0),
 });
 
 export type LoanInput = z.infer<typeof LoanZodSchema>;
 
+/* ---------- Deposit Enums ---------- */
+
+export const depositStatusOptions = [
+  "not_required",
+  "held",
+  "partially_applied",
+  "applied",
+  "refund_pending",
+  "refunded",
+] as const;
+
+export type DepositStatus = (typeof depositStatusOptions)[number];
+
+export const depositTransactionTypeOptions = [
+  "held",
+  "applied",
+  "refund",
+] as const;
+export type DepositTransactionType =
+  (typeof depositTransactionTypeOptions)[number];
+
 /* ---------- Mongoose Sub-Schemas ---------- */
+
+/* ---------- Deposit Transaction Sub-Schema ---------- */
+
+const depositTransactionSchema = new Schema(
+  {
+    type: {
+      type: String,
+      enum: depositTransactionTypeOptions,
+      required: true,
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+    reference: {
+      type: String,
+    },
+  },
+  { _id: false },
+);
+
+/* ---------- Deposit Sub-Schema ---------- */
+
+const depositSchema = new Schema(
+  {
+    amount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    status: {
+      type: String,
+      enum: depositStatusOptions,
+      default: "not_required",
+    },
+    transactions: {
+      type: [depositTransactionSchema],
+      default: [],
+    },
+  },
+  { _id: false },
+);
 
 /* ---------- Pricing Snapshot Sub-Schema ---------- */
 
@@ -211,15 +283,9 @@ const loanSchema = new Schema(
       default: [],
     },
     // Financial
-    depositAmount: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },
-    depositRefunded: {
-      type: Number,
-      min: 0,
-      default: 0,
+    deposit: {
+      type: depositSchema,
+      default: () => ({ amount: 0, status: "not_required", transactions: [] }),
     },
     totalAmount: {
       type: Number,
