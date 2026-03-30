@@ -2476,22 +2476,182 @@ Reactivates a soft-deleted location.
 
 #### GET /materials/categories
 
-Lists all material categories.
+Lists all material categories for the organization.
 
 **Permission Required:** `materials:read`
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.test.local/api/v1/materials/categories \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "categories": [
+      {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
+        "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+        "name": "Cameras",
+        "description": "Professional and consumer cameras",
+        "attributes": [
+          {
+            "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+            "isRequired": true
+          },
+          {
+            "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+            "isRequired": false
+          }
+        ],
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
 
 ---
 
 #### POST /materials/categories
 
-Creates a new category.
+Creates a new category. Categories define which attributes are available to material types within them.
 
 **Permission Required:** `materials:create`
 
-| Parameter   | Location | Type   | Required | Description   |
-| ----------- | -------- | ------ | -------- | ------------- |
-| name        | body     | string | Yes      | Category name |
-| description | body     | string | Yes      | Description   |
+| Parameter   | Location | Type     | Required | Description                                                      |
+| ----------- | -------- | -------- | -------- | ---------------------------------------------------------------- |
+| name        | body     | string   | Yes      | Category name (max 100 chars, must be unique per organization)   |
+| description | body     | string   | Yes      | Category description (max 500 chars)                             |
+| attributes  | body     | object[] | No       | Array of attributes that belong to this category (default: `[]`) |
+
+**Attributes Array Structure:**
+
+```typescript
+attributes: [
+  {
+    attributeId: string, // MongoDB ObjectId of the material attribute
+    isRequired: boolean, // Default required status for material types in this category (default: false)
+  },
+];
+```
+
+**Example Request:**
+
+```json
+{
+  "name": "Cameras",
+  "description": "Professional and consumer cameras",
+  "attributes": [
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "isRequired": true
+    }
+  ]
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "category": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Cameras",
+      "description": "Professional and consumer cameras",
+      "attributes": [
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+          "isRequired": true
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+- **400 Bad Request** – Category name already exists in this organization
+- **400 Bad Request** – Attribute ID is invalid or does not exist in organization
+
+---
+
+#### PATCH /materials/categories/:id
+
+Updates a category. All fields are optional except that the `name` must remain unique per organization.
+
+**Permission Required:** `materials:update`
+
+| Parameter   | Location | Type     | Required | Description                                           |
+| ----------- | -------- | -------- | -------- | ----------------------------------------------------- |
+| id          | path     | string   | Yes      | Category MongoDB ObjectId                             |
+| name        | body     | string   | No       | Updated category name (max 100 chars, must be unique) |
+| description | body     | string   | No       | Updated description (max 500 chars)                   |
+| attributes  | body     | object[] | No       | Updated array of attributes for this category         |
+
+**Example Request:**
+
+```json
+{
+  "name": "Professional Cameras",
+  "attributes": [
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "isRequired": true
+    },
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+      "isRequired": false
+    }
+  ]
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "category": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Professional Cameras",
+      "description": "Professional and consumer cameras",
+      "attributes": [
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+          "isRequired": true
+        },
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+          "isRequired": false
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+- **404 Not Found** – Category does not exist in this organization
+- **400 Bad Request** – Updated name already exists in organization
+- **400 Bad Request** – Attribute ID is invalid or does not exist
 
 ---
 
@@ -2501,20 +2661,333 @@ Deletes a material category. Fails if any material types reference this category
 
 **Permission Required:** `materials:delete`
 
+**Example Request:**
+
+```bash
+curl -X DELETE https://api.test.local/api/v1/materials/categories/64f1a2b3c4d5e6f7a8b9c0c9 \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Category deleted successfully"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                                   | Message                                             |
+| ------ | ------------------------------------------- | --------------------------------------------------- |
+| 404    | Category not found or doesn't belong to org | `Category not found`                                |
+| 400    | Category has linked material types          | `Cannot delete category while material types exist` |
+
+---
+
+### Material Attributes Endpoints
+
+Material attributes are global organization-scoped attribute definitions that can be reused across multiple categories and material types. Categories define which attributes are relevant, and material types can then use those attributes.
+
+#### GET /materials/attributes
+
+Lists all material attributes for the organization. Optionally filtered by category.
+
+**Permission Required:** `material_attributes:read`
+
+| Parameter  | Location | Type   | Required | Description                                                                            |
+| ---------- | -------- | ------ | -------- | -------------------------------------------------------------------------------------- |
+| categoryId | query    | string | No       | If provided, retrieves only attributes that belong to this category (MongoDB ObjectId) |
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.test.local/api/v1/materials/attributes?categoryId=64f1a2b3c4d5e6f7a8b9c0c9" \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attributes": [
+      {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+        "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+        "name": "Megapixels",
+        "unit": "MP",
+        "allowedValues": ["16", "24", "32", "45"],
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      },
+      {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0d2",
+        "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+        "name": "Color",
+        "unit": "",
+        "allowedValues": ["Red", "Black", "Silver"],
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /materials/attributes/:id
+
+Gets a specific material attribute.
+
+**Permission Required:** `material_attributes:read`
+
+| Parameter | Location | Type   | Required | Description                |
+| --------- | -------- | ------ | -------- | -------------------------- |
+| id        | path     | string | Yes      | Attribute MongoDB ObjectId |
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.test.local/api/v1/materials/attributes/64f1a2b3c4d5e6f7a8b9c0d1 \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attribute": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Megapixels",
+      "unit": "MP",
+      "allowedValues": ["16", "24", "32", "45"],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+#### POST /materials/attributes
+
+Creates a new material attribute for the organization.
+
+**Permission Required:** `material_attributes:create`
+
+| Parameter     | Location | Type     | Required | Description                                                                                     |
+| ------------- | -------- | -------- | -------- | ----------------------------------------------------------------------------------------------- |
+| name          | body     | string   | Yes      | Attribute name (max 100 chars, must be unique per organization)                                 |
+| unit          | body     | string   | No       | Unit of measurement (e.g., "MP", "mm", "kg"). Max 50 chars. (default: empty string)             |
+| allowedValues | body     | string[] | No       | If provided, the value assigned to this attribute must be one of these strings. (default: `[]`) |
+
+**Notes:**
+
+- If `allowedValues` is empty or omitted, any value is accepted (free-form).
+- If `allowedValues` is provided, values must be strings of 1–200 characters.
+- Attribute names must be unique within the organization.
+
+**Example Request (Enumerated Attribute):**
+
+```json
+{
+  "name": "Megapixels",
+  "unit": "MP",
+  "allowedValues": ["16", "24", "32", "45"]
+}
+```
+
+**Example Request (Free-form Attribute):**
+
+```json
+{
+  "name": "Serial Number",
+  "unit": "",
+  "allowedValues": []
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attribute": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Megapixels",
+      "unit": "MP",
+      "allowedValues": ["16", "24", "32", "45"],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+- **400 Bad Request** – Attribute name already exists in this organization
+- **400 Bad Request** – Invalid allowedValues (empty strings, exceeds length limits, etc.)
+
+---
+
+#### PATCH /materials/attributes/:id
+
+Updates a material attribute. All fields are optional. The name, unit, and allowedValues can be individually updated.
+
+**Permission Required:** `material_attributes:update`
+
+| Parameter     | Location | Type     | Required | Description                                            |
+| ------------- | -------- | -------- | -------- | ------------------------------------------------------ |
+| id            | path     | string   | Yes      | Attribute MongoDB ObjectId                             |
+| name          | body     | string   | No       | Updated attribute name (max 100 chars, must be unique) |
+| unit          | body     | string   | No       | Updated unit (max 50 chars)                            |
+| allowedValues | body     | string[] | No       | Updated list of allowed values                         |
+
+**Example Request:**
+
+```json
+{
+  "allowedValues": ["16", "24", "32", "45", "61"]
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "attribute": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Megapixels",
+      "unit": "MP",
+      "allowedValues": ["16", "24", "32", "45", "61"],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-12T10:30:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+- **404 Not Found** – Attribute does not exist or does not belong to this organization
+- **400 Bad Request** – Updated name already exists in organization
+- **400 Bad Request** – Invalid allowedValues format
+
+---
+
+#### DELETE /materials/attributes/:id
+
+Deletes a material attribute. Fails if any material type currently references this attribute.
+
+**Permission Required:** `material_attributes:delete`
+
+**Example Request:**
+
+```bash
+curl -X DELETE https://api.test.local/api/v1/materials/attributes/64f1a2b3c4d5e6f7a8b9c0d1 \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Material attribute deleted successfully"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                                    | Message                                  |
+| ------ | -------------------------------------------- | ---------------------------------------- |
+| 404    | Attribute not found or doesn't belong to org | `Attribute not found`                    |
+| 400    | Attribute is used by material types          | `Cannot delete attribute (still in use)` |
+
+---
+
+#### GET /materials/audit/orphaned-attribute-values
+
+Audit endpoint: returns all material types with orphaned attribute values (i.e., values that are no longer in the attribute's `allowedValues` list). This can happen when an attribute's allowed values are reduced after material types have already been created with those values.
+
+**Permission Required:** `materials:read`
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.test.local/api/v1/materials/audit/orphaned-attribute-values \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "orphanedCount": 2,
+    "orphanedMaterials": [
+      {
+        "materialTypeId": "64f1a2b3c4d5e6f7a8b9c0de",
+        "materialTypeName": "Canon EOS R5",
+        "attributeName": "Megapixels",
+        "currentValue": "61",
+        "allowedValues": ["16", "24", "32", "45"],
+        "message": "Value '61' is no longer in the allowed list"
+      },
+      {
+        "materialTypeId": "64f1a2b3c4d5e6f7a8b9c0df",
+        "materialTypeName": "Nikon Z9",
+        "attributeName": "Color",
+        "currentValue": "Bronze",
+        "allowedValues": ["Red", "Black", "Silver"],
+        "message": "Value 'Bronze' is no longer in the allowed list"
+      }
+    ]
+  }
+}
+```
+
+**Notes:**
+
+- This endpoint is useful for detecting configuration issues after attribute constraints are tightened.
+- Orphaned values can be corrected by updating the affected material type's attribute to use an allowed value, or by relaxing the attribute's `allowedValues` list.
+
 ---
 
 #### GET /materials/types
 
-Lists all material types (catalog items).
+Lists all material types (catalog items) for the organization.
 
 **Permission Required:** `materials:read`
 
-| Parameter  | Location | Type    | Required | Description                   |
-| ---------- | -------- | ------- | -------- | ----------------------------- |
-| page       | query    | integer | No       | Page number (default: 1)      |
-| limit      | query    | integer | No       | Items per page (default: 20)  |
-| categoryId | query    | string  | No       | Filter by category            |
-| search     | query    | string  | No       | Search by name or description |
+| Parameter  | Location | Type    | Required | Description                                               |
+| ---------- | -------- | ------- | -------- | --------------------------------------------------------- |
+| page       | query    | integer | No       | Page number (default: 1)                                  |
+| limit      | query    | integer | No       | Items per page (default: 20)                              |
+| categoryId | query    | string  | No       | Filter by category ID (shows only types in that category) |
+| search     | query    | string  | No       | Search by name or description                             |
+
+**Example Request:**
+
+```bash
+curl -X GET "https://api.test.local/api/v1/materials/types?categoryId=64f1a2b3c4d5e6f7a8b9c0c9" \
+  -b cookies.txt
+```
 
 **Success Response (200):**
 
@@ -2524,15 +2997,29 @@ Lists all material types (catalog items).
   "data": {
     "materialTypes": [
       {
-        "_id": "60d5f49f1c7d2e001f8e4b1a",
-        "name": "Tripod",
-        "description": "Standard tripod",
+        "_id": "64f1a2b3c4d5e6f7a8b9c0de",
+        "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+        "name": "Canon EOS R5",
+        "description": "Professional mirrorless camera",
         "categoryId": {
-          "_id": "60d5f48f1c7d2e001f8e4b19",
-          "name": "Accessories"
+          "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
+          "name": "Cameras"
         },
         "pricePerDay": 1500,
-        "attributes": []
+        "attributes": [
+          {
+            "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+            "value": "24",
+            "isRequired": true
+          },
+          {
+            "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+            "value": "Red",
+            "isRequired": false
+          }
+        ],
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
       }
     ],
     "total": 1,
@@ -2552,35 +3039,230 @@ Gets a specific material type.
 
 **Permission Required:** `materials:read`
 
+| Parameter | Location | Type   | Required | Description      |
+| --------- | -------- | ------ | -------- | ---------------- |
+| id        | path     | string | Yes      | Material type ID |
+
+**Example Request:**
+
+```bash
+curl -X GET https://api.test.local/api/v1/materials/types/64f1a2b3c4d5e6f7a8b9c0de \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "materialType": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0de",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Canon EOS R5",
+      "description": "Professional mirrorless camera",
+      "categoryId": {
+        "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
+        "name": "Cameras"
+      },
+      "pricePerDay": 1500,
+      "attributes": [
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+          "value": "24",
+          "isRequired": true
+        },
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+          "value": "Red",
+          "isRequired": false
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
 ---
 
 #### POST /materials/types
 
 Creates a new material type. Validates against organization's catalog item limit.
 
+**Key Points:**
+
+- Material types must belong to at least one category.
+- Attributes must have been previously defined via `POST /materials/attributes` and added to the category via `POST /materials/categories`.
+- Each attribute can be independently marked as required or optional for this material type. Required attributes must have non-empty values.
+- When an attribute is assigned to a material type, the value must be one of the attribute's `allowedValues` (if the attribute has constraints).
+
 **Permission Required:** `materials:create`
 
-| Parameter   | Location | Type   | Required | Description          |
-| ----------- | -------- | ------ | -------- | -------------------- |
-| name        | body     | string | Yes      | Material name        |
-| description | body     | string | Yes      | Description          |
-| categoryId  | body     | string | Yes      | Category ID          |
-| pricePerDay | body     | number | Yes      | Rental price per day |
+| Parameter                | Location | Type     | Required | Description                                                                                          |
+| ------------------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| name                     | body     | string   | Yes      | Material name (max 150 chars)                                                                        |
+| description              | body     | string   | Yes      | Description (max 500 chars)                                                                          |
+| categoryId               | body     | string   | Yes      | Category ID (MongoDB ObjectId). Attribute availability is inherited from this category.              |
+| pricePerDay              | body     | number   | Yes      | Rental price per day (must be > 0)                                                                   |
+| attributes               | body     | object[] | No       | Array of attributes for this material type (only attributes from the category can be used)           |
+| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId). Attribute must exist in the organization and the selected category. |
+| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char). Must match `allowedValues` if defined on the attribute. |
+| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                           |
+
+**Example Request:**
+
+```json
+{
+  "name": "Canon EOS R5",
+  "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
+  "description": "Professional mirrorless camera",
+  "pricePerDay": 1500,
+  "attributes": [
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "value": "24",
+      "isRequired": true
+    },
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+      "value": "Red",
+      "isRequired": false
+    }
+  ]
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "materialType": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0de",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Canon EOS R5",
+      "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
+      "description": "Professional mirrorless camera",
+      "pricePerDay": 1500,
+      "attributes": [
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+          "value": "24",
+          "isRequired": true
+        },
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+          "value": "Red",
+          "isRequired": false
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+| Status | Condition                                         | Message/Code                                            |
+| ------ | ------------------------------------------------- | ------------------------------------------------------- |
+| 400    | Required attributes have empty values             | `Attribute value cannot be empty`                       |
+| 400    | Attribute value not in `allowedValues`            | `Value '...' is not allowed for attribute '...'`        |
+| 400    | Attribute does not exist in organization          | `Attribute '...' not found in this organization`        |
+| 400    | Attribute not available for the selected category | `Attribute '...' is not available for these categories` |
+| 400    | No valid categories found                         | `No valid categories found for this material type`      |
+| 409    | Organization has reached catalog item limit       | `Catalog item limit reached`                            |
 
 ---
 
 #### PATCH /materials/types/:id
 
-Updates a material type. All fields are optional.
+Updates a material type. All fields are optional. When updating attributes, the entire attributes array replaces the previous one.
 
 **Permission Required:** `materials:update`
 
-| Parameter   | Location | Type   | Required | Description          |
-| ----------- | -------- | ------ | -------- | -------------------- |
-| name        | body     | string | No       | Material name        |
-| description | body     | string | No       | Description          |
-| categoryId  | body     | string | No       | Category ID          |
-| pricePerDay | body     | number | No       | Rental price per day |
+| Parameter                | Location | Type     | Required | Description                                                                                    |
+| ------------------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------- |
+| id                       | path     | string   | Yes      | Material type ID (MongoDB ObjectId)                                                            |
+| name                     | body     | string   | No       | Updated material name (max 150 chars)                                                          |
+| description              | body     | string   | No       | Updated description (max 500 chars)                                                            |
+| categoryId               | body     | string   | No       | Updated category ID. When changed, attribute constraints are checked against the new category. |
+| pricePerDay              | body     | number   | No       | Updated rental price per day (must be > 0)                                                     |
+| attributes               | body     | object[] | No       | Updated array of attributes (replaces previous array completely)                               |
+| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId)                                                                |
+| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char)                                                    |
+| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                     |
+
+**Example Request (Update attributes to mark one as required, add new attribute):**
+
+```json
+{
+  "attributes": [
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+      "value": "24",
+      "isRequired": true
+    },
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+      "value": "Red",
+      "isRequired": true
+    },
+    {
+      "attributeId": "64f1a2b3c4d5e6f7a8b9c0d3",
+      "value": "8K",
+      "isRequired": false
+    }
+  ]
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "materialType": {
+      "_id": "64f1a2b3c4d5e6f7a8b9c0de",
+      "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
+      "name": "Canon EOS R5",
+      "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
+      "description": "Professional mirrorless camera",
+      "pricePerDay": 1500,
+      "attributes": [
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+          "value": "24",
+          "isRequired": true
+        },
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d2",
+          "value": "Red",
+          "isRequired": true
+        },
+        {
+          "attributeId": "64f1a2b3c4d5e6f7a8b9c0d3",
+          "value": "8K",
+          "isRequired": false
+        }
+      ],
+      "updatedAt": "2024-01-02T12:00:00.000Z"
+    }
+  }
+}
+```
+
+**Validation Errors:**
+
+- **404 Not Found** – Material type not found or does not belong to the organization
+- **400 Bad Request** – Category does not exist or has no valid attributes
+- **400 Bad Request** – Attribute does not exist in organization or not available for the category
+- **400 Bad Request** – Attribute value violates `allowedValues` restriction
 
 ---
 
@@ -2589,6 +3271,33 @@ Updates a material type. All fields are optional.
 Deletes a material type. Fails if any material instances of this type exist.
 
 **Permission Required:** `materials:delete`
+
+| Parameter | Location | Type   | Required | Description      |
+| --------- | -------- | ------ | -------- | ---------------- |
+| id        | path     | string | Yes      | Material type ID |
+
+**Example Request:**
+
+```bash
+curl -X DELETE https://api.test.local/api/v1/materials/types/64f1a2b3c4d5e6f7a8b9c0de \
+  -b cookies.txt
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "message": "Material type deleted successfully"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                            | Message                                               |
+| ------ | ------------------------------------ | ----------------------------------------------------- |
+| 404    | Material type not found              | `Material type not found`                             |
+| 400    | Material type has existing instances | `Cannot delete material type with existing instances` |
 
 ---
 
@@ -2929,6 +3638,10 @@ Gets detailed information about a specific transfer, including item details.
 ---
 
 ### Material Attribute Endpoints
+
+**Per-MaterialType Attribute Configuration:**
+
+Material attributes are defined globally at the organization level via these endpoints, but **each material type independently specifies which attributes are required or optional**. This means the same attribute can be required for one material type and optional for another. The `isRequired` flag on the `MaterialAttribute` definition is deprecated; instead, use the `isRequired` field in each material type's `attributes` array (see [POST /materials/types](#post-materialstypes) for details).
 
 #### GET /materials/attributes
 
