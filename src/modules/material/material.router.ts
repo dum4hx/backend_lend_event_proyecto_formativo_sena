@@ -278,6 +278,61 @@ materialRouter.delete(
   },
 );
 
+/**
+ * GET /api/v1/materials/audit/orphaned-attribute-values
+ * Audit endpoint: Find all material types with orphaned allowedValues
+ * (i.e., attributes with values no longer in the attribute's allowedValues array).
+ * Returns list of affected materials and the orphaned values.
+ */
+materialRouter.get(
+  "/audit/orphaned-attribute-values",
+  requirePermission("materials:read"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orphaned = await materialService.auditOrphanedAttributeValues(
+        getOrgId(req),
+      );
+      res.json({
+        status: "success",
+        data: {
+          orphanedCount: orphaned.length,
+          orphanedMaterials: orphaned,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/materials/audit/attribute-deletion-impact/:attributeId
+ * Audit endpoint: Check cascade impact when deleting an attribute.
+ * Shows how many material types use this attribute and whether it's required.
+ */
+materialRouter.get(
+  "/audit/attribute-deletion-impact/:attributeId",
+  requirePermission("materials:read"),
+  async (
+    req: Request<{ attributeId: string }>,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const impact = await materialService.getAttributeDeletionImpact(
+        getOrgId(req),
+        req.params.attributeId,
+      );
+      res.json({
+        status: "success",
+        data: impact,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /* ---------- Material Type (Catalog) Routes ---------- */
 
 /**
@@ -339,6 +394,12 @@ materialRouter.get(
  * POST /api/v1/materials/types
  * Creates a new material type (catalog item).
  * Validates against organization's catalog item limit.
+ *
+ * Attributes:
+ * - Each attribute can be marked as required (isRequired: true) or optional (isRequired: false, default).
+ * - Required attributes must have non-empty values.
+ * - Attribute values are validated against allowedValues if defined on the MaterialAttribute.
+ * - Attribute scope is validated (category-scoped attributes must match material type's categories).
  */
 materialRouter.post(
   "/types",
@@ -363,6 +424,12 @@ materialRouter.post(
 /**
  * PATCH /api/v1/materials/types/:id
  * Updates a material type.
+ *
+ * Attributes:
+ * - Each attribute can be marked as required (isRequired: true) or optional (isRequired: false).
+ * - Required attributes must have non-empty values.
+ * - You can add, remove, or change the required status of individual attributes.
+ * - Required attributes cannot be removed once marked as required (validation will reject).
  */
 materialRouter.patch(
   "/types/:id",

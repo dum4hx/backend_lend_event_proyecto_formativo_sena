@@ -22,9 +22,7 @@ type MaterialInstanceWritePayload = {
   force?: boolean;
 };
 
-const normalizeOptionalString = (
-  value: unknown,
-): string | undefined => {
+const normalizeOptionalString = (value: unknown): string | undefined => {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
@@ -42,7 +40,8 @@ const parseDuplicateKeyError = (
     return null;
   }
 
-  const keyPattern = (err as { keyPattern?: Record<string, unknown> }).keyPattern;
+  const keyPattern = (err as { keyPattern?: Record<string, unknown> })
+    .keyPattern;
   const keyValue = (err as { keyValue?: Record<string, unknown> }).keyValue;
 
   if (keyPattern?.barcode || keyValue?.barcode) return "barcode";
@@ -108,42 +107,56 @@ const resolveEffectiveSerialAndBarcode = (opts: {
  * - Each attributeId must belong to the organization.
  * - If an attribute has a categoryId, the material type must include that category.
  * - If an attribute has allowedValues, the provided value must be in the list.
- * - All isRequired attributes in scope (org-wide + matching category) must be present.
+ * - For per-MaterialType required attributes, all marked as isRequired must have valid values.
  *
  * @param organizationId - Organization to scope the attribute look-up.
  * @param categoryIds    - Category IDs assigned to the material type (array may be empty).
- * @param incoming       - The attribute/value pairs coming from the request.
+ * @param incoming       - The attribute/value/isRequired tuples coming from the request.
  */
 async function validateMaterialTypeAttributes(
   organizationId: Types.ObjectId | string,
   categoryIds: string[],
-  incoming: Array<{ attributeId: string; value: string }>,
+  incoming: Array<{ attributeId: string; value: string; isRequired?: boolean }>,
 ): Promise<void> {
-  if (incoming.length === 0) {
-    // Still need to check required attributes even when none are provided
-    const requiredAttributes = await MaterialAttribute.find({
-      organizationId,
-      isRequired: true,
-      $or: [
-        { categoryId: null },
-        { categoryId: { $exists: false } },
-        ...(categoryIds.length > 0
-          ? [{ categoryId: { $in: categoryIds } }]
-          : []),
-      ],
-    });
-
-    if (requiredAttributes.length > 0) {
-      const missing = requiredAttributes.map((a) => a.name);
-      throw AppError.badRequest(
-        `Missing required attributes: ${missing.join(", ")}`,
-        { code: "MISSING_REQUIRED_ATTRIBUTES", missing },
-      );
-    }
+  // If no categories, no inherited attributes to validate
+  if (categoryIds.length === 0) {
     return;
   }
 
-  // Fetch all attributes referenced in the incoming payload
+  // If no attributes provided, that's OK (type can have zero attributes)
+  if (incoming.length === 0) {
+    return;
+  }
+
+  // Fetch all categories and their defined attributes
+  const categories = await Category.find({
+    _id: { $in: categoryIds },
+    organizationId,
+  });
+
+  if (categories.length === 0) {
+    throw AppError.badRequest(
+      `No valid categories found for this material type`,
+      { code: "INVALID_CATEGORIES" },
+    );
+  }
+
+  // Build set of all attributes available from categories
+  const categoryAttributeMap = new Map<string, { isRequired: boolean }>();
+  for (const category of categories) {
+    if (Array.isArray(category.attributes)) {
+      for (const catAttr of category.attributes) {
+        const attrId = catAttr.attributeId.toString();
+        // Store the most restrictive isRequired (true if any category requires it)
+        categoryAttributeMap.set(attrId, {
+          isRequired:
+            categoryAttributeMap.get(attrId)?.isRequired || catAttr.isRequired,
+        });
+      }
+    }
+  }
+
+  // Fetch full attribute definitions for validation
   const incomingIds = incoming.map((a) => a.attributeId);
   const foundAttributes = await MaterialAttribute.find({
     _id: { $in: incomingIds },
@@ -163,20 +176,16 @@ async function validateMaterialTypeAttributes(
       );
     }
 
-    // Category-scope check: if attribute is tied to a specific category, the type must belong to it
-    if (attr.categoryId) {
-      const requiredCategory = attr.categoryId.toString();
-      if (!categoryIds.includes(requiredCategory)) {
-        throw AppError.badRequest(
-          `Attribute '${attr.name}' is restricted to category '${requiredCategory}'. ` +
-            `The material type must belong to that category to use this attribute.`,
-          {
-            code: "ATTRIBUTE_CATEGORY_MISMATCH",
-            attributeName: attr.name,
-            requiredCategoryId: requiredCategory,
-          },
-        );
-      }
+    // Check if this attribute is available from the type's categories
+    if (!categoryAttributeMap.has(entry.attributeId)) {
+      throw AppError.badRequest(
+        `Attribute '${attr.name}' is not available for these categories`,
+        {
+          code: "ATTRIBUTE_NOT_IN_CATEGORY",
+          attributeName: attr.name,
+          attributeId: entry.attributeId,
+        },
+      );
     }
 
     // Allowed-values check
@@ -196,31 +205,6 @@ async function validateMaterialTypeAttributes(
         },
       );
     }
-  }
-
-  // Build set of provided attribute IDs for the required-attributes check
-  const providedIds = new Set(incoming.map((a) => a.attributeId));
-
-  // Fetch all required attributes in scope for this material type
-  const requiredAttributes = await MaterialAttribute.find({
-    organizationId,
-    isRequired: true,
-    $or: [
-      { categoryId: null },
-      { categoryId: { $exists: false } },
-      ...(categoryIds.length > 0 ? [{ categoryId: { $in: categoryIds } }] : []),
-    ],
-  });
-
-  const missing = requiredAttributes
-    .filter((a) => !providedIds.has(a._id.toString()))
-    .map((a) => a.name);
-
-  if (missing.length > 0) {
-    throw AppError.badRequest(
-      `Missing required attributes: ${missing.join(", ")}`,
-      { code: "MISSING_REQUIRED_ATTRIBUTES", missing },
-    );
   }
 }
 
@@ -826,7 +810,9 @@ export const materialService = {
     }
 
     if (writePayload.modelId) {
-      const materialType = await MaterialModel.findById(String(writePayload.modelId));
+      const materialType = await MaterialModel.findById(
+        String(writePayload.modelId),
+      );
       if (!materialType) {
         throw AppError.notFound("Material type not found");
       }
@@ -869,8 +855,12 @@ export const materialService = {
 
     const updatePayload: Record<string, unknown> = {
       ...(writePayload.modelId ? { modelId: writePayload.modelId } : {}),
-      ...(writePayload.locationId ? { locationId: writePayload.locationId } : {}),
-      ...(writePayload.notes !== undefined ? { notes: writePayload.notes } : {}),
+      ...(writePayload.locationId
+        ? { locationId: writePayload.locationId }
+        : {}),
+      ...(writePayload.notes !== undefined
+        ? { notes: writePayload.notes }
+        : {}),
       ...(writePayload.attributes !== undefined
         ? { attributes: writePayload.attributes }
         : {}),
@@ -915,7 +905,9 @@ export const materialService = {
     organizationId: Types.ObjectId | string,
     code: string,
   ): Promise<{ instance: unknown; matchedBy: "barcode" | "serialNumber" }> {
-    const orgFilter = { organizationId: new Types.ObjectId(String(organizationId)) };
+    const orgFilter = {
+      organizationId: new Types.ObjectId(String(organizationId)),
+    };
 
     let instance = await MaterialInstance.findOne({
       ...orgFilter,
@@ -925,7 +917,10 @@ export const materialService = {
       .populate("locationId", "name");
 
     if (instance) {
-      return { instance: renameProperty(instance, "modelId", "model"), matchedBy: "barcode" };
+      return {
+        instance: renameProperty(instance, "modelId", "model"),
+        matchedBy: "barcode",
+      };
     }
 
     instance = await MaterialInstance.findOne({
@@ -936,7 +931,10 @@ export const materialService = {
       .populate("locationId", "name");
 
     if (instance) {
-      return { instance: renameProperty(instance, "modelId", "model"), matchedBy: "serialNumber" };
+      return {
+        instance: renameProperty(instance, "modelId", "model"),
+        matchedBy: "serialNumber",
+      };
     }
 
     throw AppError.notFound("No material instance found for scanned code");
@@ -1109,30 +1107,6 @@ export const materialService = {
       }
     }
 
-    // Block changing categoryId when existing users would fall out of scope
-    if (
-      updates.categoryId !== undefined &&
-      String(updates.categoryId ?? "") !== String(attribute.categoryId ?? "")
-    ) {
-      const newCategoryId = updates.categoryId
-        ? String(updates.categoryId)
-        : null;
-      if (newCategoryId) {
-        const outOfScope = await MaterialModel.findOne({
-          organizationId,
-          "attributes.attributeId": attribute._id,
-          categoryId: { $ne: newCategoryId },
-        });
-        if (outOfScope) {
-          throw AppError.badRequest(
-            "Cannot change categoryId: one or more material types use this attribute " +
-              "but do not belong to the target category. Update those material types first.",
-            { code: "ATTRIBUTE_CATEGORY_IN_USE" },
-          );
-        }
-      }
-    }
-
     Object.assign(attribute, updates);
     try {
       await attribute.save();
@@ -1174,5 +1148,98 @@ export const materialService = {
     }
 
     await MaterialAttribute.deleteOne({ _id: id });
+  },
+
+  /**
+   * Audit endpoint: Find all material types with orphaned allowedValues
+   * (i.e., attributes with values not in the attribute's current allowedValues array)
+   */
+  async auditOrphanedAttributeValues(organizationId: Types.ObjectId | string) {
+    const orphanedMaterials: Array<{
+      materialTypeId: string;
+      materialTypeName: string;
+      attributeId: string;
+      attributeName: string;
+      orphanedValues: string[];
+      allowedValues: string[];
+    }> = [];
+
+    // Get all attributes with allowedValues restrictions
+    const attributes = await MaterialAttribute.find({
+      organizationId,
+      allowedValues: { $exists: true, $ne: [] },
+    });
+
+    for (const attr of attributes) {
+      const allowedSet = new Set(attr.allowedValues);
+
+      // Find materials using this attribute with values not in allowedValues
+      const violatingMaterials = await MaterialModel.find({
+        organizationId,
+        "attributes.attributeId": attr._id,
+        "attributes.value": { $nin: attr.allowedValues },
+      });
+
+      for (const material of violatingMaterials) {
+        const attrEntry = material.attributes.find(
+          (a) => String(a.attributeId) === String(attr._id),
+        );
+        if (attrEntry && !allowedSet.has(attrEntry.value)) {
+          orphanedMaterials.push({
+            materialTypeId: String(material._id),
+            materialTypeName: material.name,
+            attributeId: String(attr._id),
+            attributeName: attr.name,
+            orphanedValues: [attrEntry.value],
+            allowedValues: attr.allowedValues,
+          });
+        }
+      }
+    }
+
+    return orphanedMaterials;
+  },
+
+  /**
+   * Audit endpoint: Check cascade impact when deleting an attribute
+   * Returns the count and list of material types that would be affected
+   */
+  async getAttributeDeletionImpact(
+    organizationId: Types.ObjectId | string,
+    attributeId: string,
+  ) {
+    const attribute = await MaterialAttribute.findOne({
+      _id: attributeId,
+      organizationId,
+    });
+    if (!attribute) {
+      throw AppError.notFound("Material attribute not found");
+    }
+
+    const affectedMaterials = await MaterialModel.find({
+      organizationId,
+      "attributes.attributeId": attributeId,
+    }).select("_id name attributes");
+
+    const impact = affectedMaterials.map((material) => {
+      const attrCount = material.attributes.length;
+      const isRequired =
+        material.attributes.find((a) => String(a.attributeId) === attributeId)
+          ?.isRequired ?? false;
+
+      return {
+        materialTypeId: String(material._id),
+        materialTypeName: material.name,
+        totalAttributes: attrCount,
+        isRequired,
+      };
+    });
+
+    return {
+      attributeId,
+      attributeName: attribute.name,
+      affectedMaterialCount: impact.length,
+      affectedMaterials: impact,
+    };
   },
 };
