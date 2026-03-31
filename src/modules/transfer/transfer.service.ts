@@ -10,6 +10,7 @@ import {
 } from "./models/transfer_rejection_reason.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Location } from "../location/models/location.model.ts";
+import { User } from "../user/models/user.model.ts";
 import { Types, startSession, type ClientSession } from "mongoose";
 
 class TransferService {
@@ -64,6 +65,7 @@ class TransferService {
 
   /**
    * Respond to a transfer request (Approve/Reject/Cancel)
+   * Only users assigned to the source location can respond to the request
    */
   async respondToRequest(
     organizationId: string | Types.ObjectId,
@@ -78,6 +80,19 @@ class TransferService {
       organizationId,
     });
     if (!request) throw AppError.notFound("Transfer request not found");
+
+    // Validate that user is assigned to the source location
+    const user = await User.findOne({ _id: userId, organizationId });
+    if (!user) throw AppError.notFound("User not found");
+
+    const userHasAccessToSourceLocation = user.locations?.some(
+      (locId) => locId.toString() === request.fromLocationId.toString(),
+    );
+    if (!userHasAccessToSourceLocation) {
+      throw AppError.forbidden(
+        "Only users assigned to the source location can respond to transfer requests",
+      );
+    }
 
     if (request.status !== "requested") {
       throw AppError.badRequest(

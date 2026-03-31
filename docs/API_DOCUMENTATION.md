@@ -1200,11 +1200,11 @@ Returns the permission catalogue with optional filtering and grouping.
 
 **Permission Required:** `permissions:read`
 
-| Parameter        | Location | Type    | Required | Description                                                                        |
-| ---------------- | -------- | ------- | -------- | ---------------------------------------------------------------------------------- |
-| category         | query    | string  | No       | Filter to a single category (e.g. `Transfers`, `Materials`, `Roles`)               |
-| includePlatform  | query    | boolean | No       | When `true`, includes platform-only permissions (default: `false`)                 |
-| grouped          | query    | boolean | No       | When `true`, returns permissions grouped by category instead of a flat list (default: `false`) |
+| Parameter       | Location | Type    | Required | Description                                                                                    |
+| --------------- | -------- | ------- | -------- | ---------------------------------------------------------------------------------------------- |
+| category        | query    | string  | No       | Filter to a single category (e.g. `Transfers`, `Materials`, `Roles`)                           |
+| includePlatform | query    | boolean | No       | When `true`, includes platform-only permissions (default: `false`)                             |
+| grouped         | query    | boolean | No       | When `true`, returns permissions grouped by category instead of a flat list (default: `false`) |
 
 **Flat response** (`GET /permissions`):
 
@@ -3752,17 +3752,18 @@ Lists all transfer requests for the organization. By default, **fulfilled** requ
 
 Approves or rejects a transfer request. **Only users assigned to the source location can respond to the request.** When rejecting, a `rejectionReasonId` from the organization's rejection reason catalogue is required.
 
-| Parameter         | Location | Type   | Required                    | Description                                       |
-| ----------------- | -------- | ------ | --------------------------- | ------------------------------------------------- |
-| status            | body     | string | Yes                         | New status: `approved` or `rejected`              |
-| rejectionReasonId | body     | string | Yes (when status=rejected)  | ID of a valid, active `TransferRejectionReason`   |
-| rejectionNote     | body     | string | No                          | Free-text note explaining the rejection (max 500) |
+| Parameter         | Location | Type   | Required                   | Description                                       |
+| ----------------- | -------- | ------ | -------------------------- | ------------------------------------------------- |
+| status            | body     | string | Yes                        | New status: `approved` or `rejected`              |
+| rejectionReasonId | body     | string | Yes (when status=rejected) | ID of a valid, active `TransferRejectionReason`   |
+| rejectionNote     | body     | string | No                         | Free-text note explaining the rejection (max 500) |
 
 **Permission Required:** `transfers:update`
 
 **Location Requirement:** User must be assigned to the source location (`fromLocationId`) of the transfer request.
 
 **Error Responses:**
+
 - `400` — Missing rejection reason when rejecting
 - `403` — User not assigned to the source location
 - `404` — Rejection reason not found or inactive; User not found
@@ -3822,9 +3823,9 @@ Org-scoped catalogue of reasons for denying transfer requests. Default entries a
 
 Lists rejection reasons for the organization. Active reasons only by default.
 
-| Parameter      | Location | Type    | Required | Description                                 |
-| -------------- | -------- | ------- | -------- | ------------------------------------------- |
-| includeInactive | query   | boolean | No       | If `true`, includes inactive reasons too    |
+| Parameter       | Location | Type    | Required | Description                              |
+| --------------- | -------- | ------- | -------- | ---------------------------------------- |
+| includeInactive | query    | boolean | No       | If `true`, includes inactive reasons too |
 
 **Permission Required:** `transfers:read`
 
@@ -3834,8 +3835,18 @@ Lists rejection reasons for the organization. Active reasons only by default.
 {
   "status": "success",
   "data": [
-    { "id": "64f1a2...", "label": "Can't send in time", "isActive": true, "isDefault": true },
-    { "id": "64f1a3...", "label": "Custom reason", "isActive": true, "isDefault": false }
+    {
+      "id": "64f1a2...",
+      "label": "Can't send in time",
+      "isActive": true,
+      "isDefault": true
+    },
+    {
+      "id": "64f1a3...",
+      "label": "Custom reason",
+      "isActive": true,
+      "isDefault": false
+    }
   ]
 }
 ```
@@ -3846,14 +3857,15 @@ Lists rejection reasons for the organization. Active reasons only by default.
 
 Creates a new rejection reason.
 
-| Parameter | Location | Type    | Required | Description                        |
-| --------- | -------- | ------- | -------- | ---------------------------------- |
-| label     | body     | string  | Yes      | Reason label (3–120 chars)         |
-| isActive  | body     | boolean | No       | Whether active. Default: `true`    |
+| Parameter | Location | Type    | Required | Description                     |
+| --------- | -------- | ------- | -------- | ------------------------------- |
+| label     | body     | string  | Yes      | Reason label (3–120 chars)      |
+| isActive  | body     | boolean | No       | Whether active. Default: `true` |
 
 **Permission Required:** `transfer_rejection_reasons:manage`
 
 **Error Responses:**
+
 - `409` — A reason with this label already exists
 
 ---
@@ -3862,14 +3874,15 @@ Creates a new rejection reason.
 
 Updates a rejection reason's label or active status.
 
-| Parameter | Location | Type    | Required | Description                 |
-| --------- | -------- | ------- | -------- | --------------------------- |
-| label     | body     | string  | No       | New label (3–120 chars)     |
+| Parameter | Location | Type    | Required | Description                  |
+| --------- | -------- | ------- | -------- | ---------------------------- |
+| label     | body     | string  | No       | New label (3–120 chars)      |
 | isActive  | body     | boolean | No       | Enable or disable the reason |
 
 **Permission Required:** `transfer_rejection_reasons:manage`
 
 **Error Responses:**
+
 - `404` — Rejection reason not found
 - `409` — Duplicate label
 
@@ -3882,6 +3895,7 @@ Permanently deletes a rejection reason. Default (seeded) reasons are protected a
 **Permission Required:** `transfer_rejection_reasons:manage`
 
 **Error Responses:**
+
 - `400` — Default rejection reasons cannot be deleted
 - `404` — Rejection reason not found
 
@@ -5310,9 +5324,9 @@ All endpoints validate that `:locationId` belongs to the requesting user's organ
 
 Returns a high-level KPI snapshot for the location: active loans, pending inspections, overdue invoices, and items needing attention.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5324,7 +5338,7 @@ Returns a high-level KPI snapshot for the location: active loans, pending inspec
       "activeLoans": 12,
       "pendingInspections": 3,
       "overdueInvoices": 2,
-      "overdueInvoiceTotal": 1500.50,
+      "overdueInvoiceTotal": 1500.5,
       "damagedItems": 4,
       "maintenanceItems": 1,
       "pendingTransfers": 2,
@@ -5336,10 +5350,10 @@ Returns a high-level KPI snapshot for the location: active loans, pending inspec
 
 **Error Responses:**
 
-| Status | Code            | Description                                     |
-| ------ | --------------- | ----------------------------------------------- |
-| 400    | `BAD_REQUEST`   | Invalid locationId format                        |
-| 404    | `NOT_FOUND`     | Location not found or does not belong to org     |
+| Status | Code          | Description                                  |
+| ------ | ------------- | -------------------------------------------- |
+| 400    | `BAD_REQUEST` | Invalid locationId format                    |
+| 404    | `NOT_FOUND`   | Location not found or does not belong to org |
 
 ---
 
@@ -5347,9 +5361,9 @@ Returns a high-level KPI snapshot for the location: active loans, pending inspec
 
 Returns the inspection queue for the location: items pending or in-progress inspection, grouped by urgency.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5389,9 +5403,9 @@ Returns the inspection queue for the location: items pending or in-progress insp
 
 Returns overdue invoices for the location with customer details and amounts, enabling the team to prioritize collection follow-ups.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5400,14 +5414,14 @@ Returns overdue invoices for the location with customer details and amounts, ena
   "status": "success",
   "data": {
     "overdueFinancials": {
-      "totalOverdue": 2500.00,
+      "totalOverdue": 2500.0,
       "invoices": [
         {
           "invoiceId": "665...",
           "loanId": "664...",
           "customerId": "663...",
           "customerName": "John Doe",
-          "amountDue": 1200.00,
+          "amountDue": 1200.0,
           "dueDate": "2024-05-15T00:00:00Z",
           "daysOverdue": 17,
           "status": "overdue"
@@ -5424,9 +5438,9 @@ Returns overdue invoices for the location with customer details and amounts, ena
 
 Returns inventory problems at the location: items in `damaged`, `maintenance`, or `lost` status grouped by category, enabling quick resolution.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5457,9 +5471,9 @@ Returns inventory problems at the location: items in `damaged`, `maintenance`, o
 
 Returns the transfer queue for the location: inbound transfers (where the location is the destination) that are in transit or picking, plus pending transfer requests.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5498,9 +5512,9 @@ Returns the transfer queue for the location: inbound transfers (where the locati
 
 Returns loans with approaching or overdue deadlines for the location, enabling proactive customer follow-up.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5542,9 +5556,9 @@ Returns loans with approaching or overdue deadlines for the location, enabling p
 
 Returns the damage resolution queue: items with damage reported during inspections, categorized into pending assessment, pending repair, and pending billing.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 
@@ -5580,9 +5594,9 @@ Returns the damage resolution queue: items with damage reported during inspectio
 
 Aggregated TO-DO list that calls all other operations endpoints via `Promise.all` and produces a unified, prioritized task list for the location operator. Each task has a `priority` (critical/high/medium/low), `category`, `title`, `count`, and `detail` for quick scanning.
 
-| Parameter  | Location | Type   | Required | Description                          |
-| ---------- | -------- | ------ | -------- | ------------------------------------ |
-| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+| Parameter  | Location | Type   | Required | Description                      |
+| ---------- | -------- | ------ | -------- | -------------------------------- |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location |
 
 **Response:** `200 OK`
 

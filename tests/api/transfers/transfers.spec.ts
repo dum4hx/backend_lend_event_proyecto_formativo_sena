@@ -59,7 +59,7 @@ test.describe("Transfers Module", () => {
       data: {
         name: `Transfer Test Type ${Date.now()}`,
         description: "Test type for transfers",
-        categoryId,
+        categoryId: [categoryId],
         pricePerDay: 1000,
       },
     });
@@ -162,5 +162,37 @@ test.describe("Transfers Module", () => {
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(Array.isArray(body.data)).toBeTruthy();
+  });
+
+  test("PATCH /requests/:id/respond - should approve request with location access", async ({
+    request,
+  }) => {
+    // Note: This test uses the authenticated user who created the locations in beforeAll.
+    // Since location creators are auto-assigned to their locations, this user has access
+    // to the source location and can approve.
+    // Full location-based authorization testing requires multi-user test infrastructure.
+
+    const newReqRes = await request.post("/api/v1/transfers/requests", {
+      data: {
+        fromLocationId,
+        toLocationId,
+        items: [{ modelId, quantity: 1 }],
+        notes: "Testing location-based approval",
+      },
+    });
+    expect(newReqRes.status()).toBe(201);
+    const newReq = await newReqRes.json();
+    const newRequestId = newReq.data._id;
+
+    const respondRes = await request.patch(
+      `/api/v1/transfers/requests/${newRequestId}/respond`,
+      {
+        data: { status: "approved" },
+      },
+    );
+    // User who created the location has access and can approve
+    expect(respondRes.status()).toBe(200);
+    const respondData = await respondRes.json();
+    expect(respondData.data.status).toBe("approved");
   });
 });
