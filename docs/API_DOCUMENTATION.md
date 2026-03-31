@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0  
 **Base URL:** `https://api.test.local/api/v1`  
-**Last Updated:** February 2026
+**Last Updated:** July 2025
 
 ---
 
@@ -11,6 +11,31 @@
 1. [Introduction and Overview](#1-introduction-and-overview)
 2. [Getting Started Guide](#2-getting-started-guide)
 3. [Authentication and Authorization](#3-authentication-and-authorization)
+4. [Reference Documentation](#4-reference-documentation)
+   - [Authentication Endpoints](#authentication-endpoints)
+   - [User Management Endpoints](#user-management-endpoints)
+   - [Roles Endpoints](#roles-endpoints)
+   - [Permissions](#permissions)
+   - [Organization Endpoints](#organization-endpoints)
+   - [Subscription Type Endpoints](#subscription-type-endpoints-super-admin)
+   - [Billing Endpoints](#billing-endpoints)
+   - [Admin Analytics (Super Admin)](#admin-analytics-endpoints-super-admin-only)
+   - [Customer Endpoints](#customer-endpoints)
+   - [Location Endpoints](#location-endpoints)
+   - [Material Endpoints](#material-endpoints)
+   - [Material Attributes Endpoints](#material-attributes-endpoints)
+   - [Transfer Endpoints](#transfer-endpoints)
+   - [Package Endpoints](#package-endpoints)
+   - [Loan Request Endpoints](#loan-request-endpoints)
+   - [Loan Endpoints](#loan-endpoints)
+   - [Inspection Endpoints](#inspection-endpoints)
+   - [Invoice Endpoints](#invoice-endpoints)
+   - [Analytics Endpoints (Organization)](#analytics-endpoints-organization)
+   - [Reports Endpoints](#reports-endpoints)
+   - [Operations Endpoints (Location Dashboard)](#operations-endpoints-location-dashboard)
+5. [Code Samples](#5-code-samples)
+6. [Rate Limiting and Usage Guidelines](#6-rate-limiting-and-usage-guidelines)
+7. [Versioning and Deprecation Policy](#7-versioning-and-deprecation-policy)
 
 ### Subscription Type Endpoints (Super Admin)
 
@@ -1955,7 +1980,43 @@ Lists all customers in the organization.
 
 #### GET /customers/:id
 
-Gets a specific customer.
+Gets a specific customer by ID.
+
+| Parameter | Location | Type   | Required | Description |
+| --------- | -------- | ------ | -------- | ----------- |
+| id        | path     | string | Yes      | Customer ID |
+
+**Permission Required:** `customers:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "customer": {
+      "_id": "507f1f77bcf86cd799439011",
+      "organizationId": "507f1f77bcf86cd799439012",
+      "name": { "firstName": "Juan", "firstSurname": "Pérez" },
+      "email": "juan.perez@example.com",
+      "phone": "+573001234567",
+      "documentType": "cc",
+      "documentNumber": "1234567890",
+      "status": "active",
+      "totalLoans": 5,
+      "activeLoans": 1,
+      "createdAt": "2025-01-15T10:30:00.000Z",
+      "updatedAt": "2025-03-16T14:20:00.000Z"
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                                                  |
+| ------ | ---------------------------------------------------------- |
+| `404`  | Customer not found or does not belong to this organization |
 
 ---
 
@@ -1984,13 +2045,84 @@ Creates a new customer.
 
 **Permission Required:** `customers:create`
 
+**Example Request:**
+
+```bash
+curl -X POST https://api.test.local/api/v1/customers \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{
+    "name": { "firstName": "Juan", "firstSurname": "Pérez" },
+    "email": "juan.perez@example.com",
+    "phone": "+573001234567",
+    "documentType": "cc",
+    "documentNumber": "1234567890"
+  }'
+```
+
+**Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "customer": {
+      "_id": "507f1f77bcf86cd799439011",
+      "organizationId": "507f1f77bcf86cd799439012",
+      "name": { "firstName": "Juan", "firstSurname": "Pérez" },
+      "email": "juan.perez@example.com",
+      "phone": "+573001234567",
+      "documentType": "cc",
+      "documentNumber": "1234567890",
+      "status": "active",
+      "totalLoans": 0,
+      "activeLoans": 0,
+      "createdAt": "2025-07-01T10:00:00.000Z",
+      "updatedAt": "2025-07-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                                                                         |
+| ------ | --------------------------------------------------------------------------------- |
+| `400`  | Missing required fields (`name.firstName`, `name.firstSurname`, `email`, `phone`) |
+| `400`  | Invalid phone format (must be E.164: `+573001234567`)                             |
+| `409`  | Email already in use by another customer **in the same organization**             |
+| `409`  | Phone already in use by another customer **in the same organization**             |
+
+**Notes:**
+
+- Email and phone uniqueness are enforced **per organization**, not globally. Two different organizations may have the same customer email or phone.
+- The `documentType` and `documentNumber` fields are optional but recommended for legal compliance.
+- Customer is created with `status: "active"` by default.
+
 ---
 
 #### PATCH /customers/:id
 
-Updates a customer's information.
+Updates a customer's information. Only provided fields are changed.
+
+| Parameter | Location | Type   | Required | Description                    |
+| --------- | -------- | ------ | -------- | ------------------------------ |
+| id        | path     | string | Yes      | Customer ID                    |
+| name      | body     | object | No       | Name object (partial accepted) |
+| email     | body     | string | No       | Email address                  |
+| phone     | body     | string | No       | Phone in E.164 format          |
+| notes     | body     | string | No       | Free-text notes                |
 
 **Permission Required:** `customers:update`
+
+**Response:** `200 OK` — returns the updated customer object.
+
+**Error Responses:**
+
+| Status | Condition                                                              |
+| ------ | ---------------------------------------------------------------------- |
+| `404`  | Customer not found in this organization                                |
+| `409`  | Email or phone already in use by another customer in this organization |
 
 ---
 
@@ -2141,7 +2273,12 @@ curl -X DELETE https://api.test.local/api/v1/customers/507f1f77bcf86cd799439011 
 }
 ```
 
-**Error Response:** `400 Bad Request` (if customer has active loans)
+**Error Responses:**
+
+| Status | Condition                                                               |
+| ------ | ----------------------------------------------------------------------- |
+| `400`  | Customer has active or overdue loans — must be returned/completed first |
+| `404`  | Customer not found in this organization                                 |
 
 ```json
 {
@@ -3100,23 +3237,23 @@ Creates a new material type. Validates against organization's catalog item limit
 
 **Permission Required:** `materials:create`
 
-| Parameter                | Location | Type     | Required | Description                                                                                          |
-| ------------------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------------- |
-| name                     | body     | string   | Yes      | Material name (max 150 chars)                                                                        |
-| description              | body     | string   | Yes      | Description (max 500 chars)                                                                          |
-| categoryId               | body     | string   | Yes      | Category ID (MongoDB ObjectId). Attribute availability is inherited from this category.              |
-| pricePerDay              | body     | number   | Yes      | Rental price per day (must be > 0)                                                                   |
-| attributes               | body     | object[] | No       | Array of attributes for this material type (only attributes from the category can be used)           |
-| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId). Attribute must exist in the organization and the selected category. |
-| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char). Must match `allowedValues` if defined on the attribute. |
-| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                           |
+| Parameter                | Location | Type     | Required | Description                                                                                                                                              |
+| ------------------------ | -------- | -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                     | body     | string   | Yes      | Material name (max 150 chars)                                                                                                                            |
+| description              | body     | string   | Yes      | Description (max 500 chars)                                                                                                                              |
+| categoryId               | body     | string[] | Yes      | Array of category IDs (MongoDB ObjectIds). A material type can belong to multiple categories. Attribute availability is inherited from these categories. |
+| pricePerDay              | body     | number   | Yes      | Rental price per day (must be > 0)                                                                                                                       |
+| attributes               | body     | object[] | No       | Array of attributes for this material type (only attributes from the category can be used)                                                               |
+| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId). Attribute must exist in the organization and the selected category.                                                     |
+| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char). Must match `allowedValues` if defined on the attribute.                                                     |
+| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                                                                               |
 
 **Example Request:**
 
 ```json
 {
   "name": "Canon EOS R5",
-  "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
+  "categoryId": ["64f1a2b3c4d5e6f7a8b9c0c9"],
   "description": "Professional mirrorless camera",
   "pricePerDay": 1500,
   "attributes": [
@@ -3185,17 +3322,17 @@ Updates a material type. All fields are optional. When updating attributes, the 
 
 **Permission Required:** `materials:update`
 
-| Parameter                | Location | Type     | Required | Description                                                                                    |
-| ------------------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------- |
-| id                       | path     | string   | Yes      | Material type ID (MongoDB ObjectId)                                                            |
-| name                     | body     | string   | No       | Updated material name (max 150 chars)                                                          |
-| description              | body     | string   | No       | Updated description (max 500 chars)                                                            |
-| categoryId               | body     | string   | No       | Updated category ID. When changed, attribute constraints are checked against the new category. |
-| pricePerDay              | body     | number   | No       | Updated rental price per day (must be > 0)                                                     |
-| attributes               | body     | object[] | No       | Updated array of attributes (replaces previous array completely)                               |
-| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId)                                                                |
-| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char)                                                    |
-| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                     |
+| Parameter                | Location | Type     | Required | Description                                                                                                |
+| ------------------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| id                       | path     | string   | Yes      | Material type ID (MongoDB ObjectId)                                                                        |
+| name                     | body     | string   | No       | Updated material name (max 150 chars)                                                                      |
+| description              | body     | string   | No       | Updated description (max 500 chars)                                                                        |
+| categoryId               | body     | string[] | No       | Updated array of category IDs. When changed, attribute constraints are checked against the new categories. |
+| pricePerDay              | body     | number   | No       | Updated rental price per day (must be > 0)                                                                 |
+| attributes               | body     | object[] | No       | Updated array of attributes (replaces previous array completely)                                           |
+| attributes[].attributeId | body     | string   | Yes\*    | Attribute ID (MongoDB ObjectId)                                                                            |
+| attributes[].value       | body     | string   | Yes\*    | Attribute value (max 500 chars, min 1 char)                                                                |
+| attributes[].isRequired  | body     | boolean  | No       | Whether this attribute is required for this material type (default: false)                                 |
 
 **Example Request (Update attributes to mark one as required, add new attribute):**
 
@@ -4447,6 +4584,70 @@ Deletes a package.
 
 ---
 
+#### GET /packages/:id/availability
+
+Checks whether a package can be fulfilled for a given date range. Returns per-item availability with instance counts grouped by location.
+
+**Permission Required:** `packages:read`
+
+| Parameter | Location | Type   | Required | Description                                                         |
+| --------- | -------- | ------ | -------- | ------------------------------------------------------------------- |
+| id        | path     | string | Yes      | Package ObjectId                                                    |
+| startDate | query    | string | Yes      | Start of requested loan period (ISO 8601, e.g. `2025-08-01`)        |
+| endDate   | query    | string | Yes      | End of requested loan period (ISO 8601). Must be after `startDate`. |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "packageId": "665a1b2c3d4e5f6a7b8c9d0e",
+    "packageName": "Basic Event Kit",
+    "startDate": "2025-08-01T00:00:00.000Z",
+    "endDate": "2025-08-05T00:00:00.000Z",
+    "canFulfill": true,
+    "items": [
+      {
+        "materialTypeId": "664abc123def456789012345",
+        "materialTypeName": "Folding Chair",
+        "requiredQuantity": 10,
+        "totalAvailable": 25,
+        "isSatisfied": true,
+        "locations": [
+          {
+            "locationId": "664abc123def456789012346",
+            "locationName": "Main Warehouse",
+            "count": 20,
+            "instances": [
+              {
+                "instanceId": "664abc123def456789012347",
+                "serialNumber": "FC-001",
+                "barcode": "1234567890",
+                "status": "available"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Notes:**
+
+- `canFulfill` is `true` only when every item in the package has `totalAvailable >= requiredQuantity`.
+- Instances that are tied to active/overdue loans or approved/assigned/ready/shipped requests overlapping the date range are excluded from availability.
+- Useful for pre-checking availability before creating a loan request with `type: "package"`.
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Missing or invalid date parameters, or `endDate` not after `startDate`.
+- `404` — `NOT_FOUND`: Package not found in this organization.
+
+---
+
 ### Invoice Endpoints
 
 #### GET /invoices
@@ -4537,6 +4738,431 @@ Voids an invoice.
 
 ---
 
+#### POST /invoices/:id/send
+
+Sends an invoice email to the customer and transitions the invoice from `draft` to `pending` status. The email contains a formatted breakdown of line items, totals, tax, amount due, and due date.
+
+**Permission:** `invoices:update`
+
+| Parameter | Location | Type   | Required | Description      |
+| --------- | -------- | ------ | -------- | ---------------- |
+| id        | path     | string | Yes      | Invoice ObjectId |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Invoice sent successfully"
+}
+```
+
+**Behavior:**
+
+- If the invoice is in `draft` status, it transitions to `pending`.
+- If the invoice is already `pending` or another non-draft status, the email is resent but status is unchanged.
+- The customer email is resolved from the populated `customerId` field (customer must have a valid email).
+
+**Errors:**
+
+- `404` — `NOT_FOUND`: Invoice not found in this organization.
+
+---
+
+### Analytics Endpoints (Organization)
+
+All analytics endpoints require authentication, an active organization, and the `analytics:read` permission.
+
+#### GET /analytics/overview
+
+Returns a high-level dashboard overview with counts and summaries across all modules.
+
+**Permission:** `analytics:read`
+
+| Parameter | Location | Type   | Required | Description                                              |
+| --------- | -------- | ------ | -------- | -------------------------------------------------------- |
+| startDate | query    | string | No       | Filter data from this date (ISO 8601, e.g. `2025-01-01`) |
+| endDate   | query    | string | No       | Filter data up to this date (ISO 8601)                   |
+
+When date range is provided, counts for customers, loans, requests, and invoices are scoped to entities created within that period. When omitted, all-time totals are returned.
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "customers": {
+      "total": 145,
+      "active": 120
+    },
+    "materials": {
+      "catalogItems": 52,
+      "availableInstances": 380
+    },
+    "loans": {
+      "active": 23,
+      "overdue": 4
+    },
+    "requests": {
+      "pending": 7
+    },
+    "invoices": {
+      "total": 210,
+      "totalRevenue": 8500000,
+      "totalOutstanding": 350000
+    }
+  }
+}
+```
+
+---
+
+#### GET /analytics/materials
+
+Returns material utilization statistics: status breakdown across all instances and the top 10 most-used materials (by loan count).
+
+**Permission:** `analytics:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "statusBreakdown": [
+      { "status": "available", "count": 380 },
+      { "status": "loaned", "count": 45 },
+      { "status": "maintenance", "count": 12 },
+      { "status": "damaged", "count": 3 },
+      { "status": "retired", "count": 8 }
+    ],
+    "topMaterials": [
+      {
+        "_id": "664abc123def456789012345",
+        "loanCount": 47,
+        "materialName": "Folding Chair",
+        "identifier": "FC-001"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /analytics/revenue
+
+Returns monthly revenue and revenue broken down by invoice type. Defaults to the last 12 months when no date range is provided.
+
+**Permission:** `analytics:read`
+
+| Parameter | Location | Type   | Required | Description                                                    |
+| --------- | -------- | ------ | -------- | -------------------------------------------------------------- |
+| startDate | query    | string | No       | Start of revenue period (ISO 8601). Defaults to 12 months ago. |
+| endDate   | query    | string | No       | End of revenue period (ISO 8601). Defaults to now.             |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "monthlyRevenue": [
+      {
+        "year": 2025,
+        "month": 1,
+        "revenue": 1200000,
+        "invoiceCount": 18
+      },
+      {
+        "year": 2025,
+        "month": 2,
+        "revenue": 1450000,
+        "invoiceCount": 22
+      }
+    ],
+    "revenueByType": [
+      { "type": "damage", "revenue": 3200000, "count": 45 },
+      { "type": "late_fee", "revenue": 800000, "count": 12 },
+      { "type": "deposit_shortfall", "revenue": 200000, "count": 5 }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /analytics/customers
+
+Returns customer status breakdown and the top 10 customers ranked by total loan count.
+
+**Permission:** `analytics:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "statusBreakdown": [
+      { "status": "active", "count": 120 },
+      { "status": "inactive", "count": 20 },
+      { "status": "blacklisted", "count": 5 }
+    ],
+    "topCustomers": [
+      {
+        "_id": "664abc123def456789012345",
+        "loanCount": 15,
+        "name": {
+          "firstName": "Maria",
+          "firstSurname": "Garcia"
+        },
+        "email": "maria@example.com"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Reports Endpoints
+
+All reports endpoints require authentication, an active organization, and the `reports:read` permission. Reports are designed for operational analysis and support pagination, date-range filtering, and status filtering.
+
+**Common Query Parameters** (all optional):
+
+| Parameter  | Type    | Description                            |
+| ---------- | ------- | -------------------------------------- |
+| startDate  | string  | Filter from this date (ISO 8601)       |
+| endDate    | string  | Filter up to this date (ISO 8601)      |
+| status     | string  | Filter by entity status                |
+| locationId | string  | Filter by location ObjectId            |
+| customerId | string  | Filter by customer ObjectId            |
+| page       | integer | Page number (default: 1)               |
+| limit      | integer | Items per page (default: 50, max: 200) |
+
+---
+
+#### GET /reports/loans
+
+Loan report with duration, overdue analysis, and summary statistics.
+
+**Permission:** `reports:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loans": [
+      {
+        "_id": "665a1b2c3d4e5f6a7b8c9d0e",
+        "customer": {
+          "name": "Maria Garcia",
+          "email": "maria@example.com",
+          "documentNumber": "1234567890"
+        },
+        "status": "active",
+        "startDate": "2025-07-01T00:00:00.000Z",
+        "endDate": "2025-07-15T00:00:00.000Z",
+        "materialInstances": [ ... ],
+        "durationDays": 14,
+        "overdueDays": 3
+      }
+    ],
+    "total": 45,
+    "page": 1,
+    "totalPages": 1,
+    "summary": {
+      "totalLoans": 45,
+      "statusBreakdown": [
+        { "_id": "active", "count": 23 },
+        { "_id": "overdue", "count": 4 },
+        { "_id": "returned", "count": 18 }
+      ]
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `durationDays` is computed as the difference between `endDate` and `startDate`.
+- `overdueDays` is computed from `endDate` to today (only when the loan is past its end date and not returned).
+- `summary.statusBreakdown` aggregates all matching loans (not just the current page).
+
+---
+
+#### GET /reports/inventory
+
+Inventory report showing stock levels by material type and location, with status breakdown.
+
+**Permission:** `reports:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "inventory": [
+      {
+        "materialType": {
+          "_id": "664abc123def456789012345",
+          "name": "Folding Chair",
+          "identifier": "FC"
+        },
+        "totalInstances": 50,
+        "statusBreakdown": [
+          { "status": "available", "count": 35 },
+          { "status": "loaned", "count": 10 },
+          { "status": "maintenance", "count": 3 },
+          { "status": "damaged", "count": 2 }
+        ],
+        "byLocation": [
+          {
+            "locationId": "664abc123def456789012346",
+            "locationName": "Main Warehouse",
+            "count": 30
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "totalTypes": 15,
+      "totalInstances": 380
+    }
+  }
+}
+```
+
+---
+
+#### GET /reports/financial
+
+Financial report with invoice breakdown, revenue by type, and status summary.
+
+**Permission:** `reports:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "invoices": [
+      {
+        "_id": "665a1b2c3d4e5f6a7b8c9d0f",
+        "customer": { "name": "Maria Garcia", "email": "maria@example.com" },
+        "type": "rental",
+        "status": "paid",
+        "total": 150000,
+        "amountPaid": 150000,
+        "amountDue": 0,
+        "createdAt": "2025-07-01T00:00:00.000Z",
+        "dueDate": "2025-07-15T00:00:00.000Z"
+      }
+    ],
+    "total": 210,
+    "page": 1,
+    "totalPages": 5,
+    "summaryByType": [
+      { "_id": "rental", "totalRevenue": 5000000, "count": 120 },
+      { "_id": "damage", "totalRevenue": 800000, "count": 15 },
+      { "_id": "deposit_shortfall", "totalRevenue": 200000, "count": 5 }
+    ],
+    "summaryByStatus": [
+      { "_id": "paid", "totalAmount": 4500000, "count": 156 },
+      { "_id": "pending", "totalAmount": 350000, "count": 12 }
+    ]
+  }
+}
+```
+
+---
+
+#### GET /reports/damages
+
+Damage and repairs report from inspection records. Lists individual damaged items with cost information.
+
+**Permission:** `reports:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "damages": [
+      {
+        "inspectionId": "665a1b2c3d4e5f6a7b8c9d10",
+        "loanId": "665a1b2c3d4e5f6a7b8c9d0e",
+        "customer": { "name": "Carlos Mendez" },
+        "inspectedAt": "2025-07-16T10:00:00.000Z",
+        "item": {
+          "materialInstanceId": "664abc123def456789012347",
+          "conditionBefore": "good",
+          "conditionAfter": "damaged",
+          "damageDescription": "Scratched surface",
+          "chargeToCustomer": 25000,
+          "estimatedRepairCost": 15000
+        }
+      }
+    ],
+    "total": 8,
+    "page": 1,
+    "totalPages": 1,
+    "summary": {
+      "totalDamages": 8,
+      "totalCharges": 200000,
+      "totalRepairCost": 120000
+    }
+  }
+}
+```
+
+---
+
+#### GET /reports/transfers
+
+Transfer report with inter-location movement history and status summary.
+
+**Permission:** `reports:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "transfers": [
+      {
+        "_id": "665a1b2c3d4e5f6a7b8c9d11",
+        "fromLocation": { "name": "Main Warehouse" },
+        "toLocation": { "name": "Event Venue A" },
+        "status": "completed",
+        "items": [ ... ],
+        "notes": "Delivery for weekend event",
+        "createdAt": "2025-07-10T08:00:00.000Z"
+      }
+    ],
+    "total": 32,
+    "page": 1,
+    "totalPages": 1,
+    "summaryByStatus": [
+      { "_id": "completed", "count": 25 },
+      { "_id": "in_transit", "count": 5 },
+      { "_id": "pending", "count": 2 }
+    ]
+  }
+}
+```
+
+---
+
 ### Error Codes Reference
 
 | HTTP Status | Code                     | Description                       |
@@ -4550,6 +5176,347 @@ Voids an invoice.
 | 409         | `CONFLICT`               | Resource already exists           |
 | 429         | `RATE_LIMIT_EXCEEDED`    | Too many requests                 |
 | 500         | `INTERNAL_ERROR`         | Server error                      |
+
+---
+
+### Operations Endpoints (Location Dashboard)
+
+The Operations module provides pre-computed, aggregation-driven endpoints that power an operational dashboard scoped to a single location. Each endpoint returns actionable data (not raw CRUD) — think of it as a TO-DO list for the warehouse operator or manager at a given location.
+
+**Base path:** `/api/v1/locations/:locationId/operations`
+
+**Permission required for ALL endpoints:** `operations:read`
+
+**Middleware chain:** `authenticate` → `requireActiveOrganization` → `requirePermission("operations:read")`
+
+All endpoints validate that `:locationId` belongs to the requesting user's organization before returning data.
+
+---
+
+#### GET /locations/:locationId/operations/overview
+
+Returns a high-level KPI snapshot for the location: active loans, pending inspections, overdue invoices, and items needing attention.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "overview": {
+      "activeLoans": 12,
+      "pendingInspections": 3,
+      "overdueInvoices": 2,
+      "overdueInvoiceTotal": 1500.50,
+      "damagedItems": 4,
+      "maintenanceItems": 1,
+      "pendingTransfers": 2,
+      "expiringLoansNext48h": 5
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Code            | Description                                     |
+| ------ | --------------- | ----------------------------------------------- |
+| 400    | `BAD_REQUEST`   | Invalid locationId format                        |
+| 404    | `NOT_FOUND`     | Location not found or does not belong to org     |
+
+---
+
+#### GET /locations/:locationId/operations/inspections
+
+Returns the inspection queue for the location: items pending or in-progress inspection, grouped by urgency.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "inspectionQueue": {
+      "pending": [
+        {
+          "inspectionId": "665...",
+          "loanId": "664...",
+          "customerName": "John Doe",
+          "returnedAt": "2024-06-01T10:00:00Z",
+          "itemCount": 3,
+          "status": "pending"
+        }
+      ],
+      "inProgress": [
+        {
+          "inspectionId": "665...",
+          "loanId": "664...",
+          "customerName": "Jane Smith",
+          "returnedAt": "2024-05-30T14:00:00Z",
+          "itemCount": 2,
+          "status": "in_progress"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/financials/overdue
+
+Returns overdue invoices for the location with customer details and amounts, enabling the team to prioritize collection follow-ups.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "overdueFinancials": {
+      "totalOverdue": 2500.00,
+      "invoices": [
+        {
+          "invoiceId": "665...",
+          "loanId": "664...",
+          "customerId": "663...",
+          "customerName": "John Doe",
+          "amountDue": 1200.00,
+          "dueDate": "2024-05-15T00:00:00Z",
+          "daysOverdue": 17,
+          "status": "overdue"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/inventory/issues
+
+Returns inventory problems at the location: items in `damaged`, `maintenance`, or `lost` status grouped by category, enabling quick resolution.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "inventoryIssues": {
+      "damaged": [
+        {
+          "instanceId": "665...",
+          "serialNumber": "SN-001",
+          "materialTypeName": "Projector HD",
+          "status": "damaged",
+          "updatedAt": "2024-06-01T08:00:00Z"
+        }
+      ],
+      "maintenance": [],
+      "lost": []
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/transfers
+
+Returns the transfer queue for the location: inbound transfers (where the location is the destination) that are in transit or picking, plus pending transfer requests.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "transferQueue": {
+      "inboundInTransit": [
+        {
+          "transferId": "665...",
+          "fromLocationName": "Main Warehouse",
+          "status": "in_transit",
+          "itemCount": 5,
+          "createdAt": "2024-06-01T09:00:00Z"
+        }
+      ],
+      "pendingRequests": [
+        {
+          "requestId": "665...",
+          "fromLocationName": "Branch A",
+          "toLocationName": "This Location",
+          "status": "requested",
+          "itemCount": 2,
+          "createdAt": "2024-05-31T15:00:00Z"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/loans/deadlines
+
+Returns loans with approaching or overdue deadlines for the location, enabling proactive customer follow-up.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loanDeadlines": {
+      "overdue": [
+        {
+          "loanId": "664...",
+          "customerId": "663...",
+          "customerName": "John Doe",
+          "expectedReturnDate": "2024-05-28T00:00:00Z",
+          "daysOverdue": 4,
+          "itemCount": 2,
+          "status": "overdue"
+        }
+      ],
+      "dueSoon": [
+        {
+          "loanId": "664...",
+          "customerId": "663...",
+          "customerName": "Jane Smith",
+          "expectedReturnDate": "2024-06-03T00:00:00Z",
+          "hoursRemaining": 36,
+          "itemCount": 1,
+          "status": "active"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/damages
+
+Returns the damage resolution queue: items with damage reported during inspections, categorized into pending assessment, pending repair, and pending billing.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "damageQueue": {
+      "pendingAssessment": [
+        {
+          "inspectionId": "665...",
+          "loanId": "664...",
+          "instanceId": "665...",
+          "serialNumber": "SN-002",
+          "materialTypeName": "Speaker System",
+          "conditionAfter": "damaged",
+          "damageDescription": "Cracked housing",
+          "estimatedRepairCost": 150,
+          "chargeToCustomer": 100,
+          "inspectionStatus": "pending"
+        }
+      ],
+      "pendingRepair": [],
+      "pendingBilling": []
+    }
+  }
+}
+```
+
+---
+
+#### GET /locations/:locationId/operations/tasks
+
+Aggregated TO-DO list that calls all other operations endpoints via `Promise.all` and produces a unified, prioritized task list for the location operator. Each task has a `priority` (critical/high/medium/low), `category`, `title`, `count`, and `detail` for quick scanning.
+
+| Parameter  | Location | Type   | Required | Description                          |
+| ---------- | -------- | ------ | -------- | ------------------------------------ |
+| locationId | path     | string | Yes      | MongoDB ObjectId of the location     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "tasks": [
+      {
+        "priority": "critical",
+        "category": "financials",
+        "title": "Overdue invoices requiring follow-up",
+        "count": 2,
+        "detail": "Total overdue: $2500.00"
+      },
+      {
+        "priority": "high",
+        "category": "loans",
+        "title": "Overdue loans past expected return date",
+        "count": 3,
+        "detail": "Loans past their return deadline"
+      },
+      {
+        "priority": "high",
+        "category": "inspections",
+        "title": "Pending inspections awaiting review",
+        "count": 5,
+        "detail": "Items returned and waiting for inspection"
+      },
+      {
+        "priority": "medium",
+        "category": "inventory",
+        "title": "Damaged inventory items",
+        "count": 4,
+        "detail": "Items needing repair or write-off"
+      },
+      {
+        "priority": "low",
+        "category": "loans",
+        "title": "Loans due within 48 hours",
+        "count": 2,
+        "detail": "Approaching return deadlines"
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -4930,6 +5897,16 @@ X-RateLimit-Reset: 45
 | `X-RateLimit-Limit`     | Maximum requests allowed in window   |
 | `X-RateLimit-Remaining` | Requests remaining in current window |
 | `X-RateLimit-Reset`     | Seconds until window resets          |
+
+### Request Correlation IDs
+
+Every response includes an `X-Request-Id` header containing a unique correlation ID for that request. You can provide your own correlation ID by sending the `X-Request-Id` header in the request; otherwise one is generated automatically (UUID v4).
+
+```http
+X-Request-Id: 550e8400-e29b-41d4-a716-446655440000
+```
+
+Use this ID when reporting issues or debugging — it is logged on the server alongside the request details.
 
 ### Rate Limit Exceeded Response
 
