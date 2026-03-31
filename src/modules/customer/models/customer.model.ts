@@ -107,7 +107,6 @@ const customerSchema = new Schema(
       type: String,
       required: true,
       trim: true,
-      unique: true,
     },
     documentType: {
       type: String,
@@ -149,6 +148,8 @@ const customerSchema = new Schema(
 
 // Compound unique: email unique per organization
 customerSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+// Compound unique: phone unique per organization (not globally)
+customerSchema.index({ organizationId: 1, phone: 1 }, { unique: true });
 // Compound index for document lookup
 customerSchema.index(
   { organizationId: 1, documentType: 1, documentNumber: 1 },

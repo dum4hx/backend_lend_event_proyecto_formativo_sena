@@ -134,7 +134,7 @@ const userSchema = new Schema(
           `${props.value} is not a valid email!`,
       },
     },
-    phone: { type: String, required: true, unique: true, trim: true },
+    phone: { type: String, required: true, trim: true },
     password: { type: String, required: true, select: false },
     locations: [{ type: Schema.Types.ObjectId, ref: "Location" }],
     roleId: {
@@ -160,6 +160,8 @@ const userSchema = new Schema(
 
 // Compound unique index: email unique per organization
 userSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+// Compound unique index: phone unique per organization (not globally)
+userSchema.index({ organizationId: 1, phone: 1 }, { unique: true });
 userSchema.index({ organizationId: 1, roleId: 1 });
 userSchema.index({ organizationId: 1, status: 1 });
 

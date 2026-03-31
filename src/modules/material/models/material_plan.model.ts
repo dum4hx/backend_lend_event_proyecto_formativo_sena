@@ -3,6 +3,9 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 // Zod schema for API validation
 export const MaterialPlanZodSchema = z.object({
+  organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+    message: "Invalid Organization ID format",
+  }),
   name: z
     .string()
     .min(1, "Name is required")
@@ -31,12 +34,17 @@ export type MaterialPlanInput = z.infer<typeof MaterialPlanZodSchema>;
 // Material Plan mongoose schema
 const materialPlanSchema = new Schema(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
     name: {
       type: String,
       required: true,
       maxlength: 150,
       trim: true,
-      unique: true,
     },
     description: {
       type: String,
@@ -64,6 +72,8 @@ const materialPlanSchema = new Schema(
   },
 );
 
+// Compound unique: name unique per organization (not globally)
+materialPlanSchema.index({ organizationId: 1, name: 1 }, { unique: true });
 // Index for better query performance
 materialPlanSchema.index({ materialTypeIds: 1 });
 

@@ -5,9 +5,13 @@ import { Location } from "../../location/models/location.model.ts";
 // Material instance statuses
 const materialStatusOptions: string[] = [
   "available",
+  "reserved",
+  "loaned",
   "in_use",
+  "returned",
   "maintenance",
   "damaged",
+  "lost",
   "retired",
 ];
 
@@ -27,7 +31,17 @@ export const MaterialInstanceZodSchema = z.object({
     .trim(),
   notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
   status: z
-    .enum(["available", "in_use", "maintenance", "damaged", "retired"])
+    .enum([
+      "available",
+      "reserved",
+      "loaned",
+      "in_use",
+      "returned",
+      "maintenance",
+      "damaged",
+      "lost",
+      "retired",
+    ])
     .default("available"),
   locationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Location ID format",
@@ -83,7 +97,17 @@ export const MaterialInstanceCreateZodSchema = z
     useBarcodeAsSerial: z.boolean().optional(),
     notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
     status: z
-      .enum(["available", "in_use", "maintenance", "damaged", "retired"])
+      .enum([
+        "available",
+        "reserved",
+        "loaned",
+        "in_use",
+        "returned",
+        "maintenance",
+        "damaged",
+        "lost",
+        "retired",
+      ])
       .default("available"),
     attributes: z
       .array(
