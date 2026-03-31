@@ -1,7 +1,10 @@
-import type { Types } from "mongoose";
+import { Types } from "mongoose";
 import { Package } from "./models/package.model.ts";
 import type { PackageInput } from "./models/package.model.ts";
 import { MaterialModel } from "../material/models/material_type.model.ts";
+import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { Loan } from "../loan/models/loan.model.ts";
+import { LoanRequest } from "../request/models/request.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 
 export const packageService = {
@@ -153,6 +156,131 @@ export const packageService = {
 
     if (!pkg) throw AppError.notFound("Package not found");
     return pkg;
+  },
+
+  /**
+   * Returns availability information for a package: for each material type in
+   * the package, lists available instances grouped by location, considering
+   * blocking loans and requests during the given date range.
+   */
+  async getPackageAvailability(
+    organizationId: Types.ObjectId | string,
+    packageId: string,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    const pkg = await Package.findOne({ _id: packageId, organizationId })
+      .populate("items.materialTypeId", "name pricePerDay")
+      .lean();
+
+    if (!pkg) throw AppError.notFound("Package not found");
+
+    const materialTypeIds = pkg.items.map(
+      (item) => new Types.ObjectId(String(item.materialTypeId._id ?? item.materialTypeId)),
+    );
+
+    // Fetch all candidate instances (available, reserved, or loaned)
+    const instances = await MaterialInstance.find({
+      organizationId,
+      modelId: { $in: materialTypeIds },
+      status: { $in: ["available", "reserved", "loaned"] },
+    })
+      .populate("locationId", "name")
+      .lean();
+
+    // Find instances busy during the requested date range
+    const instanceIds = instances.map((i) => i._id);
+    const busyInstanceIds = new Set<string>();
+
+    if (instanceIds.length > 0) {
+      const [blockingLoans, blockingRequests] = await Promise.all([
+        Loan.find({
+          organizationId,
+          "materialInstances.materialInstanceId": { $in: instanceIds },
+          status: { $in: ["active", "overdue"] },
+          startDate: { $lt: endDate },
+          endDate: { $gt: startDate },
+        }).lean(),
+        LoanRequest.find({
+          organizationId,
+          status: { $in: ["approved", "assigned", "ready", "shipped"] },
+          "assignedMaterials.materialInstanceId": { $in: instanceIds },
+          startDate: { $lt: endDate },
+          endDate: { $gt: startDate },
+        }).lean(),
+      ]);
+
+      for (const loan of blockingLoans) {
+        for (const mi of loan.materialInstances) {
+          busyInstanceIds.add(String(mi.materialInstanceId));
+        }
+      }
+      for (const req of blockingRequests) {
+        for (const am of req.assignedMaterials ?? []) {
+          busyInstanceIds.add(String(am.materialInstanceId));
+        }
+      }
+    }
+
+    // Build per-item availability
+    const itemAvailability = pkg.items.map((item) => {
+      const typeId = String(item.materialTypeId._id ?? item.materialTypeId);
+      const typeName = (item.materialTypeId as any).name ?? typeId;
+      const requiredQty = item.quantity;
+
+      const matchingInstances = instances.filter(
+        (inst) => String(inst.modelId) === typeId,
+      );
+
+      const availableInstances = matchingInstances.filter(
+        (inst) => !busyInstanceIds.has(String(inst._id)),
+      );
+
+      // Group by location
+      const byLocation = new Map<
+        string,
+        { locationId: string; locationName: string; count: number; instances: any[] }
+      >();
+
+      for (const inst of availableInstances) {
+        const locId = String(inst.locationId._id ?? inst.locationId);
+        const locName = (inst.locationId as any).name ?? locId;
+        const entry = byLocation.get(locId) ?? {
+          locationId: locId,
+          locationName: locName,
+          count: 0,
+          instances: [],
+        };
+        entry.count += 1;
+        (entry.instances as Record<string, unknown>[]).push({
+          instanceId: String(inst._id),
+          serialNumber: inst.serialNumber,
+          barcode: (inst as any).barcode ?? null,
+          status: inst.status,
+        });
+        byLocation.set(locId, entry);
+      }
+
+      return {
+        materialTypeId: typeId,
+        materialTypeName: typeName,
+        requiredQuantity: requiredQty,
+        totalAvailable: availableInstances.length,
+        isSatisfied: availableInstances.length >= requiredQty,
+        locations: Array.from(byLocation.values()),
+      };
+    });
+
+    const allSatisfied = itemAvailability.every((item) => item.isSatisfied);
+
+    return {
+      packageId: String(pkg._id),
+      packageName: pkg.name,
+      startDate,
+      endDate,
+      canFulfill: allSatisfied,
+      items: itemAvailability,
+    };
   },
 
   async deletePackage(organizationId: Types.ObjectId | string, id: string) {

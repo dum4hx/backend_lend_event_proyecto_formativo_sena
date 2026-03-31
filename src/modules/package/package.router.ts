@@ -37,6 +37,14 @@ const listPackagesQuerySchema = paginationSchema.extend({
 
 const packageUpdateSchema = PackageZodSchema.partial();
 
+const packageAvailabilityQuerySchema = z.object({
+  startDate: z.coerce.date({ message: "startDate is required" }),
+  endDate: z.coerce.date({ message: "endDate is required" }),
+}).refine((data) => data.endDate > data.startDate, {
+  message: "endDate must be after startDate",
+  path: ["endDate"],
+});
+
 /* ---------- Routes ---------- */
 
 /**
@@ -116,6 +124,37 @@ packageRouter.post(
       const pkg = await packageService.createPackage(organizationId, req.body);
 
       res.status(201).json({ status: "success", data: { package: pkg } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/packages/:id/availability
+ * Returns available instances for each material type in the package,
+ * filtered by a date range. Useful for checking if a package can be
+ * fulfilled before creating a loan request.
+ */
+packageRouter.get(
+  "/:id/availability",
+  requirePermission("packages:read"),
+  validateQuery(packageAvailabilityQuerySchema),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const { startDate, endDate } = req.query as unknown as {
+        startDate: Date;
+        endDate: Date;
+      };
+
+      const data = await packageService.getPackageAvailability(
+        getOrgId(req),
+        req.params.id,
+        new Date(startDate),
+        new Date(endDate),
+      );
+
+      res.json({ status: "success", data });
     } catch (err) {
       next(err);
     }
