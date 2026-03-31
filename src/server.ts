@@ -19,6 +19,7 @@ import * as routers from "./routers/index.ts";
 import { connectDB } from "./utils/db/connectDB.ts";
 import { subscriptionTypeService } from "./modules/subscription_type/subscription_type.service.ts";
 import { authService } from "./modules/auth/auth.service.ts";
+import { startScheduledJobs } from "./modules/shared/scheduler.ts";
 
 /* ---------- Environment Variables ---------- */
 
@@ -142,6 +143,18 @@ app.use(`${apiV1}/pricing`, routers.pricingRouter);
 // Payment method routes
 app.use(`${apiV1}/payment-methods`, routers.paymentMethodRouter);
 
+// Analytics routes (org-level dashboard data)
+app.use(`${apiV1}/analytics`, routers.analyticsRouter);
+
+// Reports routes (org-level exportable reports)
+app.use(`${apiV1}/reports`, routers.reportsRouter);
+
+// Operations routes (location-scoped operational dashboard)
+app.use(
+  `${apiV1}/locations/:locationId/operations`,
+  routers.operationsRouter
+);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -171,6 +184,9 @@ const startServer = async (): Promise<void> => {
         console.error("Failed to purge expired pending registrations:", err);
       });
     }, 60 * 1000);
+
+    // Start scheduled background jobs (overdue detection, request expiration)
+    startScheduledJobs();
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

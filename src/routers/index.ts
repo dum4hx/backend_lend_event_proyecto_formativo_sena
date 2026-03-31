@@ -1,4 +1,5 @@
 import authRouter from "../modules/auth/auth.router.ts";
+import analyticsRouter from "../modules/analytics/analytics.router.ts";
 import billingRouter from "../modules/billing/billing.router.ts";
 import customerRouter from "../modules/customer/customer.router.ts";
 import inspectionRouter from "../modules/inspection/inspection.router.ts";
@@ -17,9 +18,12 @@ import permissionsRouter from "../modules/permissions/permission.router.ts";
 import transferRouter from "../modules/transfer/transfer.router.ts";
 import pricingRouter from "../modules/pricing/pricing.router.ts";
 import paymentMethodRouter from "../modules/payment/payment_method.router.ts";
+import reportsRouter from "../modules/reports/reports.router.ts";
+import operationsRouter from "../modules/operations/operations.router.ts";
 
 export {
   authRouter,
+  analyticsRouter,
   billingRouter,
   customerRouter,
   inspectionRouter,
@@ -38,4 +42,6 @@ export {
   transferRouter,
   pricingRouter,
   paymentMethodRouter,
+  reportsRouter,
+  operationsRouter,
 };

@@ -103,6 +103,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "payment_methods:read",
     "payment_methods:update",
     "payment_methods:delete",
+    "operations:read",
   ],
   owner: [
     // Full organization access except platform management
@@ -171,6 +172,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "payment_methods:read",
     "payment_methods:update",
     "payment_methods:delete",
+    "operations:read",
   ],
   manager: [
     "organization:read",
@@ -203,6 +205,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "payment_methods:read",
     "payment_methods:create",
     "payment_methods:update",
+    "operations:read",
   ],
   warehouse_operator: [
     "organization:read",
@@ -220,6 +223,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "transfers:update",
     "pricing:read",
     "payment_methods:read",
+    "operations:read",
   ],
   commercial_advisor: [
     "organization:read",

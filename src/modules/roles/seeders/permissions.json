@@ -495,5 +495,12 @@
     "description": "Allows deactivating payment methods in the organization.",
     "category": "Payment Methods",
     "isPlatformPermission": false
+  },
+  {
+    "_id": "operations:read",
+    "displayName": "View Operations Dashboard",
+    "description": "Allows viewing the location-scoped operational dashboard with aggregated tasks, inspections, financials, inventory issues, and transfer queues.",
+    "category": "Operations",
+    "isPlatformPermission": false
   }
 ]
