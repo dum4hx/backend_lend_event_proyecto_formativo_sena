@@ -17,6 +17,7 @@ import {
   TransferZodSchema,
   ItemConditionEnum,
 } from "./models/transfer.model.ts";
+import { TransferRejectionReasonZodSchema } from "./models/transfer_rejection_reason.model.ts";
 import { z } from "zod";
 import { Types } from "mongoose";
 
@@ -99,6 +100,11 @@ transferRouter.patch(
   validateBody(
     z.object({
       status: z.enum(["approved", "rejected"]),
+      rejectionReasonId: z
+        .string()
+        .refine((val) => Types.ObjectId.isValid(val), "Invalid rejection reason ID")
+        .optional(),
+      rejectionNote: z.string().max(500).trim().optional(),
     }),
   ),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
@@ -108,6 +114,8 @@ transferRouter.patch(
         getUserId(req),
         req.params.id,
         req.body.status,
+        req.body.rejectionReasonId,
+        req.body.rejectionNote,
       );
       res.status(200).json({ status: "success", data });
     } catch (err) {
@@ -224,6 +232,113 @@ transferRouter.patch(
         req.body.items,
       );
       res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * ============================================================================
+ * TRANSFER REJECTION REASON ROUTES
+ * ============================================================================
+ */
+
+const listRejectionReasonsQuerySchema = z.object({
+  includeInactive: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+});
+
+/**
+ * GET /transfers/rejection-reasons
+ * List rejection reasons for the organization
+ * Permission: transfers:read
+ */
+transferRouter.get(
+  "/rejection-reasons",
+  requirePermission("transfers:read"),
+  validateQuery(listRejectionReasonsQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { includeInactive } = (req as any).query;
+      const data = await transferService.listRejectionReasons(
+        getOrgId(req),
+        includeInactive,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /transfers/rejection-reasons
+ * Create a new rejection reason
+ * Permission: transfer_rejection_reasons:manage
+ */
+transferRouter.post(
+  "/rejection-reasons",
+  requirePermission("transfer_rejection_reasons:manage"),
+  validateBody(TransferRejectionReasonZodSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await transferService.createRejectionReason(
+        getOrgId(req),
+        req.body,
+      );
+      res.status(201).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /transfers/rejection-reasons/:id
+ * Update a rejection reason
+ * Permission: transfer_rejection_reasons:manage
+ */
+transferRouter.patch(
+  "/rejection-reasons/:id",
+  requirePermission("transfer_rejection_reasons:manage"),
+  validateBody(TransferRejectionReasonZodSchema.partial()),
+  async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await transferService.updateRejectionReason(
+        getOrgId(req),
+        req.params.id,
+        req.body,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /transfers/rejection-reasons/:id
+ * Delete a rejection reason (default reasons are protected)
+ * Permission: transfer_rejection_reasons:manage
+ */
+transferRouter.delete(
+  "/rejection-reasons/:id",
+  requirePermission("transfer_rejection_reasons:manage"),
+  async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      await transferService.deleteRejectionReason(getOrgId(req), req.params.id);
+      res.status(200).json({ status: "success", data: null });
     } catch (err) {
       next(err);
     }
