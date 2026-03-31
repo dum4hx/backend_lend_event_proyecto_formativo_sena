@@ -1186,13 +1186,13 @@ Delete a custom role belonging to the current organization.
 
 ### Permissions
 
-The permissions endpoint exposes all active, organization-assignable permissions from the database. It is intended for UI role editors so users can build a labelled, categorised permission picker without hard-coding permission strings on the client.
+The permissions endpoint serves the system's permission catalogue directly from the canonical `permissions.json` definitions file (no DB round-trip). It is intended for UI role editors so consumers can build a labelled, categorised permission picker without hard-coding permission strings on the client.
 
-**Super-admin-only permissions are excluded** — only permissions that can legally be assigned to an organization role are returned.
+**Platform-only permissions are excluded by default** — only permissions assignable to organization roles are returned unless `includePlatform=true` is provided.
 
 #### GET /permissions
 
-Returns all active permissions that can be assigned to organization roles, sorted by category then identifier.
+Returns the permission catalogue with optional filtering and grouping.
 
 **Authentication Required:** Yes
 
@@ -1200,49 +1200,79 @@ Returns all active permissions that can be assigned to organization roles, sorte
 
 **Permission Required:** `permissions:read`
 
-**Filters applied server-side:**
+| Parameter        | Location | Type    | Required | Description                                                                        |
+| ---------------- | -------- | ------- | -------- | ---------------------------------------------------------------------------------- |
+| category         | query    | string  | No       | Filter to a single category (e.g. `Transfers`, `Materials`, `Roles`)               |
+| includePlatform  | query    | boolean | No       | When `true`, includes platform-only permissions (default: `false`)                 |
+| grouped          | query    | boolean | No       | When `true`, returns permissions grouped by category instead of a flat list (default: `false`) |
 
-- `isPlatformPermission: false` — excludes super-admin-only capabilities (e.g. `platform:manage`, `subscription_types:*`)
-- `isActive: true` — excludes soft-disabled permissions
-
-**Response:** `200 OK`
+**Flat response** (`GET /permissions`):
 
 ```json
 {
   "status": "success",
-  "data": {
-    "permissions": [
-      {
-        "_id": "customers:create",
-        "displayName": "Create Customers",
-        "description": "Allows creating new customer records",
-        "category": "Customers"
-      },
-      {
-        "_id": "materials:read",
-        "displayName": "Read Materials",
-        "description": "Allows viewing material types and instances",
-        "category": "Materials"
-      },
-      {
-        "_id": "roles:read",
-        "displayName": "Read Roles",
-        "description": "Allows listing and viewing organization roles",
-        "category": "Roles"
-      }
-    ]
-  }
+  "data": [
+    {
+      "id": "customers:create",
+      "displayName": "Create Customers",
+      "description": "Allows registering new customers/clients in the system.",
+      "category": "Customers",
+      "isPlatformPermission": false
+    },
+    {
+      "id": "materials:read",
+      "displayName": "View Materials",
+      "description": "Allows browsing the inventory and material catalog.",
+      "category": "Materials",
+      "isPlatformPermission": false
+    }
+  ]
+}
+```
+
+**Grouped response** (`GET /permissions?grouped=true`):
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "category": "Customers",
+      "permissions": [
+        {
+          "id": "customers:create",
+          "displayName": "Create Customers",
+          "description": "Allows registering new customers/clients in the system.",
+          "category": "Customers",
+          "isPlatformPermission": false
+        }
+      ]
+    },
+    {
+      "category": "Materials",
+      "permissions": [
+        {
+          "id": "materials:read",
+          "displayName": "View Materials",
+          "description": "Allows browsing the inventory and material catalog.",
+          "category": "Materials",
+          "isPlatformPermission": false
+        }
+      ]
+    }
+  ]
 }
 ```
 
 **Response fields per permission object:**
 
-| Field         | Type   | Description                                             |
-| ------------- | ------ | ------------------------------------------------------- |
-| `_id`         | string | Permission identifier in `resource:action` format       |
-| `displayName` | string | Human-readable label for UI display                     |
-| `description` | string | Short description of what granting this permission does |
-| `category`    | string | Grouping category (e.g. `Materials`, `Roles`, `Users`)  |
+| Field                  | Type    | Description                                                |
+| ---------------------- | ------- | ---------------------------------------------------------- |
+| `id`                   | string  | Permission identifier in `resource:action` format          |
+| `displayName`          | string  | Human-readable label for UI display                        |
+| `description`          | string  | Short description of what granting this permission does    |
+| `category`             | string  | Grouping category (e.g. `Materials`, `Roles`, `Transfers`) |
+| `isPlatformPermission` | boolean | Whether this is a platform-only (super-admin) permission   |
 
 ---
 
@@ -3720,7 +3750,7 @@ Lists all transfer requests for the organization. By default, **fulfilled** requ
 
 #### PATCH /transfers/requests/:id/respond
 
-Approves or rejects a transfer request. When rejecting, a `rejectionReasonId` from the organization's rejection reason catalogue is required.
+Approves or rejects a transfer request. **Only users assigned to the source location can respond to the request.** When rejecting, a `rejectionReasonId` from the organization's rejection reason catalogue is required.
 
 | Parameter         | Location | Type   | Required                    | Description                                       |
 | ----------------- | -------- | ------ | --------------------------- | ------------------------------------------------- |
@@ -3730,9 +3760,12 @@ Approves or rejects a transfer request. When rejecting, a `rejectionReasonId` fr
 
 **Permission Required:** `transfers:update`
 
+**Location Requirement:** User must be assigned to the source location (`fromLocationId`) of the transfer request.
+
 **Error Responses:**
 - `400` — Missing rejection reason when rejecting
-- `404` — Rejection reason not found or inactive
+- `403` — User not assigned to the source location
+- `404` — Rejection reason not found or inactive; User not found
 
 ---
 
