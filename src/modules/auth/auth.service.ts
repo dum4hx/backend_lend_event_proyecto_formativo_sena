@@ -165,7 +165,11 @@ export const authService = {
         );
       }
 
-      // Check if user phone already exists
+      // Check if user phone already exists within same organization
+      // Note: phone uniqueness is per-org (compound index), not global.
+      // During registration the org is also being created, so we only check
+      // against existing users globally to avoid confusion. Once multi-org
+      // user support is added this should be scoped further.
       const existingUserWithPhone = await User.findOne({
         phone: ownerData.phone.trim(),
       }).session(session);

@@ -6,11 +6,11 @@ import {
 } from "express";
 import { z } from "zod";
 import {
-  Customer,
   CustomerZodSchema,
   CustomerUpdateZodSchema,
   documentTypes,
 } from "./models/customer.model.ts";
+import { customerService } from "./customer.service.ts";
 import {
   validateBody,
   validateQuery,
@@ -22,8 +22,6 @@ import {
   requirePermission,
   getOrgId,
 } from "../../middleware/auth.ts";
-import { Loan } from "../loan/models/loan.model.ts";
-import { AppError } from "../../errors/AppError.ts";
 
 const customerRouter = Router();
 
@@ -62,6 +60,7 @@ customerRouter.get(
 /**
  * GET /api/v1/customers
  * Lists all customers in the organization.
+ * Requires: customers:read
  */
 customerRouter.get(
   "/",
@@ -70,51 +69,12 @@ customerRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        search,
-        sortBy,
-        sortOrder,
-      } = req.query as unknown as z.infer<typeof listCustomersQuerySchema>;
-      const skip = (page - 1) * limit;
+      const query = req.query as unknown as z.infer<
+        typeof listCustomersQuerySchema
+      >;
+      const data = await customerService.listCustomers(organizationId, query);
 
-      const query: Record<string, unknown> = { organizationId };
-
-      if (status) {
-        query.status = status;
-      }
-
-      if (search) {
-        query.$or = [
-          { email: { $regex: search, $options: "i" } },
-          { "name.firstName": { $regex: search, $options: "i" } },
-          { "name.firstSurname": { $regex: search, $options: "i" } },
-          { documentNumber: { $regex: search, $options: "i" } },
-        ];
-      }
-
-      const sortField = sortBy ?? "createdAt";
-      const sortDirection = sortOrder === "asc" ? 1 : -1;
-
-      const [customers, total] = await Promise.all([
-        Customer.find(query)
-          .skip(skip)
-          .limit(limit)
-          .sort({ [sortField]: sortDirection }),
-        Customer.countDocuments(query),
-      ]);
-
-      res.json({
-        status: "success",
-        data: {
-          customers,
-          total,
-          page,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
+      res.json({ status: "success", data });
     } catch (err) {
       next(err);
     }
@@ -124,25 +84,18 @@ customerRouter.get(
 /**
  * GET /api/v1/customers/:id
  * Gets a specific customer by ID.
+ * Requires: customers:read
  */
 customerRouter.get(
   "/:id",
   requirePermission("customers:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await Customer.findOne({
-        _id: req.params.id,
-        organizationId: getOrgId(req),
-      });
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { customer },
-      });
+      const customer = await customerService.getCustomerById(
+        req.params.id as string,
+        getOrgId(req),
+      );
+      res.json({ status: "success", data: { customer } });
     } catch (err) {
       next(err);
     }
@@ -152,6 +105,7 @@ customerRouter.get(
 /**
  * POST /api/v1/customers
  * Creates a new customer.
+ * Requires: customers:create
  */
 customerRouter.post(
   "/",
@@ -159,27 +113,11 @@ customerRouter.post(
   validateBody(CustomerZodSchema.omit({ organizationId: true })),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const organizationId = getOrgId(req);
-
-      // Check for duplicate email
-      const existing = await Customer.findOne({
-        organizationId,
-        email: req.body.email.toLowerCase(),
-      });
-
-      if (existing) {
-        throw AppError.conflict("A customer with this email already exists");
-      }
-
-      const customer = await Customer.create({
-        ...req.body,
-        organizationId,
-      });
-
-      res.status(201).json({
-        status: "success",
-        data: { customer },
-      });
+      const customer = await customerService.createCustomer(
+        getOrgId(req),
+        req.body,
+      );
+      res.status(201).json({ status: "success", data: { customer } });
     } catch (err) {
       next(err);
     }
@@ -189,6 +127,7 @@ customerRouter.post(
 /**
  * PATCH /api/v1/customers/:id
  * Updates a customer's information.
+ * Requires: customers:update
  */
 customerRouter.patch(
   "/:id",
@@ -196,20 +135,12 @@ customerRouter.patch(
   validateBody(CustomerUpdateZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await Customer.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: req.body },
-        { new: true, runValidators: true },
+      const customer = await customerService.updateCustomer(
+        req.params.id as string,
+        getOrgId(req),
+        req.body,
       );
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
-      res.json({
-        status: "success",
-        data: { customer },
-      });
+      res.json({ status: "success", data: { customer } });
     } catch (err) {
       next(err);
     }
@@ -219,22 +150,18 @@ customerRouter.patch(
 /**
  * POST /api/v1/customers/:id/activate
  * Activates (or reactivates) a customer.
+ * Requires: customers:update
  */
 customerRouter.post(
   "/:id/activate",
   requirePermission("customers:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await Customer.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { status: "active" } },
-        { new: true },
+      const customer = await customerService.changeStatus(
+        req.params.id as string,
+        getOrgId(req),
+        "active",
       );
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
       res.json({
         status: "success",
         data: { customer },
@@ -249,22 +176,18 @@ customerRouter.post(
 /**
  * POST /api/v1/customers/:id/deactivate
  * Deactivates a customer (sets status to inactive).
+ * Requires: customers:update
  */
 customerRouter.post(
   "/:id/deactivate",
   requirePermission("customers:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await Customer.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { status: "inactive" } },
-        { new: true },
+      const customer = await customerService.changeStatus(
+        req.params.id as string,
+        getOrgId(req),
+        "inactive",
       );
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
       res.json({
         status: "success",
         data: { customer },
@@ -279,22 +202,18 @@ customerRouter.post(
 /**
  * POST /api/v1/customers/:id/blacklist
  * Blacklists a customer.
+ * Requires: customers:update
  */
 customerRouter.post(
   "/:id/blacklist",
   requirePermission("customers:update"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customer = await Customer.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { status: "blacklisted" } },
-        { new: true },
+      const customer = await customerService.changeStatus(
+        req.params.id as string,
+        getOrgId(req),
+        "blacklisted",
       );
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
       res.json({
         status: "success",
         data: { customer },
@@ -308,35 +227,18 @@ customerRouter.post(
 
 /**
  * DELETE /api/v1/customers/:id
- * Deletes a customer (soft delete by setting status to inactive).
+ * Soft-deletes a customer (sets status to inactive). Blocks if active loans exist.
+ * Requires: customers:delete
  */
 customerRouter.delete(
   "/:id",
   requirePermission("customers:delete"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const customerId = req.params.id as string;
-
-      // Check if customer has active loans
-      const activeLoans = await Loan.countDocuments({
-        customerId,
-        status: { $in: ["active", "overdue"] },
-      });
-
-      if (activeLoans > 0) {
-        throw AppError.badRequest("Cannot delete customer with active loans");
-      }
-
-      const customer = await Customer.findOneAndUpdate(
-        { _id: req.params.id, organizationId: getOrgId(req) },
-        { $set: { status: "inactive" } },
-        { new: true },
+      await customerService.deleteCustomer(
+        req.params.id as string,
+        getOrgId(req),
       );
-
-      if (!customer) {
-        throw AppError.notFound("Customer not found");
-      }
-
       res.json({
         status: "success",
         message: "Customer deleted successfully",

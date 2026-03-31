@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Invoice, type InvoiceDocument } from "./models/invoice.model.ts";
 import { PaymentMethod } from "../payment/models/payment_method.model.ts";
 import { AppError } from "../../errors/AppError.ts";
+import { emailService } from "../../utils/email.ts";
 
 /**
  * Service to handle invoice business logic
@@ -301,7 +302,7 @@ export const invoiceService = {
   },
 
   /**
-   * Sends an invoice (placeholder for email logic)
+   * Sends an invoice email to the customer and transitions draft → pending.
    */
   async sendInvoice(id: string, organizationId: Types.ObjectId) {
     const invoice = await Invoice.findOne({
@@ -313,7 +314,35 @@ export const invoiceService = {
       throw AppError.notFound("Invoice not found");
     }
 
-    // TODO: Implement email sending logic
+    const customer = invoice.customerId as unknown as {
+      email: string;
+      name: { firstName: string; firstSurname: string };
+    };
+
+    if (customer?.email) {
+      await emailService.sendInvoiceEmail(
+        customer.email,
+        customer.name?.firstName ?? "Customer",
+        {
+          invoiceNumber: invoice.invoiceNumber,
+          type: invoice.type,
+          lineItems: invoice.lineItems as Array<{
+            description: string;
+            quantity: number;
+            unitPrice: number;
+            totalPrice: number;
+          }>,
+          subtotal: invoice.subtotal,
+          taxAmount: invoice.taxAmount ?? 0,
+          totalAmount: invoice.totalAmount,
+          amountPaid: invoice.amountPaid ?? 0,
+          amountDue: invoice.amountDue ?? 0,
+          dueDate: invoice.dueDate,
+          notes: invoice.notes,
+        },
+      );
+    }
+
     if (invoice.status === "draft") {
       invoice.status = "pending";
       await invoice.save();

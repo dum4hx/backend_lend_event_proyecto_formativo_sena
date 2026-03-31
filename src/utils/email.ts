@@ -133,4 +133,95 @@ export const emailService = {
 
     logger.info("Invite email sent", { to, organizationName });
   },
+
+  /**
+   * Sends an invoice email to a customer with line items and total.
+   */
+  async sendInvoiceEmail(
+    to: string,
+    firstName: string,
+    invoice: {
+      invoiceNumber: string;
+      type: string;
+      lineItems: Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        totalPrice: number;
+      }>;
+      subtotal: number;
+      taxAmount: number;
+      totalAmount: number;
+      amountPaid: number;
+      amountDue: number;
+      dueDate: Date;
+      notes?: string | null | undefined;
+    },
+  ): Promise<void> {
+    const lineItemsHtml = invoice.lineItems
+      .map(
+        (item) => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.description}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">$${item.unitPrice.toFixed(2)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">$${item.totalPrice.toFixed(2)}</td>
+        </tr>`,
+      )
+      .join("");
+
+    const dueDateStr = new Date(invoice.dueDate).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #1a1a2e;">Invoice ${invoice.invoiceNumber}</h2>
+        <p>Hi <strong>${firstName}</strong>,</p>
+        <p>You have a new invoice from LendEvent. Here are the details:</p>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+          <thead>
+            <tr style="background: #f4f4f8;">
+              <th style="padding: 8px; text-align: left;">Description</th>
+              <th style="padding: 8px; text-align: center;">Qty</th>
+              <th style="padding: 8px; text-align: right;">Unit Price</th>
+              <th style="padding: 8px; text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lineItemsHtml}
+          </tbody>
+        </table>
+
+        <div style="text-align: right; margin-top: 16px;">
+          <p style="margin: 4px 0;">Subtotal: <strong>$${invoice.subtotal.toFixed(2)}</strong></p>
+          <p style="margin: 4px 0;">Tax: <strong>$${invoice.taxAmount.toFixed(2)}</strong></p>
+          <p style="margin: 4px 0; font-size: 18px;">Total: <strong>$${invoice.totalAmount.toFixed(2)}</strong></p>
+          ${invoice.amountPaid > 0 ? `<p style="margin: 4px 0;">Paid: <strong>$${invoice.amountPaid.toFixed(2)}</strong></p>` : ""}
+          <p style="margin: 4px 0; color: ${invoice.amountDue > 0 ? "#c0392b" : "#27ae60"};">Amount Due: <strong>$${invoice.amountDue.toFixed(2)}</strong></p>
+        </div>
+
+        <p style="margin-top: 16px;"><strong>Due Date:</strong> ${dueDateStr}</p>
+        ${invoice.notes ? `<p style="color: #555;"><strong>Notes:</strong> ${invoice.notes}</p>` : ""}
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="color: #aaa; font-size: 12px;">LendEvent &mdash; Event Rental Management</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"LendEvent" <${SMTP_FROM}>`,
+      to,
+      subject: `Invoice ${invoice.invoiceNumber} — $${invoice.amountDue.toFixed(2)} due by ${dueDateStr}`,
+      html,
+    });
+
+    logger.info("Invoice email sent", {
+      to,
+      invoiceNumber: invoice.invoiceNumber,
+    });
+  },
 };
