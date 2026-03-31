@@ -4,9 +4,13 @@ import {
   TransferRequest,
   type TransferRequestInput,
 } from "./models/transfer_request.model.ts";
+import {
+  TransferRejectionReason,
+  type TransferRejectionReasonInput,
+} from "./models/transfer_rejection_reason.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Location } from "../location/models/location.model.ts";
-import { Types, startSession } from "mongoose";
+import { Types, startSession, type ClientSession } from "mongoose";
 
 class TransferService {
   /**
@@ -50,6 +54,9 @@ class TransferService {
       status: "requested" as const,
       items: payload.items,
       ...(payload.notes !== undefined && { notes: payload.notes }),
+      ...(payload.neededBy !== undefined && {
+        neededBy: new Date(payload.neededBy),
+      }),
     });
 
     return request;
@@ -63,6 +70,8 @@ class TransferService {
     userId: string | Types.ObjectId,
     requestId: string | Types.ObjectId,
     status: "approved" | "rejected",
+    rejectionReasonId?: string,
+    rejectionNote?: string,
   ) {
     const request = await TransferRequest.findOne({
       _id: requestId,
@@ -74,6 +83,25 @@ class TransferService {
       throw AppError.badRequest(
         `Cannot respond to a request in ${request.status} status`,
       );
+    }
+
+    if (status === "rejected") {
+      if (!rejectionReasonId) {
+        throw AppError.badRequest(
+          "Rejection reason is required when rejecting a request",
+        );
+      }
+      const reason = await TransferRejectionReason.findOne({
+        _id: rejectionReasonId,
+        organizationId,
+        isActive: true,
+      });
+      if (!reason) throw AppError.notFound("Rejection reason not found");
+
+      (request as any).rejectionReasonId = reason._id;
+      if (rejectionNote !== undefined) {
+        (request as any).rejectionNote = rejectionNote;
+      }
     }
 
     request.status = status;
@@ -332,6 +360,154 @@ class TransferService {
 
     if (!transfer) throw AppError.notFound("Transfer not found");
     return transfer;
+  }
+
+  // ============================================================================
+  // TRANSFER REJECTION REASONS
+  // ============================================================================
+
+  /**
+   * Seed default rejection reasons for a new organization
+   */
+  async seedDefaultRejectionReasons(
+    organizationId: Types.ObjectId,
+    session?: ClientSession,
+  ): Promise<void> {
+    const existing = await TransferRejectionReason.findOne({
+      organizationId,
+    }).session(session ?? null);
+    if (existing) return; // idempotent
+
+    const defaults = [
+      "Can't send in time",
+      "Unviable loan profit vs transfer cost",
+      "Items already committed to another loan",
+      "Insufficient inventory at origin",
+    ];
+
+    await TransferRejectionReason.insertMany(
+      defaults.map((label) => ({
+        organizationId,
+        label,
+        isActive: true,
+        isDefault: true,
+      })),
+      { session: session ?? null },
+    );
+  }
+
+  /**
+   * List rejection reasons for an organization
+   */
+  async listRejectionReasons(
+    organizationId: string | Types.ObjectId,
+    includeInactive = false,
+  ) {
+    const filter: Record<string, unknown> = { organizationId };
+    if (!includeInactive) filter.isActive = true;
+
+    const reasons = await TransferRejectionReason.find(filter).sort({
+      label: 1,
+    });
+
+    return reasons.map((r) => ({
+      id: r._id,
+      label: r.label,
+      isActive: r.isActive,
+      isDefault: r.isDefault,
+    }));
+  }
+
+  /**
+   * Create a new rejection reason
+   */
+  async createRejectionReason(
+    organizationId: string | Types.ObjectId,
+    data: TransferRejectionReasonInput,
+  ) {
+    const duplicate = await TransferRejectionReason.findOne({
+      organizationId,
+      label: { $regex: new RegExp(`^${data.label}$`, "i") },
+    });
+    if (duplicate)
+      throw AppError.conflict(
+        "A rejection reason with this label already exists",
+      );
+
+    const reason = await TransferRejectionReason.create({
+      organizationId,
+      label: data.label,
+      isActive: data.isActive ?? true,
+      isDefault: false,
+    });
+
+    return {
+      id: reason._id,
+      label: reason.label,
+      isActive: reason.isActive,
+      isDefault: reason.isDefault,
+    };
+  }
+
+  /**
+   * Update a rejection reason
+   */
+  async updateRejectionReason(
+    organizationId: string | Types.ObjectId,
+    reasonId: string,
+    data: Partial<TransferRejectionReasonInput>,
+  ) {
+    const reason = await TransferRejectionReason.findOne({
+      _id: reasonId,
+      organizationId,
+    });
+    if (!reason) throw AppError.notFound("Rejection reason not found");
+
+    if (data.label !== undefined && data.label !== reason.label) {
+      const duplicate = await TransferRejectionReason.findOne({
+        organizationId,
+        label: { $regex: new RegExp(`^${data.label}$`, "i") },
+        _id: { $ne: reason._id },
+      });
+      if (duplicate)
+        throw AppError.conflict(
+          "A rejection reason with this label already exists",
+        );
+      reason.label = data.label;
+    }
+
+    if (data.isActive !== undefined) {
+      reason.isActive = data.isActive;
+    }
+
+    await reason.save();
+
+    return {
+      id: reason._id,
+      label: reason.label,
+      isActive: reason.isActive,
+      isDefault: reason.isDefault,
+    };
+  }
+
+  /**
+   * Delete a rejection reason (default reasons cannot be deleted)
+   */
+  async deleteRejectionReason(
+    organizationId: string | Types.ObjectId,
+    reasonId: string,
+  ) {
+    const reason = await TransferRejectionReason.findOne({
+      _id: reasonId,
+      organizationId,
+    });
+    if (!reason) throw AppError.notFound("Rejection reason not found");
+    if (reason.isDefault)
+      throw AppError.badRequest(
+        "Default rejection reasons cannot be deleted",
+      );
+
+    await reason.deleteOne();
   }
 }
 
