@@ -502,5 +502,12 @@
     "description": "Allows viewing the location-scoped operational dashboard with aggregated tasks, inspections, financials, inventory issues, and transfer queues.",
     "category": "Operations",
     "isPlatformPermission": false
+  },
+  {
+    "_id": "transfer_rejection_reasons:manage",
+    "displayName": "Manage Transfer Rejection Reasons",
+    "description": "Allows creating, editing, and deleting the catalogue of transfer request rejection reasons.",
+    "category": "Transfers",
+    "isPlatformPermission": false
   }
 ]
