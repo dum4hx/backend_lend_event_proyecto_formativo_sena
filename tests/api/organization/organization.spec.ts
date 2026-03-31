@@ -1,28 +1,102 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Organization Module", () => {
-  test("GET /organization - should return org details", async ({ request }) => {
-    const res = await request.get("organizations"); // Note: Endpoint in server.ts is plural? Checking API ref.
-    // API Ref says GET /organization. Server.ts says /api/v1/organizations.
-    // I will try /organizations based on server.ts route mount, but check if router handles root "/"
-    // Usually routes are like: post /organizations -> create, get /organizations -> list (admin) or get /organizations/me
-    // API Ref says "GET /organization - Gets your organization details."
-    // If the router is mounted at /organizations, and the path inside is "/" it would be /organizations.
-    // I'll stick to /organizations based on server.ts mounting and common patterns for now.
+  /* ===================== GET Details ===================== */
 
-    // Wait, let's correct this. If server.ts says `app.use('/api/v1/organizations', organizationRouter)`,
-    // and the router has `router.get('/', ...)` that would be `/organizations`.
-    // The API Reference says "GET /organization". This might be a mismatch or `organizationRouter`
-    // handles specific paths. For now I'll use `/organizations` based on server.ts.
-
-    const res2 = await request.get("organizations");
-    // If that fails, might be /organization if mounted differently, but server.ts is source of truth.
-    expect(res2.status()).toBe(200);
+  test("GET /organizations - should return current org details", async ({
+    request,
+  }) => {
+    const res = await request.get("organizations");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data.organization).toBeDefined();
+    expect(body.data.organization.name).toBeDefined();
+    expect(body.data.organization.email).toBeDefined();
+    expect(body.data.organization.subscription).toBeDefined();
   });
 
-  test("GET /organization/usage - should return usage", async ({ request }) => {
+  test("GET /organizations - should include address", async ({ request }) => {
+    const res = await request.get("organizations");
+    expect(res.status()).toBe(200);
+    const org = (await res.json()).data.organization;
+    expect(org.address).toBeDefined();
+    expect(org.address.city).toBeDefined();
+  });
+
+  /* ===================== PATCH Update ===================== */
+
+  test("PATCH /organizations - should update organization name", async ({
+    request,
+  }) => {
+    const newName = `Updated Org ${Date.now()}`;
+    const res = await request.patch("organizations", {
+      data: { name: newName },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data.organization.name).toBe(newName);
+  });
+
+  test("PATCH /organizations - should update contact email", async ({
+    request,
+  }) => {
+    const newEmail = `org-contact-${Date.now()}@example.com`;
+    const res = await request.patch("organizations", {
+      data: { email: newEmail },
+    });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.data.organization.email).toBe(newEmail);
+  });
+
+  test("PATCH /organizations - should reject invalid payload", async ({
+    request,
+  }) => {
+    // name must be a string; send invalid type
+    const res = await request.patch("organizations", {
+      data: { name: "" },
+    });
+    // Expect validation error
+    expect(res.status()).toBeGreaterThanOrEqual(400);
+  });
+
+  /* ===================== Usage ===================== */
+
+  test("GET /organizations/usage - should return plan usage", async ({
+    request,
+  }) => {
     const res = await request.get("organizations/usage");
-    // Again, checking path.
-    expect(res.status().toString()).toMatch(/200|404/);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data.usage).toBeDefined();
+    expect(typeof body.data.usage.currentCatalogItems).toBe("number");
+    expect(typeof body.data.usage.maxCatalogItems).toBe("number");
+    expect(typeof body.data.usage.currentSeats).toBe("number");
+    expect(typeof body.data.usage.maxSeats).toBe("number");
+    expect(typeof body.data.usage.canAddCatalogItem).toBe("boolean");
+    expect(typeof body.data.usage.canAddSeat).toBe("boolean");
+  });
+
+  /* ===================== Plans ===================== */
+
+  test("GET /organizations/plans - should return available plans", async ({
+    request,
+  }) => {
+    const res = await request.get("organizations/plans");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(Array.isArray(body.data.plans)).toBe(true);
+    expect(body.data.plans.length).toBeGreaterThan(0);
+
+    // Each plan should have expected fields
+    const plan = body.data.plans[0];
+    expect(plan.name).toBeDefined();
+    expect(plan.displayName).toBeDefined();
+    expect(typeof plan.basePriceMonthly).toBe("number");
+    expect(typeof plan.pricePerSeat).toBe("number");
   });
 });
