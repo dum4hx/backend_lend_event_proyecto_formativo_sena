@@ -39,6 +39,10 @@ export const TransferRequestZodSchema = z.object({
     )
     .min(1, "At least one item must be requested"),
   notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+  neededBy: z
+    .string()
+    .datetime({ message: "neededBy must be a valid ISO date" })
+    .optional(),
 });
 
 export type TransferRequestInput = z.infer<typeof TransferRequestZodSchema>;
@@ -99,6 +103,18 @@ const transferRequestSchema = new Schema(
       },
     ],
     notes: {
+      type: String,
+      maxlength: 500,
+      trim: true,
+    },
+    neededBy: {
+      type: Date,
+    },
+    rejectionReasonId: {
+      type: Schema.Types.ObjectId,
+      ref: "TransferRejectionReason",
+    },
+    rejectionNote: {
       type: String,
       maxlength: 500,
       trim: true,
