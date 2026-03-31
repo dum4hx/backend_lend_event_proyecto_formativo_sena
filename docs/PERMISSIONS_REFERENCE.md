@@ -65,6 +65,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`transfers:create`](#transferscreate)
 - [`transfers:read`](#transfersread)
 - [`transfers:update`](#transfersupdate)
+- [`transfer_rejection_reasons:manage`](#transfer_rejection_reasonsmanage)
 - [`users:create`](#userscreate)
 - [`users:delete`](#usersdelete)
 - [`users:read`](#usersread)
@@ -621,6 +622,17 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows responding to transfer requests and marking transfers as received.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Transfers
+
+### `transfer_rejection_reasons:manage`
+
+- **Display Name:** Manage Transfer Rejection Reasons
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating, editing and deleting the org-level catalogue of rejection reasons used when denying transfer requests.
+- **Allowed Action:** Create, modify, and delete rejection reason records.
+- **Resource Target:** TransferRejectionReason
+- **Roles:** super_admin, owner, manager
 
 ### `users:create`
 

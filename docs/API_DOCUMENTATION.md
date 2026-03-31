@@ -3681,6 +3681,7 @@ Creates a new transfer request to move materials between locations. Items are sp
 | toLocationId   | body     | string | Yes      | Destination location ID                                      |
 | items          | body     | array  | Yes      | List of `{ modelId: string, quantity: number }` (min 1 item) |
 | notes          | body     | string | No       | Request notes                                                |
+| neededBy       | body     | string | No       | ISO 8601 date — deadline by which the transfer is needed     |
 
 **Permission Required:** `transfers:create`
 
@@ -3719,13 +3720,19 @@ Lists all transfer requests for the organization. By default, **fulfilled** requ
 
 #### PATCH /transfers/requests/:id/respond
 
-Approves or rejects a transfer request.
+Approves or rejects a transfer request. When rejecting, a `rejectionReasonId` from the organization's rejection reason catalogue is required.
 
-| Parameter | Location | Type   | Required | Description                          |
-| --------- | -------- | ------ | -------- | ------------------------------------ |
-| status    | body     | string | Yes      | New status: `approved` or `rejected` |
+| Parameter         | Location | Type   | Required                    | Description                                       |
+| ----------------- | -------- | ------ | --------------------------- | ------------------------------------------------- |
+| status            | body     | string | Yes                         | New status: `approved` or `rejected`              |
+| rejectionReasonId | body     | string | Yes (when status=rejected)  | ID of a valid, active `TransferRejectionReason`   |
+| rejectionNote     | body     | string | No                          | Free-text note explaining the rejection (max 500) |
 
 **Permission Required:** `transfers:update`
+
+**Error Responses:**
+- `400` — Missing rejection reason when rejecting
+- `404` — Rejection reason not found or inactive
 
 ---
 
@@ -3771,6 +3778,79 @@ Lists all physical transfers.
 Gets detailed information about a specific transfer, including item details.
 
 **Permission Required:** `transfers:read`
+
+---
+
+### Transfer Rejection Reason Endpoints
+
+Org-scoped catalogue of reasons for denying transfer requests. Default entries are seeded at organization registration and cannot be deleted.
+
+#### GET /transfers/rejection-reasons
+
+Lists rejection reasons for the organization. Active reasons only by default.
+
+| Parameter      | Location | Type    | Required | Description                                 |
+| -------------- | -------- | ------- | -------- | ------------------------------------------- |
+| includeInactive | query   | boolean | No       | If `true`, includes inactive reasons too    |
+
+**Permission Required:** `transfers:read`
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": [
+    { "id": "64f1a2...", "label": "Can't send in time", "isActive": true, "isDefault": true },
+    { "id": "64f1a3...", "label": "Custom reason", "isActive": true, "isDefault": false }
+  ]
+}
+```
+
+---
+
+#### POST /transfers/rejection-reasons
+
+Creates a new rejection reason.
+
+| Parameter | Location | Type    | Required | Description                        |
+| --------- | -------- | ------- | -------- | ---------------------------------- |
+| label     | body     | string  | Yes      | Reason label (3–120 chars)         |
+| isActive  | body     | boolean | No       | Whether active. Default: `true`    |
+
+**Permission Required:** `transfer_rejection_reasons:manage`
+
+**Error Responses:**
+- `409` — A reason with this label already exists
+
+---
+
+#### PATCH /transfers/rejection-reasons/:id
+
+Updates a rejection reason's label or active status.
+
+| Parameter | Location | Type    | Required | Description                 |
+| --------- | -------- | ------- | -------- | --------------------------- |
+| label     | body     | string  | No       | New label (3–120 chars)     |
+| isActive  | body     | boolean | No       | Enable or disable the reason |
+
+**Permission Required:** `transfer_rejection_reasons:manage`
+
+**Error Responses:**
+- `404` — Rejection reason not found
+- `409` — Duplicate label
+
+---
+
+#### DELETE /transfers/rejection-reasons/:id
+
+Permanently deletes a rejection reason. Default (seeded) reasons are protected and cannot be deleted.
+
+**Permission Required:** `transfer_rejection_reasons:manage`
+
+**Error Responses:**
+- `400` — Default rejection reasons cannot be deleted
+- `404` — Rejection reason not found
 
 ---
 
