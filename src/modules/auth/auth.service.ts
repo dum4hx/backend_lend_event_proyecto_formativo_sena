@@ -797,15 +797,6 @@ export const authService = {
 
     const profile = await userService.getProfile(userId);
 
-    // Check if user is owner
-    const hasOwnerPermissions = await authService.isOwner(userId);
-
-    if (!hasOwnerPermissions) {
-      throw AppError.unauthorized(
-        "Only organization owners can check payment status",
-      );
-    }
-
     // Allow login if user is super admin, regardless of org status
     const isSuperAdmin = await authService.isSuperAdmin(userId);
     if (isSuperAdmin) {
