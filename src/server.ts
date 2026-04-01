@@ -150,10 +150,7 @@ app.use(`${apiV1}/analytics`, routers.analyticsRouter);
 app.use(`${apiV1}/reports`, routers.reportsRouter);
 
 // Operations routes (location-scoped operational dashboard)
-app.use(
-  `${apiV1}/locations/:locationId/operations`,
-  routers.operationsRouter
-);
+app.use(`${apiV1}/locations/:locationId/operations`, routers.operationsRouter);
 
 /* ---------- 404 Handler ---------- */
 

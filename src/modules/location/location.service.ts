@@ -201,7 +201,7 @@ export class LocationService {
    * Validations:
    * - Unique name per organization
    * - All required fields present (validated by Mongoose)
-   * - Automatically relates to creator if they are an owner
+   * - Automatically relates the creator to the location via their locations array
    */
   static async createLocation(data: CreateLocationData) {
     const { userId, ...locationData } = data;
@@ -219,14 +219,11 @@ export class LocationService {
     // Create and return new location
     const location = await Location.create(locationData);
 
-    // If creator is an owner, associate the location with them
-    const isOwner = await authService.isOwner(userId);
-    if (isOwner) {
-      await User.updateOne(
-        { _id: userId },
-        { $addToSet: { locations: location._id } },
-      );
-    }
+    // Automatically associate the creator with the location
+    await User.updateOne(
+      { _id: userId },
+      { $addToSet: { locations: location._id } },
+    );
 
     return location;
   }

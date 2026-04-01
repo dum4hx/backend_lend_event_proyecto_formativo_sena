@@ -330,10 +330,7 @@ async function getOverview(
   });
   const transfersInTransit = await Transfer.countDocuments({
     ...orgFilter,
-    $or: [
-      { fromLocationId: locationId },
-      { toLocationId: locationId },
-    ],
+    $or: [{ fromLocationId: locationId }, { toLocationId: locationId }],
     status: "in_transit",
   });
 
@@ -767,10 +764,7 @@ async function getTransferQueue(
     {
       $match: {
         ...orgFilter,
-        $or: [
-          { fromLocationId: locationId },
-          { toLocationId: locationId },
-        ],
+        $or: [{ fromLocationId: locationId }, { toLocationId: locationId }],
         status: "requested",
       },
     },
@@ -1064,7 +1058,8 @@ async function getDamageQueue(
 
   // Categorize by resolution stage
   const pendingAssessment = damageItems.filter(
-    (d) => d.inspectionStatus === "pending" || d.inspectionStatus === "in_progress",
+    (d) =>
+      d.inspectionStatus === "pending" || d.inspectionStatus === "in_progress",
   );
   const pendingRepair = damageItems.filter(
     (d) =>
