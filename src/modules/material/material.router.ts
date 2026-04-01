@@ -333,6 +333,94 @@ materialRouter.get(
   },
 );
 
+/* ---------- Catalog Overview Schema ---------- */
+
+const catalogOverviewQuerySchema = paginationSchema.extend({
+  locationId: z.string().optional(),
+  categoryId: z.string().optional(),
+  materialTypeId: z.string().optional(),
+  search: z.string().optional(),
+});
+
+/* ---------- Catalog Overview Route ---------- */
+
+/**
+ * GET /api/v1/materials/catalog/overview
+ *
+ * Returns a comprehensive, aggregation-driven operational view of the catalog
+ * and item status — computed entirely in MongoDB (no instances loaded into memory).
+ *
+ * Scope:
+ * - Organization-wide (default): aggregates across ALL locations.
+ * - Location-specific: add ?locationId=<id> to filter to one location.
+ *
+ * Permissions: materials:read
+ *
+ * Query params:
+ * - locationId    : limit scope to a single location
+ * - categoryId    : filter by category
+ * - materialTypeId: filter to a single material type
+ * - search        : text search on material type name
+ * - page / limit  : paginate the materialTypes list
+ *
+ * Response 200:
+ * {
+ *   status: "success",
+ *   data: {
+ *     summary: { totalMaterialTypes, totalInstances, globalAvailabilityRate,
+ *                globalUtilizationRate, materialTypesWithLowStock, materialTypesWithHighDamage },
+ *     materialTypes: [
+ *       { materialTypeId, name, pricePerDay, categories,
+ *         totals: { totalInstances, available, reserved, loaned, inUse,
+ *                   returned, maintenance, damaged, lost, retired },
+ *         metrics: { availabilityRate, utilizationRate, damageRate,
+ *                    repairRate, reservationPressure },
+ *         alerts: [{ type, severity }] }
+ *     ],
+ *     pagination: { page, limit, total, totalPages }
+ *   }
+ * }
+ *
+ * Alert types:
+ * - LOW_STOCK          : available < 20% of total AND < 5 units
+ * - HIGH_UTILIZATION   : (loaned + inUse) / total > 0.8
+ * - HIGH_DAMAGE_RATE   : damaged / total > 0.1 (high) or > 0.05 (medium)
+ * - OVER_RESERVED      : reserved > available
+ */
+materialRouter.get(
+  "/catalog/overview",
+  requirePermission("materials:read"),
+  validateQuery(catalogOverviewQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const { locationId, categoryId, materialTypeId, search, page, limit } =
+        req.query as {
+          locationId?: string;
+          categoryId?: string;
+          materialTypeId?: string;
+          search?: string;
+          page?: string;
+          limit?: string;
+        };
+
+      const result = await materialService.getCatalogOverview({
+        organizationId,
+        ...(locationId && { locationId }),
+        ...(categoryId && { categoryId }),
+        ...(materialTypeId && { materialTypeId }),
+        ...(search && { search }),
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 50,
+      });
+
+      res.status(200).json({ status: "success", data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /* ---------- Material Type (Catalog) Routes ---------- */
 
 /**

@@ -60,9 +60,7 @@ export const reportsService = {
       );
       const overdueDays =
         loan.status === "overdue"
-          ? Math.ceil(
-              (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24),
-            )
+          ? Math.ceil((now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24))
           : 0;
 
       return {
@@ -153,7 +151,7 @@ export const reportsService = {
       },
       {
         $lookup: {
-          from: "materials",
+          from: "materialtypes",
           localField: "_id",
           foreignField: "_id",
           as: "materialType",

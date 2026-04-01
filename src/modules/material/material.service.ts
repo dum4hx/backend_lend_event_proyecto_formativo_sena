@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { type PipelineStage, Types } from "mongoose";
 import { Category } from "./models/category.model.ts";
 import { MaterialModel } from "./models/material_type.model.ts";
 import { MaterialAttribute } from "./models/material_attribute.model.ts";
@@ -696,6 +696,449 @@ export const materialService = {
     return {
       currentUserLocations: result.currentUserLocations,
       otherLocations: result.otherLocations,
+    };
+  },
+
+  /**
+   * Returns a comprehensive operational overview of the catalog and item status.
+   *
+   * Scope:
+   * - Organization-wide (default) — aggregates across ALL locations.
+   * - Location-specific — filtered by `locationId`.
+   *
+   * Design decision: single endpoint with optional `locationId` param.
+   * The only logic difference between org-level and location-level is one
+   * additional `$match` filter. Separate endpoints would duplicate the entire
+   * aggregation pipeline for negligible gain.
+   *
+   * The entire computation is done inside MongoDB via a single aggregation
+   * pipeline — no instances are loaded into application memory.
+   *
+   * Alert thresholds:
+   * - LOW_STOCK   : available < 20% of total AND available < 5 units
+   * - HIGH_UTILIZATION : (loaned + in_use) / total > 0.8
+   * - HIGH_DAMAGE_RATE : damaged / total > 0.1 → high | > 0.05 → medium
+   * - OVER_RESERVED : reserved > available
+   */
+  async getCatalogOverview(opts: {
+    organizationId: Types.ObjectId | string;
+    locationId?: string;
+    categoryId?: string;
+    materialTypeId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const {
+      organizationId,
+      locationId,
+      categoryId,
+      materialTypeId,
+      search,
+      page = 1,
+      limit = 50,
+    } = opts;
+
+    const skip = (page - 1) * limit;
+
+    // ── Stage 1: match instances by org (and optionally location) ──────────
+    // All fields in $match are indexed on MaterialInstance.
+    const instanceMatch: Record<string, unknown> = {
+      organizationId: new Types.ObjectId(String(organizationId)),
+    };
+    if (locationId) {
+      instanceMatch.locationId = new Types.ObjectId(locationId);
+    }
+
+    // ── Stage 2: type-level $match filters (applied after $lookup) ─────────
+    const typeMatch: Record<string, unknown> = {};
+    if (materialTypeId) {
+      typeMatch["type._id"] = new Types.ObjectId(materialTypeId);
+    }
+    if (categoryId) {
+      typeMatch["type.categoryId"] = new Types.ObjectId(categoryId);
+    }
+    if (search) {
+      typeMatch["type.name"] = { $regex: search, $options: "i" };
+    }
+
+    // Helper: extract a specific status count from the statusCounts array.
+    const statusCount = (statusValue: string) => ({
+      $reduce: {
+        input: "$statusCounts",
+        initialValue: 0,
+        in: {
+          $cond: [
+            { $eq: ["$$this.status", statusValue] },
+            { $add: ["$$value", "$$this.count"] },
+            "$$value",
+          ],
+        },
+      },
+    });
+
+    // Helper: safe division (returns 0 when divisor is 0).
+    const safeDivide = (
+      numerator: Record<string, unknown>,
+      divisor: string,
+    ) => ({
+      $cond: [
+        { $gt: [`$${divisor}`, 0] },
+        { $divide: [numerator, `$${divisor}`] },
+        0,
+      ],
+    });
+
+    const pipeline: PipelineStage[] = [
+      // ── 1. Filter instances ────────────────────────────────────────────────
+      { $match: instanceMatch },
+
+      // ── 2. Count instances per (modelId, status) pair ────────────────────
+      {
+        $group: {
+          _id: { modelId: "$modelId", status: "$status" },
+          count: { $sum: 1 },
+        },
+      },
+
+      // ── 3. Pivot to one doc per modelId with statusCounts array ───────────
+      {
+        $group: {
+          _id: "$_id.modelId",
+          totalInstances: { $sum: "$count" },
+          statusCounts: {
+            $push: { status: "$_id.status", count: "$count" },
+          },
+        },
+      },
+
+      // ── 4. Join material type metadata ────────────────────────────────────
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "_id",
+          foreignField: "_id",
+          as: "type",
+        },
+      },
+      { $unwind: { path: "$type", preserveNullAndEmptyArrays: true } },
+
+      // ── 5. Apply type-level filters (categoryId, materialTypeId, search) ──
+      ...(Object.keys(typeMatch).length > 0 ? [{ $match: typeMatch }] : []),
+
+      // ── 6. Join category metadata ─────────────────────────────────────────
+      {
+        $lookup: {
+          from: "categories",
+          localField: "type.categoryId",
+          foreignField: "_id",
+          as: "categories",
+        },
+      },
+
+      // ── 7. Compute individual status counts from the pivot array ──────────
+      {
+        $addFields: {
+          available: statusCount("available"),
+          reserved: statusCount("reserved"),
+          loaned: statusCount("loaned"),
+          inUse: statusCount("in_use"),
+          returned: statusCount("returned"),
+          maintenance: statusCount("maintenance"),
+          damaged: statusCount("damaged"),
+          lost: statusCount("lost"),
+          retired: statusCount("retired"),
+        },
+      },
+
+      // ── 8. Compute operational metrics ────────────────────────────────────
+      {
+        $addFields: {
+          "metrics.availabilityRate": safeDivide(
+            { $toDouble: "$available" },
+            "totalInstances",
+          ),
+          "metrics.utilizationRate": {
+            $cond: [
+              { $gt: ["$totalInstances", 0] },
+              {
+                $divide: [
+                  { $add: ["$loaned", "$inUse"] },
+                  { $toDouble: "$totalInstances" },
+                ],
+              },
+              0,
+            ],
+          },
+          "metrics.damageRate": safeDivide(
+            { $toDouble: "$damaged" },
+            "totalInstances",
+          ),
+          "metrics.repairRate": safeDivide(
+            { $toDouble: "$maintenance" },
+            "totalInstances",
+          ),
+          "metrics.reservationPressure": safeDivide(
+            { $toDouble: "$reserved" },
+            "totalInstances",
+          ),
+        },
+      },
+
+      // ── 9. Compute smart alerts ───────────────────────────────────────────
+      {
+        $addFields: {
+          alerts: {
+            $concatArrays: [
+              // LOW_STOCK: available < 20% of total AND available < 5
+              {
+                $cond: [
+                  {
+                    $and: [
+                      {
+                        $lt: [
+                          "$available",
+                          { $multiply: ["$totalInstances", 0.2] },
+                        ],
+                      },
+                      { $lt: ["$available", 5] },
+                      { $gt: ["$totalInstances", 0] },
+                    ],
+                  },
+                  [
+                    {
+                      type: "LOW_STOCK",
+                      severity: {
+                        $cond: [{ $eq: ["$available", 0] }, "high", "medium"],
+                      },
+                    },
+                  ],
+                  [],
+                ],
+              },
+              // HIGH_UTILIZATION: (loaned + in_use) / total > 0.8
+              {
+                $cond: [
+                  {
+                    $and: [
+                      { $gt: ["$totalInstances", 0] },
+                      {
+                        $gt: [
+                          {
+                            $divide: [
+                              { $add: ["$loaned", "$inUse"] },
+                              { $toDouble: "$totalInstances" },
+                            ],
+                          },
+                          0.8,
+                        ],
+                      },
+                    ],
+                  },
+                  [{ type: "HIGH_UTILIZATION", severity: "high" }],
+                  [],
+                ],
+              },
+              // HIGH_DAMAGE_RATE: damaged / total > 0.05
+              {
+                $cond: [
+                  {
+                    $and: [
+                      { $gt: ["$totalInstances", 0] },
+                      {
+                        $gt: [
+                          {
+                            $divide: [
+                              { $toDouble: "$damaged" },
+                              { $toDouble: "$totalInstances" },
+                            ],
+                          },
+                          0.1,
+                        ],
+                      },
+                    ],
+                  },
+                  [{ type: "HIGH_DAMAGE_RATE", severity: "high" }],
+                  {
+                    $cond: [
+                      {
+                        $and: [
+                          { $gt: ["$totalInstances", 0] },
+                          {
+                            $gt: [
+                              {
+                                $divide: [
+                                  { $toDouble: "$damaged" },
+                                  { $toDouble: "$totalInstances" },
+                                ],
+                              },
+                              0.05,
+                            ],
+                          },
+                        ],
+                      },
+                      [{ type: "HIGH_DAMAGE_RATE", severity: "medium" }],
+                      [],
+                    ],
+                  },
+                ],
+              },
+              // OVER_RESERVED: reserved > available
+              {
+                $cond: [
+                  { $gt: ["$reserved", "$available"] },
+                  [{ type: "OVER_RESERVED", severity: "medium" }],
+                  [],
+                ],
+              },
+            ],
+          },
+        },
+      },
+
+      // ── 10. Shape the per-type document ───────────────────────────────────
+      {
+        $project: {
+          _id: 0,
+          materialTypeId: "$_id",
+          name: "$type.name",
+          pricePerDay: "$type.pricePerDay",
+          categories: {
+            $map: {
+              input: "$categories",
+              as: "cat",
+              in: { categoryId: "$$cat._id", name: "$$cat.name" },
+            },
+          },
+          totals: {
+            totalInstances: "$totalInstances",
+            available: "$available",
+            reserved: "$reserved",
+            loaned: "$loaned",
+            inUse: "$inUse",
+            returned: "$returned",
+            maintenance: "$maintenance",
+            damaged: "$damaged",
+            lost: "$lost",
+            retired: "$retired",
+          },
+          metrics: 1,
+          alerts: 1,
+        },
+      },
+
+      // ── 11. Group by primary category, paginate types ─────────────────────
+      {
+        $facet: {
+          materialTypes: [
+            { $sort: { name: 1 } },
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          totalCount: [{ $count: "count" }],
+          summaryStats: [
+            {
+              $group: {
+                _id: null,
+                totalMaterialTypes: { $sum: 1 },
+                totalInstances: { $sum: "$totals.totalInstances" },
+                totalAvailable: { $sum: "$totals.available" },
+                totalLoaned: { $sum: "$totals.loaned" },
+                totalInUse: { $sum: "$totals.inUse" },
+                totalDamaged: { $sum: "$totals.damaged" },
+                typesWithLowStock: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $gt: [
+                          {
+                            $size: {
+                              $filter: {
+                                input: "$alerts",
+                                cond: { $eq: ["$$this.type", "LOW_STOCK"] },
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+                typesWithHighDamage: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $gt: [
+                          {
+                            $size: {
+                              $filter: {
+                                input: "$alerts",
+                                cond: {
+                                  $eq: ["$$this.type", "HIGH_DAMAGE_RATE"],
+                                },
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const [result] = await MaterialInstance.aggregate(pipeline);
+
+    const stats = result.summaryStats[0] ?? {
+      totalMaterialTypes: 0,
+      totalInstances: 0,
+      totalAvailable: 0,
+      totalLoaned: 0,
+      totalInUse: 0,
+      totalDamaged: 0,
+      typesWithLowStock: 0,
+      typesWithHighDamage: 0,
+    };
+
+    const total = result.totalCount[0]?.count ?? 0;
+
+    const summary = {
+      totalMaterialTypes: stats.totalMaterialTypes,
+      totalInstances: stats.totalInstances,
+      globalAvailabilityRate:
+        stats.totalInstances > 0
+          ? +(stats.totalAvailable / stats.totalInstances).toFixed(4)
+          : 0,
+      globalUtilizationRate:
+        stats.totalInstances > 0
+          ? +(
+              (stats.totalLoaned + stats.totalInUse) /
+              stats.totalInstances
+            ).toFixed(4)
+          : 0,
+      materialTypesWithLowStock: stats.typesWithLowStock,
+      materialTypesWithHighDamage: stats.typesWithHighDamage,
+    };
+
+    return {
+      summary,
+      materialTypes: result.materialTypes,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   },
 

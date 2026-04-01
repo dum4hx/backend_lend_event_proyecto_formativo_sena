@@ -3468,6 +3468,105 @@ curl -X DELETE https://api.test.local/api/v1/materials/types/64f1a2b3c4d5e6f7a8b
 
 ---
 
+#### GET /materials/catalog/overview
+
+Returns a comprehensive, aggregation-driven operational view of the catalog and item status. All metrics and alerts are computed in a single MongoDB aggregation pipeline — no instances are loaded into application memory.
+
+**Authentication:** Required  
+**Permission:** `materials:read`
+
+**Query Parameters:**
+
+| Parameter        | Type   | Required | Description                                              |
+| ---------------- | ------ | -------- | -------------------------------------------------------- |
+| `locationId`     | string | No       | Limit scope to a specific location (org-wide if omitted) |
+| `categoryId`     | string | No       | Filter material types by category                        |
+| `materialTypeId` | string | No       | Filter to a single material type                         |
+| `search`         | string | No       | Case-insensitive text search on material type name       |
+| `page`           | number | No       | Page number (default: 1)                                 |
+| `limit`          | number | No       | Items per page (default: 50)                             |
+
+**Example Request:**
+
+```http
+GET /api/v1/materials/catalog/overview
+GET /api/v1/materials/catalog/overview?locationId=<id>
+GET /api/v1/materials/catalog/overview?categoryId=<id>&search=tent&page=1&limit=20
+```
+
+**Success Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "summary": {
+      "totalMaterialTypes": 12,
+      "totalInstances": 340,
+      "globalAvailabilityRate": 0.6471,
+      "globalUtilizationRate": 0.2353,
+      "materialTypesWithLowStock": 2,
+      "materialTypesWithHighDamage": 1
+    },
+    "materialTypes": [
+      {
+        "materialTypeId": "64f1a2b3c4d5e6f7a8b9c0d1",
+        "name": "Camping Tent 4-person",
+        "pricePerDay": 25000,
+        "categories": [
+          { "categoryId": "64f1a2b3c4d5e6f7a8b9c0e1", "name": "Camping" }
+        ],
+        "totals": {
+          "totalInstances": 20,
+          "available": 12,
+          "reserved": 3,
+          "loaned": 4,
+          "inUse": 0,
+          "returned": 0,
+          "maintenance": 1,
+          "damaged": 0,
+          "lost": 0,
+          "retired": 0
+        },
+        "metrics": {
+          "availabilityRate": 0.6,
+          "utilizationRate": 0.2,
+          "damageRate": 0.0,
+          "repairRate": 0.05,
+          "reservationPressure": 0.15
+        },
+        "alerts": []
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 12,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+**Alert Types:**
+
+| Alert Type         | Condition                                          | Severity                          |
+| ------------------ | -------------------------------------------------- | --------------------------------- |
+| `LOW_STOCK`        | `available < 20%` of total **and** `available < 5` | `high` (if 0 available), `medium` |
+| `HIGH_UTILIZATION` | `(loaned + inUse) / total > 0.8`                   | `high`                            |
+| `HIGH_DAMAGE_RATE` | `damaged / total > 0.1`                            | `high`                            |
+| `HIGH_DAMAGE_RATE` | `damaged / total > 0.05`                           | `medium`                          |
+| `OVER_RESERVED`    | `reserved > available`                             | `medium`                          |
+
+**Error Responses:**
+
+| Status | Condition                | Message        |
+| ------ | ------------------------ | -------------- |
+| 401    | Not authenticated        | `Unauthorized` |
+| 403    | Missing `materials:read` | `Forbidden`    |
+
+---
+
 #### GET /materials/instances
 
 Lists all material instances. Supports three display modes controlled by query parameters:
