@@ -49,6 +49,13 @@ const returnLoanSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const getLoanQuerySchema = z.object({
+  groupByMaterialType: z
+    .string()
+    .optional()
+    .transform((val) => val === "true"),
+});
+
 /* ---------- Routes ---------- */
 
 /**
@@ -117,20 +124,27 @@ loanRouter.get(
 /**
  * GET /api/v1/loans/:id
  * Gets a specific loan by ID.
+ *
+ * Query Parameters:
+ * - groupByMaterialType: If true, materialInstances are grouped by materialTypeId.
  */
 loanRouter.get(
   "/:id",
   requirePermission("loans:read"),
+  validateQuery(getLoanQuerySchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
       const loanId = req.params.id;
+      const { groupByMaterialType } = req.query as any;
 
       if (!loanId || typeof loanId !== "string") {
         throw AppError.badRequest("Invalid loan ID");
       }
 
-      const loan = await loanService.getLoanById(loanId, organizationId);
+      const opts =
+        groupByMaterialType !== undefined ? { groupByMaterialType } : undefined;
+      const loan = await loanService.getLoanById(loanId, organizationId, opts);
 
       res.json({
         status: "success",

@@ -48,6 +48,40 @@ export const OrganizationUpdateZodSchema = OrganizationZodSchema.partial().omit(
 
 export type OrganizationInput = z.infer<typeof OrganizationZodSchema>;
 
+/* ---------- Settings Zod Schema ---------- */
+
+export const OrganizationSettingsZodSchema = z.object({
+  damageDueDays: z
+    .number()
+    .int()
+    .min(1, "Minimum 1 day")
+    .max(365, "Maximum 365 days")
+    .optional(),
+  requireFullPaymentBeforeCheckout: z.boolean().optional(),
+});
+
+export type OrganizationSettingsInput = z.infer<
+  typeof OrganizationSettingsZodSchema
+>;
+
+/* ---------- Settings Sub-Schema ---------- */
+
+const settingsSchema = new Schema(
+  {
+    damageDueDays: {
+      type: Number,
+      default: 30,
+      min: 1,
+      max: 365,
+    },
+    requireFullPaymentBeforeCheckout: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: false },
+);
+
 /* ---------- Subscription Sub-Schema ---------- */
 
 const subscriptionSchema = new Schema(
@@ -120,6 +154,10 @@ const organizationSchema = new Schema(
     },
     subscription: {
       type: subscriptionSchema,
+      default: () => ({}),
+    },
+    settings: {
+      type: settingsSchema,
       default: () => ({}),
     },
   },

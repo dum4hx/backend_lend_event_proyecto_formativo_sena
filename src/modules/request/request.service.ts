@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Types, startSession } from "mongoose";
 import {
   LoanRequest,
   type LoanRequestDocument,
@@ -13,6 +13,10 @@ import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
+import {
+  validateTransition,
+  LOAN_REQUEST_TRANSITIONS,
+} from "../shared/state_machine.ts";
 
 interface RequestItemInput {
   type?: string;
@@ -80,6 +84,72 @@ function normalizeRequestItem(
     referenceId: resolvedReferenceId,
     quantity: item.quantity,
   };
+}
+
+interface AssignmentInput {
+  materialTypeId: string;
+  materialInstanceId: string;
+}
+
+interface AssignmentWithIndex {
+  materialInstanceId: Types.ObjectId;
+  itemIndex: number;
+}
+
+function buildMaterialTypeQueues(
+  request: LoanRequestDocument,
+): Map<string, number[]> {
+  const queues = new Map<string, number[]>();
+
+  request.items.forEach((item, itemIndex) => {
+    if (item.type !== "material") {
+      return;
+    }
+
+    const materialTypeId = new Types.ObjectId(item.referenceId).toString();
+    const queue = queues.get(materialTypeId) ?? [];
+
+    for (let i = 0; i < item.quantity; i++) {
+      queue.push(itemIndex);
+    }
+
+    queues.set(materialTypeId, queue);
+  });
+
+  return queues;
+}
+
+function mapAssignmentsToRequestItemIndexes(
+  request: LoanRequestDocument,
+  assignments: AssignmentInput[],
+): AssignmentWithIndex[] {
+  const materialTypeQueues = buildMaterialTypeQueues(request);
+
+  return assignments.map((assignment, index) => {
+    const materialTypeId = new Types.ObjectId(
+      assignment.materialTypeId,
+    ).toString();
+    const itemQueue = materialTypeQueues.get(materialTypeId);
+
+    if (!itemQueue || itemQueue.length === 0) {
+      throw AppError.badRequest(
+        `Assignment at index ${index} does not match any request material item or exceeds requested quantity`,
+      );
+    }
+
+    const itemIndex = itemQueue.shift();
+
+    if (itemIndex === undefined) {
+      throw AppError.badRequest(
+        `Unable to map assignment at index ${index} to request item`,
+      );
+    }
+
+    return {
+      materialInstanceId: new Types.ObjectId(assignment.materialInstanceId),
+      itemIndex,
+    };
+  });
 }
 
 /* ---------- Request Service ---------- */
@@ -269,12 +339,13 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: "pending",
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in pending status");
+      throw AppError.notFound("Request not found");
     }
+
+    validateTransition(request.status, "approved", LOAN_REQUEST_TRANSITIONS);
 
     request.status = "approved";
     request.approvedBy = new Types.ObjectId(userId);
@@ -307,12 +378,13 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: "pending",
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in pending status");
+      throw AppError.notFound("Request not found");
     }
+
+    validateTransition(request.status, "rejected", LOAN_REQUEST_TRANSITIONS);
 
     request.status = "rejected";
     request.rejectionReason = reason;
@@ -326,7 +398,166 @@ export const requestService = {
   },
 
   /**
+   * Assigns material instances to an approved request and marks it as ready
+   * in a single transaction. Validates mapping, availability, and ownership.
+   */
+  async assignMaterialsTransaction(
+    requestId: string | Types.ObjectId,
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    assignments: AssignmentInput[],
+  ): Promise<LoanRequestDocument> {
+    // Duplicate check before starting the session
+    const materialInstanceIds = assignments.map((a) =>
+      new Types.ObjectId(a.materialInstanceId).toString(),
+    );
+    const duplicated = materialInstanceIds.filter(
+      (id, i, ids) => ids.indexOf(id) !== i,
+    );
+    if (duplicated.length > 0) {
+      throw AppError.badRequest("Duplicated materialInstanceId in assignments");
+    }
+
+    const session = await startSession();
+    let updatedRequest: LoanRequestDocument | null = null;
+
+    try {
+      await session.withTransaction(async () => {
+        const request = await LoanRequest.findOne(
+          { _id: requestId, organizationId },
+          null,
+          { session },
+        );
+
+        if (!request) {
+          throw AppError.notFound("Request not found");
+        }
+
+        validateTransition(request.status, "ready", LOAN_REQUEST_TRANSITIONS);
+
+        const mappedAssignments = mapAssignmentsToRequestItemIndexes(
+          request,
+          assignments,
+        );
+
+        // Validate instances exist and belong to this organization
+        const instances = await MaterialInstance.find(
+          {
+            _id: {
+              $in: mappedAssignments.map((a) => a.materialInstanceId),
+            },
+            organizationId,
+          },
+          null,
+          { session },
+        );
+
+        if (instances.length !== mappedAssignments.length) {
+          throw AppError.notFound(
+            "One or more material instances do not exist in this organization",
+          );
+        }
+
+        const instancesById = new Map(
+          instances.map((inst) => [
+            new Types.ObjectId(inst._id).toString(),
+            inst,
+          ]),
+        );
+
+        for (const [i, mapped] of mappedAssignments.entries()) {
+          const input = assignments[i];
+          if (!input) {
+            throw AppError.badRequest(
+              `Invalid assignment payload at index ${i}`,
+            );
+          }
+          const instance = instancesById.get(
+            new Types.ObjectId(mapped.materialInstanceId).toString(),
+          );
+          if (!instance) {
+            throw AppError.notFound(
+              `Material instance not found for assignment at index ${i}`,
+            );
+          }
+          if (
+            new Types.ObjectId(input.materialTypeId).toString() !==
+            new Types.ObjectId(instance.modelId).toString()
+          ) {
+            throw AppError.badRequest(
+              `materialTypeId does not match the selected material instance at index ${i}`,
+            );
+          }
+        }
+
+        // Double-booking protection: check for temporal overlap
+        const instanceOids = mappedAssignments.map(
+          (a) => a.materialInstanceId,
+        );
+        const overlapping = await LoanRequest.find(
+          {
+            organizationId,
+            _id: { $ne: new Types.ObjectId(String(requestId)) },
+            status: { $in: ["approved", "assigned", "ready"] },
+            "assignedMaterials.materialInstanceId": { $in: instanceOids },
+            startDate: { $lte: request.endDate },
+            endDate: { $gte: request.startDate },
+          },
+          null,
+          { session },
+        );
+
+        if (overlapping.length > 0) {
+          throw AppError.conflict(
+            "One or more material instances are reserved for overlapping requests",
+          );
+        }
+
+        // Reserve all instances atomically
+        const updateResult = await MaterialInstance.updateMany(
+          {
+            _id: {
+              $in: mappedAssignments.map((a) => a.materialInstanceId),
+            },
+            organizationId,
+            status: "available",
+          },
+          { $set: { status: "reserved" } },
+          { session },
+        );
+
+        if (updateResult.modifiedCount !== mappedAssignments.length) {
+          throw AppError.conflict(
+            "One or more material instances are not available",
+          );
+        }
+
+        request.assignedMaterials =
+          mappedAssignments as unknown as LoanRequestDocument["assignedMaterials"];
+        request.assignedBy = new Types.ObjectId(userId);
+        request.assignedAt = new Date();
+        request.status = "ready";
+        await request.save({ session });
+
+        updatedRequest = (await LoanRequest.findById(request._id, null, {
+          session,
+        })
+          .populate("customerId", "email name phone address")
+          .populate(
+            "assignedMaterials.materialInstanceId",
+            "serialNumber status modelId",
+          )) as unknown as LoanRequestDocument;
+      });
+
+      return updatedRequest as unknown as LoanRequestDocument;
+    } finally {
+      await session.endSession();
+    }
+  },
+
+  /**
    * Assigns specific material instances to an approved request.
+   * @deprecated Use assignMaterialsTransaction instead.
    */
   async assignMaterials(
     requestId: string | Types.ObjectId,
@@ -390,12 +621,13 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: "assigned",
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in assigned status");
+      throw AppError.notFound("Request not found");
     }
+
+    validateTransition(request.status, "ready", LOAN_REQUEST_TRANSITIONS);
 
     if (!request.assignedMaterials || request.assignedMaterials.length === 0) {
       throw AppError.badRequest("No materials assigned to this request");
@@ -452,6 +684,45 @@ export const requestService = {
   },
 
   /**
+   * Records that the rental fee for a request has been paid.
+   * Only allowed when the request is in a pre-checkout status and
+   * has a total rental amount greater than zero.
+   */
+  async recordRentalFeePayment(
+    requestId: string | Types.ObjectId,
+    organizationId: string | Types.ObjectId,
+  ): Promise<LoanRequestDocument> {
+    const request = await LoanRequest.findOne({
+      _id: requestId,
+      organizationId,
+      status: { $in: ["approved", "deposit_pending", "assigned", "ready"] },
+    });
+
+    if (!request) {
+      throw AppError.notFound("Request not found or not in a payable status");
+    }
+
+    if ((request.totalAmount ?? 0) === 0) {
+      throw AppError.badRequest(
+        "This request has no rental amount; payment recording is not required",
+      );
+    }
+
+    if (request.rentalFeePaidAt) {
+      throw AppError.conflict("Rental fee has already been recorded as paid");
+    }
+
+    request.rentalFeePaidAt = new Date();
+    await request.save();
+
+    logger.info("Rental fee payment recorded for request", {
+      requestId: request._id.toString(),
+    });
+
+    return request as unknown as LoanRequestDocument;
+  },
+
+  /**
    * Cancels a request and releases any reserved materials.
    */
   async cancelRequest(
@@ -461,12 +732,13 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: { $in: ["pending", "approved", "assigned", "ready"] },
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or cannot be cancelled");
+      throw AppError.notFound("Request not found");
     }
+
+    validateTransition(request.status, "cancelled", LOAN_REQUEST_TRANSITIONS);
 
     // If materials were assigned, release them
     if (request.assignedMaterials && request.assignedMaterials.length > 0) {

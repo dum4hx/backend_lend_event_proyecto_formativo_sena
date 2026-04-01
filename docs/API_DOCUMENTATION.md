@@ -17,6 +17,7 @@
    - [Roles Endpoints](#roles-endpoints)
    - [Permissions](#permissions)
    - [Organization Endpoints](#organization-endpoints)
+   - [Organization Settings](#get-organizationssettings)
    - [Subscription Type Endpoints](#subscription-type-endpoints-super-admin)
    - [Billing Endpoints](#billing-endpoints)
    - [Admin Analytics (Super Admin)](#admin-analytics-endpoints-super-admin-only)
@@ -33,6 +34,7 @@
    - [Analytics Endpoints (Organization)](#analytics-endpoints-organization)
    - [Reports Endpoints](#reports-endpoints)
    - [Operations Endpoints (Location Dashboard)](#operations-endpoints-location-dashboard)
+   - [Background Jobs](#background-jobs)
 5. [Code Samples](#5-code-samples)
 6. [Rate Limiting and Usage Guidelines](#6-rate-limiting-and-usage-guidelines)
 7. [Versioning and Deprecation Policy](#7-versioning-and-deprecation-policy)
@@ -1380,6 +1382,69 @@ Gets available subscription plans.
   }
 }
 ```
+
+---
+
+#### GET /organizations/settings
+
+Gets the current organization's policy settings.
+
+**Auth:** `authenticate` + `requirePermission("organization:read")`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "settings": {
+      "damageDueDays": 30,
+      "requireFullPaymentBeforeCheckout": false
+    }
+  }
+}
+```
+
+**Settings reference:**
+
+| Field                              | Type    | Default | Description                                                                                                      |
+| ---------------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `damageDueDays`                    | integer | `30`    | Number of days after inspection to set as the due date for damage invoices (1–365).                              |
+| `requireFullPaymentBeforeCheckout` | boolean | `false` | When `true`, `POST /loans/from-request/:requestId` will reject checkout unless the rental fee has been recorded. |
+
+---
+
+#### PATCH /organizations/settings
+
+Updates the organization's policy settings. Only the fields provided in the body are updated; omitted fields remain unchanged.
+
+**Auth:** `authenticate` + `requirePermission("organization:update")`
+
+| Parameter                        | Location | Type    | Required | Description                                    |
+| -------------------------------- | -------- | ------- | -------- | ---------------------------------------------- |
+| damageDueDays                    | body     | integer | No       | Damage invoice due-date window in days (1–365) |
+| requireFullPaymentBeforeCheckout | body     | boolean | No       | Require rental fee payment before checkout     |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "settings": {
+      "damageDueDays": 15,
+      "requireFullPaymentBeforeCheckout": true
+    }
+  }
+}
+```
+
+**Errors:**
+
+| Code              | Condition                                             |
+| ----------------- | ----------------------------------------------------- |
+| `400 BAD_REQUEST` | Validation error (e.g., `damageDueDays` out of range) |
+| `404 NOT_FOUND`   | Organization not found                                |
 
 ---
 
@@ -4283,12 +4348,9 @@ This endpoint performs assignment + ready transition atomically:
 
 - `400 BAD_REQUEST`: invalid payload, duplicated `materialInstanceId`, type-instance mismatch
 - `404 NOT_FOUND`: request or material instance does not exist in organization
-- `409 CONFLICT`: request not in `approved` status or one/more instances unavailable
+- `409 CONFLICT`: request not in `approved` status, one/more instances unavailable, or **temporal overlap** — one or more instances are already reserved for an overlapping date range in another approved/assigned/ready request
 
-Legacy compatibility remains available through:
-
-- `POST /requests/:id/assign`
-- `POST /requests/:id/ready`
+**Double-booking protection:** Before reserving instances, the server checks whether any of the requested `materialInstanceId` values are already assigned to another request whose date range overlaps the current request's `startDate`–`endDate`. If an overlap is detected, the entire operation is rolled back and a `409 CONFLICT` error is returned.
 
 ---
 
@@ -4310,6 +4372,43 @@ Valid request states: `approved`, `deposit_pending`, `assigned`, `ready`
 | `400 BAD_REQUEST` | `depositAmount` is `0` — no deposit to record |
 | `404 NOT_FOUND`   | Request not found or not in a payable status  |
 | `409 CONFLICT`    | Deposit already recorded as paid              |
+
+---
+
+#### POST /requests/:id/record-rental-payment
+
+Records that the rental fee for a request has been paid manually (cash, bank transfer, etc.). This is separate from the deposit payment and is only relevant when the organization has `requireFullPaymentBeforeCheckout` enabled in its settings.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:update`
+
+Valid request states: `approved`, `deposit_pending`, `assigned`, `ready`
+
+- Requires `totalAmount > 0`; returns `400` if the request has no rental amount.
+- Returns `409 CONFLICT` if the rental fee was already recorded as paid.
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "request": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a0",
+      "rentalFeePaidAt": "2026-03-15T10:30:00.000Z",
+      "status": "approved"
+    }
+  },
+  "message": "Rental fee payment recorded successfully"
+}
+```
+
+**Errors:**
+
+| Code              | Condition                                      |
+| ----------------- | ---------------------------------------------- |
+| `400 BAD_REQUEST` | `totalAmount` is `0` — no rental fee to record |
+| `404 NOT_FOUND`   | Request not found or not in a payable status   |
+| `409 CONFLICT`    | Rental fee already recorded as paid            |
 
 ---
 
@@ -4381,7 +4480,83 @@ Gets all overdue loans (auto-updates overdue status).
 
 #### GET /loans/:id
 
-Gets a specific loan with full details.
+Gets a specific loan with full details. The response includes populated `customerId`, `requestId`, and `materialInstances`.
+
+**Query Parameters:**
+
+| Parameter           | Type    | Required | Description                                                                   |
+| ------------------- | ------- | -------- | ----------------------------------------------------------------------------- |
+| groupByMaterialType | boolean | No       | If `true`, group material instances by material type ID (see response below). |
+
+**Fields populated in response:**
+
+- `materialInstances`: Array of instances (default behavior). Each instance includes `materialInstanceId` (with `serialNumber`, `status`, `modelId`, `name`), `materialTypeId`, and `materialType` (with `_id` and `name`).
+- `materialInstancesByType`: Object with material type IDs as keys and arrays of instances as values (only when `groupByMaterialType=true`). The `materialInstances` field is omitted in this case. Each instance includes the same populated fields as above.
+
+**Example Response (default):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loan": {
+      "_id": "...",
+      "materialInstances": [
+        {
+          "materialInstanceId": { "_id": "...", "serialNumber": "SN-001", "status": "active", "modelId": "MOD-1", "name": "Projector HD" },
+          "materialTypeId": "type-123",
+          "materialType": { "_id": "type-123", "name": "Projectors" }
+        }
+      ],
+      "deposit": { ... }
+    }
+  }
+}
+```
+
+**Example Response (grouped):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loan": {
+      "_id": "...",
+      "materialInstancesByType": {
+        "type-123": [
+          {
+            "materialInstanceId": { "_id": "...", "serialNumber": "SN-001", "status": "active", "modelId": "MOD-1", "name": "Projector HD" },
+            "materialTypeId": "type-123",
+            "materialType": { "_id": "type-123", "name": "Projectors" }
+          },
+          {
+            "materialInstanceId": { "_id": "...", "serialNumber": "SN-002", "status": "active", "modelId": "MOD-1", "name": "Projector HD" },
+            "materialTypeId": "type-123",
+            "materialType": { "_id": "type-123", "name": "Projectors" }
+          }
+        ],
+        "type-456": [
+          {
+            "materialInstanceId": { "_id": "...", "serialNumber": "SP-001", "status": "active", "modelId": "MOD-2", "name": "Speaker System" },
+            "materialTypeId": "type-456",
+            "materialType": { "_id": "type-456", "name": "Audio Equipment" }
+          }
+        ]
+      },
+      "deposit": { ... }
+    }
+  }
+}
+```
+
+When the loan has a deposit (`deposit.amount > 0`), the response includes two computed fields on the `deposit` object:
+
+| Computed Field             | Type    | Description                                                                                      |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `deposit.refundAvailable`  | boolean | `true` when `deposit.status` is `refund_pending` or `partially_applied` (i.e., a refund is owed) |
+| `deposit.refundableAmount` | number  | The remaining deposit amount after subtracting any applied damage charges                        |
+
+These fields are also included in `GET /loans` list responses.
 
 ---
 
@@ -4395,19 +4570,22 @@ Creates a loan from a ready request (pickup / checkout action).
 
 1. The request must be in `ready` status.
 2. If `depositAmount > 0`, the deposit must have been recorded as paid (`depositPaidAt` is set). Use `POST /requests/:id/record-payment` to record manual payments first.
+3. If the organization setting `requireFullPaymentBeforeCheckout` is `true` and the request has a `totalAmount > 0`, the rental fee must have been recorded as paid (`rentalFeePaidAt` is set). Use `POST /requests/:id/record-rental-payment` first.
 
 On success:
 
 - A new `Loan` is created with `status: "active"`.
 - The source request transitions to `status: "shipped"` and its `loanId` field is populated with the new loan's ID.
 - All assigned material instances are marked as `loaned`.
+- Each material instance's `conditionAtCheckout` is captured from the instance's current condition.
 
 **Errors:**
 
-| Code              | Condition                                         |
-| ----------------- | ------------------------------------------------- |
-| `400 BAD_REQUEST` | Deposit has not been paid and `depositAmount > 0` |
-| `404 NOT_FOUND`   | Request not found or not in `ready` status        |
+| Code              | Condition                                                                      |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `400 BAD_REQUEST` | Deposit has not been paid and `depositAmount > 0`                              |
+| `400 BAD_REQUEST` | Rental fee has not been paid and `requireFullPaymentBeforeCheckout` is enabled |
+| `404 NOT_FOUND`   | Request not found or not in `ready` status                                     |
 
 ---
 
@@ -4484,6 +4662,7 @@ Gets a specific inspection by ID with full item details.
           },
           "conditionBefore": "good",
           "conditionAfter": "damaged",
+          "conditionDegraded": true,
           "damageDescription": "Scratched screen",
           "chargeToCustomer": 50000,
           "repairRequired": true
@@ -4502,17 +4681,19 @@ Gets a specific inspection by ID with full item details.
 
 Creates an inspection for a returned loan. If damages or lost items are reported with a cost, a "damage" invoice is automatically generated for the customer.
 
-| Parameter                | Location | Type     | Required | Description                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | -------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)                                                                                                                                                                                                                                                                                               |
-| overallNotes             | body     | string   | No       | General notes about the inspection                                                                                                                                                                                                                                                                                                                          |
-| items                    | body     | object[] | Yes      | Array of inspected items                                                                                                                                                                                                                                                                                                                                    |
-| items.materialInstanceId | body     | string   | Yes      | ID of the material instance                                                                                                                                                                                                                                                                                                                                 |
-| items.condition          | body     | string   | Yes      | `good`, `damaged`, `lost`                                                                                                                                                                                                                                                                                                                                   |
-| items.notes              | body     | string   | No       | Notes for this specific item                                                                                                                                                                                                                                                                                                                                |
-| items.damageDescription  | body     | string   | No       | Description of the damage                                                                                                                                                                                                                                                                                                                                   |
-| items.damageCost         | body     | number   | No       | Cost in cents to be charged to the customer (e.g., 150000 = $1,500.00 COP)                                                                                                                                                                                                                                                                                  |
-| dueDate                  | body     | string   | No       | Optional ISO datetime for the damage invoice due date. Only allowed when one or more items are `damaged` or `lost` and a damage invoice will be generated. If provided it will be set as the invoice `dueDate`; otherwise the server defaults to 30 days from creation. Supplying `dueDate` when no invoice will be generated results in `400 Bad Request`. |
+The server automatically populates `conditionBefore` from the material instance's `conditionAtCheckout` recorded when the loan was created, and computes `conditionDegraded` (boolean) by comparing the severity index of `conditionBefore` against the submitted `condition`. If no damages are found, the loan is auto-transitioned to `inspected` status.
+
+| Parameter                | Location | Type     | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------ | -------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)                                                                                                                                                                                                                                                                                                                                                     |
+| overallNotes             | body     | string   | No       | General notes about the inspection                                                                                                                                                                                                                                                                                                                                                                                |
+| items                    | body     | object[] | Yes      | Array of inspected items                                                                                                                                                                                                                                                                                                                                                                                          |
+| items.materialInstanceId | body     | string   | Yes      | ID of the material instance                                                                                                                                                                                                                                                                                                                                                                                       |
+| items.condition          | body     | string   | Yes      | `good`, `damaged`, `lost`                                                                                                                                                                                                                                                                                                                                                                                         |
+| items.notes              | body     | string   | No       | Notes for this specific item                                                                                                                                                                                                                                                                                                                                                                                      |
+| items.damageDescription  | body     | string   | No       | Description of the damage                                                                                                                                                                                                                                                                                                                                                                                         |
+| items.damageCost         | body     | number   | No       | Cost in cents to be charged to the customer (e.g., 150000 = $1,500.00 COP)                                                                                                                                                                                                                                                                                                                                        |
+| dueDate                  | body     | string   | No       | Optional ISO datetime for the damage invoice due date. Only allowed when one or more items are `damaged` or `lost` and a damage invoice will be generated. If provided it will be set as the invoice `dueDate`; otherwise the server defaults to the organization's `damageDueDays` setting (default: 30 days from creation). Supplying `dueDate` when no invoice will be generated results in `400 Bad Request`. |
 
 **Auth:** `authenticate` + `requireActiveOrganization` + `inspections:create`
 
@@ -5743,6 +5924,27 @@ Aggregated TO-DO list that calls all other operations endpoints via `Promise.all
   }
 }
 ```
+
+---
+
+### Background Jobs
+
+The server runs several scheduled background jobs that maintain data integrity and send notifications. These jobs run automatically and do not expose HTTP endpoints.
+
+#### Overdue Loan Detection
+
+- **Interval:** Every 5 minutes
+- **Behavior:** Finds all loans with `status: "active"` whose `endDate` is in the past. Transitions each to `status: "overdue"`. For each newly overdue loan, sends an email notification (`sendOverdueLoanNotification`) to the user who created the original request, including the loan ID, customer name, end date, and days overdue.
+
+#### Stale Request Expiration
+
+- **Interval:** Every 5 minutes
+- **Behavior:** Finds all loan requests with `status: "approved"` or `"deposit_pending"` whose `depositDueDate` is in the past. Transitions each to `status: "expired"`. For each expired request, sends an email notification (`sendRequestExpiredNotification`) to the user who created the request, including the request ID, customer name, and deposit due date.
+
+#### Deposit Refund Reminders
+
+- **Interval:** Every 4 hours
+- **Behavior:** Finds loans with `deposit.status: "refund_pending"` that were returned more than 48 hours ago. Sends a reminder email (`sendDepositRefundReminder`) to the user who checked out the loan, including the loan ID, customer name, deposit amount, and days pending. Throttled: will not send a reminder to the same loan more than once every 48 hours (tracked via `lastRefundReminderSentAt`).
 
 ---
 

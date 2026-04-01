@@ -181,6 +181,11 @@ const loanRequestSchema = new Schema(
       type: String,
     }, // Stripe Payment Intent ID
 
+    // Rental fee tracking
+    rentalFeePaidAt: {
+      type: Date,
+    },
+
     // Assignment fields
     assignedMaterials: [assignedMaterialSchema],
     assignedBy: {

@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
+import {
+  conditionAtCheckoutOptions,
+  conditionAtReturnOptions,
+} from "../../shared/condition_levels.ts";
 
 /* ---------- Loan Status ---------- */
 
@@ -19,26 +23,17 @@ export type LoanStatusZodType = z.infer<typeof LoanStatusZod>;
 
 /* ---------- Condition Option Enums & Zod Schemas ---------- */
 
-export const conditionAtCheckoutOptions = [
-  "excellent",
-  "good",
-  "fair",
-  "poor",
-] as const;
+// Re-export condition options from shared module
+export { conditionAtCheckoutOptions, conditionAtReturnOptions };
 
-export const conditionAtReturnOptions = [
-  "excellent",
-  "good",
-  "fair",
-  "poor",
-  "damaged",
-  "lost",
-] as const;
-
-export const ConditionAtCheckoutZod = z.enum(conditionAtCheckoutOptions);
+export const ConditionAtCheckoutZod = z.enum(
+  conditionAtCheckoutOptions as unknown as [string, ...string[]],
+);
 export type ConditionAtCheckoutZodType = z.infer<typeof ConditionAtCheckoutZod>;
 
-export const ConditionAtReturnZod = z.enum(conditionAtReturnOptions);
+export const ConditionAtReturnZod = z.enum(
+  conditionAtReturnOptions as unknown as [string, ...string[]],
+);
 export type ConditionAtReturnZodType = z.infer<typeof ConditionAtReturnZod>;
 
 /* ---------- Material Instance in Loan ---------- */
@@ -213,15 +208,11 @@ const loanMaterialInstanceSchema = new Schema(
     // Condition tracking
     conditionAtCheckout: {
       type: String,
-      enum: (() => {
-        return conditionAtCheckoutOptions as unknown as string[];
-      })(),
+      enum: conditionAtCheckoutOptions,
     },
     conditionAtReturn: {
       type: String,
-      enum: (() => {
-        return conditionAtReturnOptions as unknown as string[];
-      })(),
+      enum: conditionAtReturnOptions,
     },
     notes: String,
   },
@@ -247,6 +238,13 @@ const loanSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Customer",
       required: true,
+    },
+    // Origin location (the location from which the materials were checked out)
+    locationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Location",
+      required: true,
+      index: true,
     },
     // User references
     checkedOutBy: {
@@ -316,6 +314,8 @@ const loanSchema = new Schema(
       type: String,
       maxlength: 1000,
     },
+    // Scheduler tracking
+    lastRefundReminderSentAt: Date,
   },
   {
     timestamps: true,
@@ -328,6 +328,7 @@ loanSchema.index({ organizationId: 1, customerId: 1 });
 loanSchema.index({ organizationId: 1, status: 1 });
 loanSchema.index({ organizationId: 1, endDate: 1 });
 loanSchema.index({ organizationId: 1, createdAt: -1 });
+loanSchema.index({ organizationId: 1, locationId: 1 });
 loanSchema.index({ "materialInstances.materialInstanceId": 1 });
 
 /* ---------- Pre-save Middleware ---------- */

@@ -6,6 +6,7 @@ import { MaterialModel } from "../material/models/material_type.model.ts";
 import { Invoice } from "../invoice/models/invoice.model.ts";
 import { Inspection } from "../inspection/models/inspection.model.ts";
 import { Transfer } from "../transfer/models/transfer.model.ts";
+import { materialService } from "../material/material.service.ts";
 
 interface ReportFilters {
   startDate?: Date | undefined;
@@ -407,6 +408,34 @@ export const reportsService = {
         count: s.count,
         totalItems: s.totalItems,
       })),
+    };
+  },
+
+  /**
+   * Catalog export: returns all material types with stock levels, metrics, and alerts.
+   * Fetches all pages from getCatalogOverview (no pagination limit) for a full export.
+   */
+  async getCatalogExport(
+    organizationId: Types.ObjectId | string,
+    opts: {
+      locationId?: string;
+      categoryId?: string;
+      search?: string;
+    } = {},
+  ) {
+    // Fetch all rows in one pass using a high limit
+    const result = await materialService.getCatalogOverview({
+      organizationId,
+      ...opts,
+      page: 1,
+      limit: 10_000,
+    });
+
+    return {
+      exportedAt: new Date(),
+      totalMaterialTypes: result.summary.totalMaterialTypes,
+      filters: opts,
+      materialTypes: result.materialTypes,
     };
   },
 };

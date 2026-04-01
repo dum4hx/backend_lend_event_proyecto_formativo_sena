@@ -175,7 +175,7 @@ export const invoiceService = {
     createdBy: Types.ObjectId;
     invoiceNumber: string;
   }) {
-    const { items, taxRate = 0.19, dueDate, ...rest } = params;
+    const { items, taxRate = 0, dueDate, ...rest } = params;
 
     // Calculate totals
     const subtotal = items.reduce(

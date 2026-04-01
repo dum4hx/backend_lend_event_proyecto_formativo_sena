@@ -3,7 +3,15 @@ import { Inspection } from "./models/inspection.model.ts";
 import { Loan } from "../loan/models/loan.model.ts";
 import { Invoice } from "../invoice/models/invoice.model.ts";
 import { invoiceService } from "../invoice/invoice.service.ts";
+import { Organization } from "../organization/models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
+import {
+  isConditionDegraded,
+} from "../shared/condition_levels.ts";
+import {
+  validateTransition,
+  LOAN_TRANSITIONS,
+} from "../shared/state_machine.ts";
 
 export const inspectionService = {
   /**
@@ -160,14 +168,25 @@ export const inspectionService = {
         );
 
         // Create inspection with proper items format
-        const inspectionItems = items.map((item) => ({
-          materialInstanceId: new Types.ObjectId(item.materialInstanceId),
-          conditionBefore: "good", // Default, would be populated from loan data in real impl
-          conditionAfter: item.condition,
-          damageDescription: item.damageDescription,
-          chargeToCustomer: item.damageCost ?? 0,
-          repairRequired: item.condition === "damaged",
-        }));
+        const inspectionItems = items.map((item) => {
+          // Look up real condition at checkout from loan data
+          const loanMaterial = loan.materialInstances.find(
+            (mi: any) =>
+              mi.materialInstanceId.toString() === item.materialInstanceId,
+          );
+          const conditionBefore =
+            (loanMaterial as any)?.conditionAtCheckout ?? "good";
+
+          return {
+            materialInstanceId: new Types.ObjectId(item.materialInstanceId),
+            conditionBefore,
+            conditionAfter: item.condition,
+            conditionDegraded: isConditionDegraded(conditionBefore, item.condition),
+            damageDescription: item.damageDescription,
+            chargeToCustomer: item.damageCost ?? 0,
+            repairRequired: item.condition === "damaged",
+          };
+        });
 
         const [inspection]: any = await (Inspection as any).create(
           [
@@ -203,7 +222,14 @@ export const inspectionService = {
               throw AppError.badRequest("Invalid dueDate format");
             }
           } else {
-            invoiceDueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+            // Use org-level policy for damage due days
+            const org = await Organization.findById(organizationId)
+              .select("settings")
+              .session(session);
+            const damageDueDays = org?.settings?.damageDueDays ?? 30;
+            invoiceDueDate = new Date(
+              Date.now() + damageDueDays * 24 * 60 * 60 * 1000,
+            );
           }
           const invoiceLineItems = damagedItems.map((item) => ({
             description:
@@ -285,8 +311,12 @@ export const inspectionService = {
               reference: "No damages found — deposit pending physical refund",
             });
             loanDeposit.status = "refund_pending";
-            await loan.save({ session });
           }
+
+          // Auto-transition loan to inspected on clean inspection
+          validateTransition(loan.status, "inspected", LOAN_TRANSITIONS);
+          loan.status = "inspected";
+          await loan.save({ session });
         }
 
         const populatedInspection = await Inspection.findById(inspection._id)

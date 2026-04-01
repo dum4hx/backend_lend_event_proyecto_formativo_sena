@@ -107,6 +107,10 @@ const itemInspectionMongooseSchema = new Schema(
       min: 0,
       default: 0,
     },
+    conditionDegraded: {
+      type: Boolean,
+      default: false,
+    },
     // Transition tracking
     transitionedToStatus: {
       type: String,

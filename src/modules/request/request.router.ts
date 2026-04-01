@@ -6,10 +6,7 @@ import {
 } from "express";
 import { z } from "zod";
 import { Types } from "mongoose";
-import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import {
-  LoanRequest,
-  type LoanRequestDocument,
   LoanRequestZodSchema,
   requestStatusOptions,
 } from "./models/request.model.ts";
@@ -113,71 +110,6 @@ const approveRequestSchema = z.object({
 const rejectRequestSchema = z.object({
   reason: z.string().min(1).max(1000),
 });
-
-type AssignmentInput = z.infer<
-  typeof assignMaterialsSchema
->["assignments"][number];
-
-type AssignmentWithIndex = {
-  materialInstanceId: Types.ObjectId;
-  itemIndex: number;
-};
-
-const buildMaterialTypeQueues = (
-  request: LoanRequestDocument,
-): Map<string, number[]> => {
-  const queues = new Map<string, number[]>();
-
-  request.items.forEach((item, itemIndex) => {
-    if (item.type !== "material") {
-      return;
-    }
-
-    const materialTypeId = new Types.ObjectId(item.referenceId).toString();
-    const queue = queues.get(materialTypeId) ?? [];
-
-    for (let i = 0; i < item.quantity; i++) {
-      queue.push(itemIndex);
-    }
-
-    queues.set(materialTypeId, queue);
-  });
-
-  return queues;
-};
-
-const mapAssignmentsToRequestItemIndexes = (
-  request: LoanRequestDocument,
-  assignments: AssignmentInput[],
-): AssignmentWithIndex[] => {
-  const materialTypeQueues = buildMaterialTypeQueues(request);
-
-  return assignments.map((assignment, index) => {
-    const materialTypeId = new Types.ObjectId(
-      assignment.materialTypeId,
-    ).toString();
-    const itemQueue = materialTypeQueues.get(materialTypeId);
-
-    if (!itemQueue || itemQueue.length === 0) {
-      throw AppError.badRequest(
-        `Assignment at index ${index} does not match any request material item or exceeds requested quantity`,
-      );
-    }
-
-    const itemIndex = itemQueue.shift();
-
-    if (itemIndex === undefined) {
-      throw AppError.badRequest(
-        `Unable to map assignment at index ${index} to request item`,
-      );
-    }
-
-    return {
-      materialInstanceId: new Types.ObjectId(assignment.materialInstanceId),
-      itemIndex,
-    };
-  });
-};
 
 /* ---------- Routes ---------- */
 
@@ -382,209 +314,27 @@ requestRouter.post(
   requirePermission("requests:assign"),
   validateBody(assignMaterialsSchema),
   async (req: Request, res: Response, next: NextFunction) => {
-    const session = await LoanRequest.startSession();
-
     try {
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
       const { assignments } = req.body as z.infer<typeof assignMaterialsSchema>;
 
-      const materialInstanceIds = assignments.map((assignment) =>
-        new Types.ObjectId(assignment.materialInstanceId).toString(),
-      );
-
-      const duplicatedInstanceIds = materialInstanceIds.filter(
-        (id, index, ids) => ids.indexOf(id) !== index,
-      );
-
-      if (duplicatedInstanceIds.length > 0) {
-        throw AppError.badRequest(
-          "Duplicated materialInstanceId in assignments",
-        );
-      }
-
-      let updatedRequest: Awaited<
-        ReturnType<typeof LoanRequest.findById>
-      > | null = null;
-
-      await session.withTransaction(async () => {
-        const request = await LoanRequest.findOne(
-          {
-            _id: req.params.id,
-            organizationId,
-            status: "approved",
-          },
-          null,
-          { session },
-        );
-
-        if (!request) {
-          const existingRequest = await LoanRequest.findOne(
-            {
-              _id: req.params.id,
-              organizationId,
-            },
-            null,
-            { session },
-          );
-
-          if (!existingRequest) {
-            throw AppError.notFound("Request not found");
-          }
-
-          throw AppError.conflict(
-            `Request is not in a valid status to prepare. Current status: ${existingRequest.status}`,
-          );
-        }
-
-        const mappedAssignments = mapAssignmentsToRequestItemIndexes(
-          request,
-          assignments,
-        );
-
-        const instances = await MaterialInstance.find(
-          {
-            _id: {
-              $in: mappedAssignments.map(
-                (assignment) => assignment.materialInstanceId,
-              ),
-            },
-            organizationId,
-          },
-          null,
-          { session },
-        );
-
-        if (instances.length !== mappedAssignments.length) {
-          throw AppError.notFound(
-            "One or more material instances do not exist in this organization",
-          );
-        }
-
-        const instancesById = new Map(
-          instances.map((instance) => [
-            new Types.ObjectId(instance._id).toString(),
-            instance,
-          ]),
-        );
-
-        for (const [i, assignment] of mappedAssignments.entries()) {
-          const assignmentInput = assignments[i];
-
-          if (!assignmentInput) {
-            throw AppError.badRequest(
-              `Invalid assignment payload at index ${i}`,
-            );
-          }
-
-          const instance = instancesById.get(
-            new Types.ObjectId(assignment.materialInstanceId).toString(),
-          );
-
-          if (!instance) {
-            throw AppError.notFound(
-              `Material instance not found for assignment at index ${i}`,
-            );
-          }
-
-          const assignmentTypeId = new Types.ObjectId(
-            assignmentInput.materialTypeId,
-          ).toString();
-          const instanceTypeId = new Types.ObjectId(
-            instance.modelId,
-          ).toString();
-
-          if (assignmentTypeId !== instanceTypeId) {
-            throw AppError.badRequest(
-              `materialTypeId does not match the selected material instance at index ${i}`,
-            );
-          }
-        }
-
-        const updateInstancesResult = await MaterialInstance.updateMany(
-          {
-            _id: {
-              $in: mappedAssignments.map(
-                (assignment) => assignment.materialInstanceId,
-              ),
-            },
-            organizationId,
-            status: "available",
-          },
-          {
-            $set: {
-              status: "reserved",
-            },
-          },
-          {
-            session,
-          },
-        );
-
-        if (updateInstancesResult.modifiedCount !== mappedAssignments.length) {
-          throw AppError.conflict(
-            "One or more material instances are not available",
-          );
-        }
-
-        request.assignedMaterials =
-          mappedAssignments as unknown as LoanRequestDocument["assignedMaterials"];
-        request.assignedBy = new Types.ObjectId(user.id);
-        request.assignedAt = new Date();
-        request.status = "ready";
-
-        await request.save({ session });
-
-        updatedRequest = await LoanRequest.findById(request._id, null, {
-          session,
-        })
-          .populate("customerId", "email name phone address")
-          .populate(
-            "assignedMaterials.materialInstanceId",
-            "serialNumber status modelId",
-          );
-      });
-
-      res.json({
-        status: "success",
-        data: { request: updatedRequest },
-        message: "Materials assigned and request marked as ready",
-      });
-    } catch (err) {
-      next(err);
-    } finally {
-      await session.endSession();
-    }
-  },
-);
-
-/**
- * POST /api/v1/requests/:id/assign
- * Assigns specific material instances to an approved request (Warehouse Operator action).
- */
-requestRouter.post(
-  "/:id/assign",
-  requirePermission("requests:assign"),
-  validateBody(assignMaterialsSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const organizationId = getOrgId(req);
       const requestId = req.params.id;
-
       if (typeof requestId !== "string") {
         throw AppError.badRequest("Invalid request ID");
       }
 
-      const request = await requestService.assignMaterials(
+      const request = await requestService.assignMaterialsTransaction(
         requestId,
         organizationId,
-        req.body.assignments,
+        user.id,
+        assignments,
       );
 
       res.json({
         status: "success",
         data: { request },
-        message: "Materials assigned successfully",
+        message: "Materials assigned and request marked as ready",
       });
     } catch (err) {
       next(err);
@@ -651,6 +401,40 @@ requestRouter.post(
         status: "success",
         data: { request },
         message: "Deposit payment recorded successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/requests/:id/record-rental-payment
+ * Records the rental fee payment for a request (manual confirmation).
+ * Use when payment is made outside of Stripe (e.g., cash, bank transfer).
+ * Requires: requests:update
+ */
+requestRouter.post(
+  "/:id/record-rental-payment",
+  requirePermission("requests:update"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const requestId = req.params.id;
+
+      if (typeof requestId !== "string") {
+        throw AppError.badRequest("Invalid request ID");
+      }
+
+      const request = await requestService.recordRentalFeePayment(
+        requestId,
+        organizationId,
+      );
+
+      res.json({
+        status: "success",
+        data: { request },
+        message: "Rental fee payment recorded successfully",
       });
     } catch (err) {
       next(err);

@@ -5,7 +5,10 @@ import {
   type NextFunction,
 } from "express";
 import { organizationService } from "./organization.service.ts";
-import { OrganizationUpdateZodSchema } from "./models/organization.model.ts";
+import {
+  OrganizationUpdateZodSchema,
+  OrganizationSettingsZodSchema,
+} from "./models/organization.model.ts";
 import { subscriptionTypeService } from "../subscription_type/subscription_type.service.ts";
 import { validateBody } from "../../middleware/validation.ts";
 import {
@@ -82,6 +85,52 @@ organizationRouter.get(
       res.json({
         status: "success",
         data: { usage },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/organizations/settings
+ * Gets the current organization settings.
+ */
+organizationRouter.get(
+  "/settings",
+  requirePermission("organization:read"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const settings = await organizationService.getSettings(getOrgId(req));
+
+      res.json({
+        status: "success",
+        data: { settings },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/organizations/settings
+ * Updates organization settings (policies). Owner only.
+ */
+organizationRouter.patch(
+  "/settings",
+  requirePermission("organization:update"),
+  validateBody(OrganizationSettingsZodSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await organizationService.updateSettings(
+        getOrgId(req),
+        req.body,
+      );
+
+      res.json({
+        status: "success",
+        data: result,
       });
     } catch (err) {
       next(err);

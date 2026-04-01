@@ -3,6 +3,7 @@ import {
   Organization,
   type OrganizationInput,
   type SubscriptionPlan,
+  type OrganizationSettingsInput,
 } from "./models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import type { PlanUsage } from "./types/index.ts";
@@ -401,5 +402,56 @@ export const organizationService = {
     if (locations.length !== locationIds.length) {
       throw AppError.badRequest("One or more location IDs are invalid");
     }
+  },
+
+  /**
+   * Updates organization-level settings (policies).
+   * Only modifies provided fields — existing settings are preserved.
+   */
+  async updateSettings(
+    organizationId: Types.ObjectId | string,
+    data: OrganizationSettingsInput,
+  ): Promise<{ settings: { damageDueDays: number; requireFullPaymentBeforeCheckout: boolean } }> {
+    const updateFields: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        updateFields[`settings.${key}`] = value;
+      }
+    }
+
+    const organization = await Organization.findByIdAndUpdate(
+      organizationId,
+      { $set: updateFields },
+      { new: true, runValidators: true },
+    ).select("settings");
+
+    if (!organization) {
+      throw AppError.notFound("Organization not found");
+    }
+
+    return {
+      settings: {
+        damageDueDays: organization.settings?.damageDueDays ?? 30,
+        requireFullPaymentBeforeCheckout:
+          organization.settings?.requireFullPaymentBeforeCheckout ?? false,
+      },
+    };
+  },
+
+  /**
+   * Returns the current settings for an organization.
+   */
+  async getSettings(
+    organizationId: Types.ObjectId | string,
+  ): Promise<{ damageDueDays: number; requireFullPaymentBeforeCheckout: boolean }> {
+    const org = await Organization.findById(organizationId).select("settings");
+    if (!org) {
+      throw AppError.notFound("Organization not found");
+    }
+    return {
+      damageDueDays: org.settings?.damageDueDays ?? 30,
+      requireFullPaymentBeforeCheckout:
+        org.settings?.requireFullPaymentBeforeCheckout ?? false,
+    };
   },
 };

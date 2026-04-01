@@ -2,9 +2,36 @@ import { Types, startSession } from "mongoose";
 import { Loan, type LoanDocument } from "./models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { Organization } from "../organization/models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
+import {
+  validateTransition,
+  LOAN_TRANSITIONS,
+} from "../shared/state_machine.ts";
+
+/* ---------- Internal Helpers ---------- */
+
+/**
+ * Computes refund availability fields on a deposit object.
+ * Response-only — not persisted.
+ */
+function enrichDepositWithRefundInfo(deposit: any): any {
+  if (!deposit || deposit.amount === 0) return deposit;
+
+  const alreadyApplied: number = (deposit.transactions ?? [])
+    .filter((t: any) => t.type === "applied")
+    .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+  return {
+    ...deposit,
+    refundAvailable:
+      deposit.status === "refund_pending" ||
+      deposit.status === "partially_applied",
+    refundableAmount: Math.max(0, deposit.amount - alreadyApplied),
+  };
+}
 
 export interface CreateLoanFromRequestInput {
   requestId: string;
@@ -46,6 +73,20 @@ export const loanService = {
           );
         }
 
+        // Enforce full-payment policy when enabled by the organization
+        const org = await Organization.findById(organizationId)
+          .select("settings")
+          .session(session);
+        if (
+          org?.settings?.requireFullPaymentBeforeCheckout &&
+          (request.totalAmount ?? 0) > 0 &&
+          !request.rentalFeePaidAt
+        ) {
+          throw AppError.badRequest(
+            "Cannot create a loan: the rental fee has not been paid and the organization requires full payment before checkout",
+          );
+        }
+
         // Update material instances to loaned status
         const instanceIds = await (request as any).markAssignedMaterialsLoaned(
           session,
@@ -69,6 +110,30 @@ export const loanService = {
               }
             : { amount: 0, status: "not_required" as const, transactions: [] };
 
+        // Build material instance details (also capture locationId from the first instance)
+        let loanLocationId: Types.ObjectId | undefined;
+        const materialInstancesPayload = await Promise.all(
+          instanceIds.map(async (id: any) => {
+            const instance = await MaterialInstance.findById(id)
+              .select("modelId locationId")
+              .session(session);
+            if (!loanLocationId && instance?.locationId) {
+              loanLocationId = instance.locationId as Types.ObjectId;
+            }
+            return {
+              materialInstanceId: id,
+              materialTypeId: instance?.modelId ?? id,
+              conditionAtCheckout: "good",
+            };
+          }),
+        );
+
+        if (!loanLocationId) {
+          throw AppError.badRequest(
+            "Cannot determine loan origin location: no valid material instances found",
+          );
+        }
+
         // Create the loan
         const [loan]: any = await (Loan as any).create(
           [
@@ -76,10 +141,8 @@ export const loanService = {
               organizationId,
               customerId: request.customerId,
               requestId: request._id,
-              materialInstances: instanceIds.map((id: any) => ({
-                materialInstanceId: id,
-                materialTypeId: id,
-              })),
+              locationId: loanLocationId,
+              materialInstances: materialInstancesPayload,
               startDate: new Date(),
               endDate: request.endDate,
               deposit,
@@ -146,6 +209,8 @@ export const loanService = {
           throw AppError.notFound("Loan not found or already returned");
         }
 
+        validateTransition(loan.status, "returned", LOAN_TRANSITIONS);
+
         // Update material instances to returned status (pending inspection)
         const instanceIds = loan.materialInstances.map(
           (mi) => mi.materialInstanceId,
@@ -195,6 +260,8 @@ export const loanService = {
     if (!loan) {
       throw AppError.notFound("Loan not found or not in returned status");
     }
+
+    validateTransition(loan.status, "closed", LOAN_TRANSITIONS);
 
     // Guard: deposit must be fully resolved before closing
     const deposit = (loan as any).deposit;
@@ -331,7 +398,11 @@ export const loanService = {
     ]);
 
     return {
-      loans: loans as unknown as LoanDocument[],
+      loans: loans.map((l) => {
+        const obj = l.toObject() as any;
+        obj.deposit = enrichDepositWithRefundInfo(obj.deposit);
+        return obj;
+      }) as unknown as LoanDocument[],
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -394,27 +465,144 @@ export const loanService = {
   },
 
   /**
-   * Gets a specific loan by ID.
+   * Gets a specific loan by ID. Includes computed deposit refund availability.
+   * Optionally groups materialInstances by materialTypeId using MongoDB aggregation.
+   *
+   * @param groupByMaterialType If true, groups materialInstances by materialTypeId at the database level
+   *                            and returns materialInstancesByType object instead of array.
    */
   async getLoanById(
     loanId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
+    opts?: { groupByMaterialType?: boolean },
   ): Promise<LoanDocument> {
-    const loan = await Loan.findOne({
-      _id: loanId,
-      organizationId,
-    })
-      .populate("customerId", "email name phone address")
-      .populate(
-        "materialInstances.materialInstanceId",
-        "serialNumber status modelId",
-      )
-      .populate("requestId", "startDate endDate");
+    const loanIdObj = new Types.ObjectId(loanId);
+    const orgIdObj = new Types.ObjectId(organizationId);
+
+    const pipeline: any[] = [
+      { $match: { _id: loanIdObj, organizationId: orgIdObj } },
+      // Populate customer — write result back into customerId field directly
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customerId",
+          foreignField: "_id",
+          as: "customerId",
+          pipeline: [{ $project: { email: 1, name: 1, phone: 1, address: 1 } }],
+        },
+      },
+      { $unwind: { path: "$customerId", preserveNullAndEmptyArrays: true } },
+      // Populate request — write result back into requestId field directly
+      {
+        $lookup: {
+          from: "loanrequests",
+          localField: "requestId",
+          foreignField: "_id",
+          as: "requestId",
+          pipeline: [{ $project: { startDate: 1, endDate: 1 } }],
+        },
+      },
+      { $unwind: { path: "$requestId", preserveNullAndEmptyArrays: true } },
+      // Unwind materialInstances for per-instance lookups
+      { $unwind: "$materialInstances" },
+      // Populate materialInstance details — write result back into materialInstances.materialInstanceId
+      {
+        $lookup: {
+          from: "materialinstances",
+          localField: "materialInstances.materialInstanceId",
+          foreignField: "_id",
+          as: "materialInstances.materialInstanceId",
+          pipeline: [{ $project: { serialNumber: 1, status: 1, modelId: 1, name: 1 } }],
+        },
+      },
+      { $unwind: { path: "$materialInstances.materialInstanceId", preserveNullAndEmptyArrays: true } },
+      // Populate materialType details
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "materialInstances.materialTypeId",
+          foreignField: "_id",
+          as: "materialInstances.materialType",
+          pipeline: [{ $project: { _id: 1, name: 1 } }],
+        },
+      },
+      { $unwind: { path: "$materialInstances.materialType", preserveNullAndEmptyArrays: true } },
+    ];
+
+    const instanceShape = {
+      materialInstanceId: "$materialInstances.materialInstanceId",
+      materialTypeId: "$materialInstances.materialTypeId",
+      materialType: "$materialInstances.materialType",
+    };
+
+    if (opts?.groupByMaterialType) {
+      pipeline.push(
+        // Stage 1: group by loan + materialType to collect each type's instances
+        {
+          $group: {
+            _id: { loanId: "$_id", typeId: "$materialInstances.materialTypeId" },
+            root: { $first: "$$ROOT" },
+            typeName: { $first: "$materialInstances.materialType.name" },
+            instances: { $push: instanceShape },
+          },
+        },
+        // Stage 2: group by loan, build the final keyed map keyed by materialType name
+        {
+          $group: {
+            _id: "$_id.loanId",
+            root: { $first: "$root" },
+            typeGroups: {
+              $push: {
+                k: { $ifNull: ["$typeName", { $toString: "$_id.typeId" }] },
+                v: {
+                  materialType: { $first: "$instances.materialType" },
+                  instances: "$instances",
+                },
+              },
+            },
+          },
+        },
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: [
+                "$root",
+                { materialInstancesByType: { $arrayToObject: "$typeGroups" } },
+              ],
+            },
+          },
+        },
+        // Remove the residual single-item materialInstances leaked from $$ROOT
+        { $unset: "materialInstances" },
+      );
+    } else {
+      pipeline.push(
+        {
+          $group: {
+            _id: "$_id",
+            root: { $first: "$$ROOT" },
+            materialInstances: { $push: instanceShape },
+          },
+        },
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: ["$root", { materialInstances: "$materialInstances" }],
+            },
+          },
+        },
+      );
+    }
+
+    const [loan] = await Loan.aggregate(pipeline);
 
     if (!loan) {
       throw AppError.notFound("Loan not found");
     }
 
-    return loan as unknown as LoanDocument;
+    const loanObj = loan as any;
+    loanObj.deposit = enrichDepositWithRefundInfo(loanObj.deposit);
+
+    return loanObj as LoanDocument;
   },
 };

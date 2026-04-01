@@ -224,4 +224,122 @@ export const emailService = {
       invoiceNumber: invoice.invoiceNumber,
     });
   },
+
+  /**
+   * Sends a notification that a loan is overdue.
+   */
+  async sendOverdueLoanNotification(
+    to: string,
+    firstName: string,
+    loan: {
+      loanId: string;
+      customerName: string;
+      endDate: Date;
+      daysOverdue: number;
+    },
+  ): Promise<void> {
+    const endDateStr = new Date(loan.endDate).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #c0392b;">Overdue Loan Alert</h2>
+        <p>Hi <strong>${firstName}</strong>,</p>
+        <p>Loan <strong>${loan.loanId}</strong> for customer <strong>${loan.customerName}</strong> is now <strong>${loan.daysOverdue} day(s) overdue</strong>.</p>
+        <p>The loan was due on <strong>${endDateStr}</strong>. Please arrange for the return of materials as soon as possible.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="color: #aaa; font-size: 12px;">LendEvent &mdash; Event Rental Management</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"LendEvent" <${SMTP_FROM}>`,
+      to,
+      subject: `Overdue Loan Alert — Loan ${loan.loanId} (${loan.daysOverdue} days overdue)`,
+      html,
+    });
+
+    logger.info("Overdue loan notification sent", { to, loanId: loan.loanId });
+  },
+
+  /**
+   * Sends a notification that a loan request has expired.
+   */
+  async sendRequestExpiredNotification(
+    to: string,
+    firstName: string,
+    request: {
+      requestId: string;
+      customerName: string;
+      depositDueDate: Date;
+    },
+  ): Promise<void> {
+    const dueDateStr = new Date(request.depositDueDate).toLocaleDateString(
+      "en-US",
+      { year: "numeric", month: "long", day: "numeric" },
+    );
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #e67e22;">Request Expired</h2>
+        <p>Hi <strong>${firstName}</strong>,</p>
+        <p>Loan request <strong>${request.requestId}</strong> for customer <strong>${request.customerName}</strong> has expired because the deposit was not paid by the deadline (<strong>${dueDateStr}</strong>).</p>
+        <p>Any reserved materials have been released. A new request can be created if needed.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="color: #aaa; font-size: 12px;">LendEvent &mdash; Event Rental Management</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"LendEvent" <${SMTP_FROM}>`,
+      to,
+      subject: `Request Expired — Request ${request.requestId}`,
+      html,
+    });
+
+    logger.info("Request expired notification sent", {
+      to,
+      requestId: request.requestId,
+    });
+  },
+
+  /**
+   * Sends a reminder that a deposit refund is pending action.
+   */
+  async sendDepositRefundReminder(
+    to: string,
+    firstName: string,
+    loan: {
+      loanId: string;
+      customerName: string;
+      depositAmount: number;
+      daysPending: number;
+    },
+  ): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #2980b9;">Deposit Refund Reminder</h2>
+        <p>Hi <strong>${firstName}</strong>,</p>
+        <p>Loan <strong>${loan.loanId}</strong> for customer <strong>${loan.customerName}</strong> has a deposit of <strong>$${loan.depositAmount.toFixed(2)}</strong> pending refund for <strong>${loan.daysPending} day(s)</strong>.</p>
+        <p>Please process the refund at your earliest convenience.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="color: #aaa; font-size: 12px;">LendEvent &mdash; Event Rental Management</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"LendEvent" <${SMTP_FROM}>`,
+      to,
+      subject: `Deposit Refund Reminder — Loan ${loan.loanId} ($${loan.depositAmount.toFixed(2)})`,
+      html,
+    });
+
+    logger.info("Deposit refund reminder sent", {
+      to,
+      loanId: loan.loanId,
+    });
+  },
 };
