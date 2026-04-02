@@ -9,6 +9,7 @@ import {
   LOAN_TRANSITIONS,
   LOAN_REQUEST_TRANSITIONS,
 } from "./state_machine.ts";
+import { incidentService } from "../incident/incident.service.ts";
 
 /* ---------- Scheduled Job Intervals ---------- */
 
@@ -41,6 +42,29 @@ async function detectOverdueLoans(): Promise<void> {
       }
       loan.status = "overdue";
       await loan.save();
+
+      // Create overdue incident (idempotent — skips if one already exists)
+      try {
+        const daysOverdue = Math.ceil(
+          (now.getTime() - new Date(loan.endDate).getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        await incidentService.createIncident({
+          organizationId: loan.organizationId as any,
+          loanId: loan._id as any,
+          context: "loan",
+          type: "overdue",
+          createdBy: loan.checkedOutBy as any,
+          sourceType: "scheduler",
+          severity: daysOverdue > 7 ? "high" : "medium",
+          metadata: { daysOverdue },
+        });
+      } catch (incidentErr) {
+        logger.error("Failed to create overdue incident", {
+          loanId: loan._id.toString(),
+          error: incidentErr,
+        });
+      }
 
       // Send notification to the request creator
       try {
