@@ -5,9 +5,7 @@ import { Invoice } from "../invoice/models/invoice.model.ts";
 import { invoiceService } from "../invoice/invoice.service.ts";
 import { Organization } from "../organization/models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
-import {
-  isConditionDegraded,
-} from "../shared/condition_levels.ts";
+import { isConditionDegraded } from "../shared/condition_levels.ts";
 import {
   validateTransition,
   LOAN_TRANSITIONS,
@@ -181,7 +179,10 @@ export const inspectionService = {
             materialInstanceId: new Types.ObjectId(item.materialInstanceId),
             conditionBefore,
             conditionAfter: item.condition,
-            conditionDegraded: isConditionDegraded(conditionBefore, item.condition),
+            conditionDegraded: isConditionDegraded(
+              conditionBefore,
+              item.condition,
+            ),
             damageDescription: item.damageDescription,
             chargeToCustomer: item.damageCost ?? 0,
             repairRequired: item.condition === "damaged",
