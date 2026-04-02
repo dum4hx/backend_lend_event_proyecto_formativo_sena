@@ -4,14 +4,28 @@ import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Organization } from "../organization/models/organization.model.ts";
 import { AppError } from "../../errors/AppError.ts";
+import { Inspection } from "../inspection/models/inspection.model.ts";
 import { logger } from "../../utils/logger.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
 import {
   validateTransition,
   LOAN_TRANSITIONS,
+  LOAN_REQUEST_TRANSITIONS,
 } from "../shared/state_machine.ts";
 
 /* ---------- Internal Helpers ---------- */
+
+/**
+ * Validates and applies a status transition on a loan document.
+ * Does NOT save — caller is responsible for persisting.
+ */
+function transitionLoanStatus(
+  loan: LoanDocument & { status: string },
+  nextStatus: string,
+): void {
+  validateTransition(loan.status, nextStatus, LOAN_TRANSITIONS);
+  loan.status = nextStatus as any;
+}
 
 /**
  * Computes refund availability fields on a deposit object.
@@ -156,11 +170,10 @@ export const loanService = {
         );
 
         // Mark the request as shipped (materials dispatched) and link the loan
-        await LoanRequest.updateOne(
-          { _id: request._id },
-          { $set: { status: "shipped", loanId: loan._id } },
-          { session },
-        );
+        validateTransition(request.status, "shipped", LOAN_REQUEST_TRANSITIONS);
+        request.status = "shipped";
+        (request as any).loanId = loan._id;
+        await request.save({ session });
 
         const populatedLoan = await Loan.findById(loan._id)
           .session(session)
@@ -209,7 +222,7 @@ export const loanService = {
           throw AppError.notFound("Loan not found or already returned");
         }
 
-        validateTransition(loan.status, "returned", LOAN_TRANSITIONS);
+        transitionLoanStatus(loan, "returned");
 
         // Update material instances to returned status (pending inspection)
         const instanceIds = loan.materialInstances.map(
@@ -220,8 +233,6 @@ export const loanService = {
           { $set: { status: "returned" } },
           { session },
         );
-
-        loan.status = "returned";
         loan.returnedAt = new Date();
         if (notes) {
           loan.notes = (loan.notes ?? "") + `\nReturn notes: ${notes}`;
@@ -261,7 +272,7 @@ export const loanService = {
       throw AppError.notFound("Loan not found or not in returned status");
     }
 
-    validateTransition(loan.status, "closed", LOAN_TRANSITIONS);
+    transitionLoanStatus(loan, "closed");
 
     // Guard: deposit must be fully resolved before closing
     const deposit = (loan as any).deposit;
@@ -308,7 +319,6 @@ export const loanService = {
       );
     }
 
-    loan.status = "closed";
     await loan.save();
 
     return loan as unknown as LoanDocument;
@@ -338,7 +348,9 @@ export const loanService = {
     }
 
     loan.endDate = newEndDate;
-    loan.status = "active"; // Reset from overdue if applicable
+    if (loan.status === "overdue") {
+      transitionLoanStatus(loan, "active");
+    }
     if (notes) {
       loan.notes = (loan.notes ?? "") + `\nExtension: ${notes}`;
     }
@@ -434,6 +446,18 @@ export const loanService = {
       throw AppError.badRequest("This loan has no deposit to refund");
     }
 
+    // Ensure the loan has a completed inspection before allowing a refund
+    const completedInspection = await Inspection.exists({
+      loanId: loan._id,
+      organizationId,
+      status: "completed",
+    });
+    if (!completedInspection) {
+      throw AppError.badRequest(
+        "Cannot refund the deposit until the loan has a completed inspection.",
+      );
+    }
+
     if (
       deposit.status !== "refund_pending" &&
       deposit.status !== "partially_applied"
@@ -512,10 +536,17 @@ export const loanService = {
           localField: "materialInstances.materialInstanceId",
           foreignField: "_id",
           as: "materialInstances.materialInstanceId",
-          pipeline: [{ $project: { serialNumber: 1, status: 1, modelId: 1, name: 1 } }],
+          pipeline: [
+            { $project: { serialNumber: 1, status: 1, modelId: 1, name: 1 } },
+          ],
         },
       },
-      { $unwind: { path: "$materialInstances.materialInstanceId", preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: "$materialInstances.materialInstanceId",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
       // Populate materialType details
       {
         $lookup: {
@@ -526,7 +557,12 @@ export const loanService = {
           pipeline: [{ $project: { _id: 1, name: 1 } }],
         },
       },
-      { $unwind: { path: "$materialInstances.materialType", preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: {
+          path: "$materialInstances.materialType",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
     ];
 
     const instanceShape = {
@@ -540,7 +576,10 @@ export const loanService = {
         // Stage 1: group by loan + materialType to collect each type's instances
         {
           $group: {
-            _id: { loanId: "$_id", typeId: "$materialInstances.materialTypeId" },
+            _id: {
+              loanId: "$_id",
+              typeId: "$materialInstances.materialTypeId",
+            },
             root: { $first: "$$ROOT" },
             typeName: { $first: "$materialInstances.materialType.name" },
             instances: { $push: instanceShape },
@@ -587,7 +626,10 @@ export const loanService = {
         {
           $replaceRoot: {
             newRoot: {
-              $mergeObjects: ["$root", { materialInstances: "$materialInstances" }],
+              $mergeObjects: [
+                "$root",
+                { materialInstances: "$materialInstances" },
+              ],
             },
           },
         },
