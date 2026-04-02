@@ -5,8 +5,7 @@ import {
   type NextFunction,
 } from "express";
 import { z } from "zod";
-import { Types } from "mongoose";
-import { Loan, loanStatusOptions } from "../loan/models/loan.model.ts";
+import { loanStatusOptions } from "../loan/models/loan.model.ts";
 import { loanService } from "./loan.service.ts";
 import {
   validateBody,
@@ -93,17 +92,6 @@ loanRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-
-      // Update overdue status
-      const now = new Date();
-      await Loan.updateMany(
-        {
-          organizationId,
-          status: "active",
-          endDate: { $lt: now },
-        },
-        { $set: { status: "overdue" } },
-      );
 
       const result = await loanService.listLoans(organizationId, {
         overdue: true,

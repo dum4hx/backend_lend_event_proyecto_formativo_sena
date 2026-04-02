@@ -91,6 +91,26 @@ transferRouter.get(
 );
 
 /**
+ * GET /transfers/requests/:id
+ * Get details for a specific transfer request with populated fields
+ */
+transferRouter.get(
+  "/requests/:id",
+  requirePermission("transfers:read"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await transferService.getRequest(
+        getOrgId(req),
+        req.params.id,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * PATCH /transfers/requests/:id/cancel
  * Cancel a transfer request — only the request creator can cancel it, and only when status is "requested"
  */

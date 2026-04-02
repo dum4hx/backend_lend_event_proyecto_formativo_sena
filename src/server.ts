@@ -122,6 +122,9 @@ app.use(`${apiV1}/loans`, routers.loanRouter);
 // Inspection routes
 app.use(`${apiV1}/inspections`, routers.inspectionRouter);
 
+// Incident routes
+app.use(`${apiV1}/incidents`, routers.incidentRouter);
+
 // Invoice routes
 app.use(`${apiV1}/invoices`, routers.invoiceRouter);
 
@@ -151,6 +154,9 @@ app.use(`${apiV1}/reports`, routers.reportsRouter);
 
 // Operations routes (location-scoped operational dashboard)
 app.use(`${apiV1}/locations/:locationId/operations`, routers.operationsRouter);
+
+// Maintenance batch routes
+app.use(`${apiV1}/maintenance`, routers.maintenanceRouter);
 
 /* ---------- 404 Handler ---------- */
 

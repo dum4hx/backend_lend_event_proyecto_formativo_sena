@@ -117,10 +117,7 @@ reportsRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const filters = req.query as unknown as ReportQuery;
-      const data = await reportsService.getDamageReport(
-        getOrgId(req),
-        filters,
-      );
+      const data = await reportsService.getDamageReport(getOrgId(req), filters);
       res.json({ status: "success", data });
     } catch (err) {
       next(err);
@@ -166,7 +163,9 @@ type CatalogExportQuery = z.infer<typeof catalogExportQuerySchema>;
 /** Converts a single material-type row into a flat CSV record. */
 function materialTypeToRow(mt: any): string {
   const categories = (mt.categories ?? []).map((c: any) => c.name).join("|");
-  const alerts = (mt.alerts ?? []).map((a: any) => `${a.severity}:${a.type}`).join("|");
+  const alerts = (mt.alerts ?? [])
+    .map((a: any) => `${a.severity}:${a.type}`)
+    .join("|");
   const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
   const fields = [
     mt.name,
@@ -208,11 +207,18 @@ reportsRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { format, ...filters } = req.query as unknown as CatalogExportQuery;
-      const exportFilters: { locationId?: string; categoryId?: string; search?: string } = {};
+      const exportFilters: {
+        locationId?: string;
+        categoryId?: string;
+        search?: string;
+      } = {};
       if (filters.locationId) exportFilters.locationId = filters.locationId;
       if (filters.categoryId) exportFilters.categoryId = filters.categoryId;
       if (filters.search) exportFilters.search = filters.search;
-      const data = await reportsService.getCatalogExport(getOrgId(req), exportFilters);
+      const data = await reportsService.getCatalogExport(
+        getOrgId(req),
+        exportFilters,
+      );
 
       if (format === "csv") {
         const rows = [CSV_HEADER, ...data.materialTypes.map(materialTypeToRow)];

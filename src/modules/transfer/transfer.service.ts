@@ -142,6 +142,25 @@ class TransferService {
   }
 
   /**
+   * Get a single transfer request by ID with populated fields
+   */
+  async getRequest(
+    organizationId: string | Types.ObjectId,
+    requestId: string | Types.ObjectId,
+  ) {
+    const request = await TransferRequest.findOne({
+      _id: requestId,
+      organizationId,
+    })
+      .populate("requestedBy", "name email")
+      .populate("fromLocationId", "name")
+      .populate("toLocationId", "name");
+
+    if (!request) throw AppError.notFound("Transfer request not found");
+    return request;
+  }
+
+  /**
    * Cancel a transfer request
    * Only the user who created the request can cancel it, and only when status is "requested"
    */

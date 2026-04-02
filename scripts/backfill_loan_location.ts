@@ -37,8 +37,8 @@ async function run() {
   let skipped = 0;
 
   for (const loan of loans) {
-    const firstInstanceId =
-      (loan as any).materialInstances?.[0]?.materialInstanceId;
+    const firstInstanceId = (loan as any).materialInstances?.[0]
+      ?.materialInstanceId;
 
     if (!firstInstanceId) {
       console.warn(`  [SKIP] Loan ${loan._id} — no material instances`);
@@ -58,9 +58,7 @@ async function run() {
       continue;
     }
 
-    console.log(
-      `  Loan ${loan._id} → locationId = ${instance.locationId}`,
-    );
+    console.log(`  Loan ${loan._id} → locationId = ${instance.locationId}`);
 
     if (apply) {
       await Loan.updateOne(

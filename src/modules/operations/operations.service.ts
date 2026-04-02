@@ -203,8 +203,9 @@ async function validateLocationBelongsToOrg(
 async function getOverview(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<OverviewResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -236,21 +237,12 @@ async function getOverview(
     },
   ]);
 
-  // --- Loans: find all loans whose instances belong to this location ---
-  // We match loans by querying instances at this location
-  const instanceIdsAtLocation = await MaterialInstance.find({
-    ...orgFilter,
-    locationId: locationId,
-  }).distinct("_id");
+  // --- Loans: query directly by locationId (stable field set at checkout) ---
+  const loanLocationFilter = { ...orgFilter, locationId: locationId };
 
   const [loanCounts] = await Loan.aggregate([
     {
-      $match: {
-        ...orgFilter,
-        "materialInstances.materialInstanceId": {
-          $in: instanceIdsAtLocation,
-        },
-      },
+      $match: loanLocationFilter,
     },
     {
       $group: {
@@ -283,42 +275,87 @@ async function getOverview(
     },
   ]);
 
-  // --- Pending inspections (items returned but not yet inspected) ---
-  const pendingInspectionCount = await Loan.countDocuments({
-    ...orgFilter,
-    status: "returned",
-    "materialInstances.materialInstanceId": {
-      $in: instanceIdsAtLocation,
-    },
-  });
-
   // --- Financials ---
 
-  // Overdue invoices
-  const overdueInvoiceCount = await Invoice.countDocuments({
-    ...orgFilter,
-    status: "overdue",
-  });
-
-  // Pending deposit refunds — loans that are inspected/closed with deposit status "refund_pending"
-  const pendingRefundCount = await Loan.countDocuments({
-    ...orgFilter,
-    "deposit.status": "refund_pending",
-    "materialInstances.materialInstanceId": {
-      $in: instanceIdsAtLocation,
+  // Overdue invoices scoped to this location via loan $lookup (avoids unbounded $in)
+  const [overdueInvoiceAgg] = await Invoice.aggregate([
+    {
+      $match: {
+        organizationId: orgId,
+        status: { $in: ["pending", "overdue", "partially_paid"] },
+        dueDate: { $lt: now },
+      },
     },
+    {
+      $lookup: {
+        from: "loans",
+        let: { loanId: "$loanId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$_id", "$$loanId"] },
+                  { $eq: ["$locationId", locationId] },
+                ],
+              },
+            },
+          },
+          { $project: { _id: 1 } },
+          { $limit: 1 },
+        ],
+        as: "loanData",
+      },
+    },
+    { $match: { "loanData.0": { $exists: true } } },
+    { $count: "total" },
+  ]);
+  const overdueInvoiceCount = overdueInvoiceAgg?.total ?? 0;
+
+  // Pending deposit refunds — loans at this location with deposit.status = "refund_pending"
+  const pendingRefundCount = await Loan.countDocuments({
+    ...loanLocationFilter,
+    "deposit.status": "refund_pending",
   });
 
-  // Unresolved damage charges — completed inspections with additional charges and no linked invoice
-  const unresolvedDamageCount = await Inspection.countDocuments({
-    ...orgFilter,
-    status: "completed",
-    additionalChargeRequired: { $gt: 0 },
-    invoiceId: { $exists: false },
-  });
+  // Unresolved damage charges — completed inspections for loans at this location with no invoice
+  const [unresolvedDamageAgg] = await Inspection.aggregate([
+    {
+      $match: {
+        organizationId: orgId,
+        status: "completed",
+        additionalChargeRequired: { $gt: 0 },
+        invoiceId: { $exists: false },
+      },
+    },
+    {
+      $lookup: {
+        from: "loans",
+        let: { loanId: "$loanId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$_id", "$$loanId"] },
+                  { $eq: ["$locationId", locationId] },
+                ],
+              },
+            },
+          },
+          { $project: { _id: 1 } },
+          { $limit: 1 },
+        ],
+        as: "loanData",
+      },
+    },
+    { $match: { "loanData.0": { $exists: true } } },
+    { $count: "total" },
+  ]);
+  const unresolvedDamageCount = unresolvedDamageAgg?.total ?? 0;
 
   // --- Transfers ---
-  const incomingPending = await Transfer.countDocuments({
+  const incomingInTransit = await Transfer.countDocuments({
     ...orgFilter,
     toLocationId: locationId,
     status: "in_transit",
@@ -328,9 +365,9 @@ async function getOverview(
     fromLocationId: locationId,
     status: "picking",
   });
-  const transfersInTransit = await Transfer.countDocuments({
+  const outgoingInTransit = await Transfer.countDocuments({
     ...orgFilter,
-    $or: [{ fromLocationId: locationId }, { toLocationId: locationId }],
+    fromLocationId: locationId,
     status: "in_transit",
   });
 
@@ -383,10 +420,10 @@ async function getOverview(
       severity: "medium",
     });
   }
-  if (incomingPending > 0) {
+  if (incomingInTransit > 0) {
     alerts.push({
       type: "incoming_transfers",
-      count: incomingPending,
+      count: incomingInTransit,
       severity: "low",
     });
   }
@@ -394,7 +431,7 @@ async function getOverview(
   return {
     inventory: {
       itemsInRepair: inv.inRepair,
-      itemsPendingInspection: pendingInspectionCount,
+      itemsPendingInspection: ln.returnPendingInspection,
       itemsMissing: inv.missing,
       itemsDamaged: inv.damaged,
     },
@@ -410,9 +447,9 @@ async function getOverview(
       unresolvedDamageCharges: unresolvedDamageCount,
     },
     transfers: {
-      incomingPending,
+      incomingPending: incomingInTransit,
       outgoingPending,
-      transfersInTransit,
+      transfersInTransit: incomingInTransit + outgoingInTransit,
     },
     alerts,
   };
@@ -425,16 +462,18 @@ async function getOverview(
 async function getInspectionQueue(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<InspectionQueueItem[]> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   const now = new Date();
 
-  // Find loans with status "returned" whose material instances are at this location
+  // Find loans with status "returned" at this location whose instances are pending inspection
   const results = await Loan.aggregate([
     {
       $match: {
         organizationId: orgId,
+        locationId: locationId,
         status: "returned",
       },
     },
@@ -542,12 +581,13 @@ async function getInspectionQueue(
 async function getOverdueFinancials(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<OverdueFinancialsResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   const now = new Date();
 
-  // --- Overdue invoices ---
+  // --- Overdue invoices (location-scoped via loan $lookup) ---
   const overdueInvoices: OverdueInvoice[] = await Invoice.aggregate([
     {
       $match: {
@@ -556,6 +596,28 @@ async function getOverdueFinancials(
         dueDate: { $lt: now },
       },
     },
+    {
+      $lookup: {
+        from: "loans",
+        let: { loanId: "$loanId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$_id", "$$loanId"] },
+                  { $eq: ["$locationId", locationId] },
+                ],
+              },
+            },
+          },
+          { $project: { _id: 1 } },
+          { $limit: 1 },
+        ],
+        as: "loanData",
+      },
+    },
+    { $match: { "loanData.0": { $exists: true } } },
     {
       $lookup: {
         from: "customers",
@@ -589,21 +651,13 @@ async function getOverdueFinancials(
     { $limit: 100 },
   ]);
 
-  // --- Pending deposit refunds ---
-  // Loans at this location with deposit.status = "refund_pending"
-  const instanceIdsAtLocation = await MaterialInstance.find({
-    organizationId: orgId,
-    locationId: locationId,
-  }).distinct("_id");
-
+  // --- Pending deposit refunds (location-scoped via locationId) ---
   const pendingDepositRefunds: PendingDepositRefund[] = await Loan.aggregate([
     {
       $match: {
         organizationId: orgId,
+        locationId: locationId,
         "deposit.status": "refund_pending",
-        "materialInstances.materialInstanceId": {
-          $in: instanceIdsAtLocation,
-        },
       },
     },
     {
@@ -651,11 +705,12 @@ async function getOverdueFinancials(
 async function getInventoryIssues(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<InventoryIssuesResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   // --- Missing, damaged, in-repair items at this location ---
-  const issueInstances = await MaterialInstance.aggregate([
+  const [issuesByStatus] = await MaterialInstance.aggregate([
     {
       $match: {
         organizationId: orgId,
@@ -681,18 +736,16 @@ async function getInventoryIssues(
         locationId: 1,
       },
     },
-    { $limit: 200 },
+    {
+      $facet: {
+        missingItems: [{ $match: { status: "lost" } }, { $limit: 100 }],
+        damagedItems: [{ $match: { status: "damaged" } }, { $limit: 100 }],
+        inRepair: [{ $match: { status: "maintenance" } }, { $limit: 100 }],
+      },
+    },
   ]);
 
-  const missingItems = issueInstances.filter(
-    (i: InventoryIssueItem) => i.status === "lost",
-  );
-  const damagedItems = issueInstances.filter(
-    (i: InventoryIssueItem) => i.status === "damaged",
-  );
-  const inRepair = issueInstances.filter(
-    (i: InventoryIssueItem) => i.status === "maintenance",
-  );
+  const { missingItems, damagedItems, inRepair } = issuesByStatus;
 
   // --- Low stock models ---
   const location = await Location.findOne({
@@ -701,41 +754,54 @@ async function getInventoryIssues(
   }).select("materialCapacities");
 
   const lowStockModels: LowStockModel[] = [];
-  if (location?.materialCapacities) {
-    for (const cap of location.materialCapacities) {
-      const availableCount = await MaterialInstance.countDocuments({
-        organizationId: orgId,
-        locationId: locationId,
-        modelId: cap.materialTypeId,
-        status: "available",
-      });
-      // Low stock if available is < 20% of max (or 0 when max is set)
-      const threshold = Math.max(1, Math.ceil(cap.maxQuantity * 0.2));
-      if (availableCount <= threshold && cap.maxQuantity > 0) {
-        // Fetch model name
-        const materialType = await MaterialInstance.aggregate([
-          {
-            $match: {
-              organizationId: orgId,
-              modelId: cap.materialTypeId,
-            },
-          },
-          {
-            $lookup: {
-              from: "materialtypes",
-              localField: "modelId",
-              foreignField: "_id",
-              as: "mt",
-            },
-          },
-          { $unwind: "$mt" },
-          { $project: { modelName: "$mt.name" } },
-          { $limit: 1 },
-        ]);
+  if (location?.materialCapacities && location.materialCapacities.length > 0) {
+    // Single aggregation: available counts by modelId at this location + material type names
+    const availCounts: Array<{
+      _id: Types.ObjectId;
+      available: number;
+      modelName: string;
+    }> = await MaterialInstance.aggregate([
+      {
+        $match: {
+          organizationId: orgId,
+          locationId: locationId,
+          status: "available",
+        },
+      },
+      { $group: { _id: "$modelId", available: { $sum: 1 } } },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "_id",
+          foreignField: "_id",
+          as: "mt",
+        },
+      },
+      { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          available: 1,
+          modelName: { $ifNull: ["$mt.name", "Unknown"] },
+        },
+      },
+    ]);
 
+    const availMap = new Map(
+      availCounts.map((r) => [
+        r._id.toString(),
+        { available: r.available, modelName: r.modelName },
+      ]),
+    );
+
+    for (const cap of location.materialCapacities) {
+      if (!cap.maxQuantity || cap.maxQuantity <= 0) continue;
+      const entry = availMap.get(cap.materialTypeId.toString());
+      const availableCount = entry?.available ?? 0;
+      const threshold = Math.max(1, Math.ceil(cap.maxQuantity * 0.2));
+      if (availableCount <= threshold) {
         lowStockModels.push({
           modelId: cap.materialTypeId.toString(),
-          modelName: materialType[0]?.modelName ?? "Unknown",
+          modelName: entry?.modelName ?? "Unknown",
           available: availableCount,
           maxQuantity: cap.maxQuantity,
           currentQuantity: cap.currentQuantity,
@@ -754,8 +820,9 @@ async function getInventoryIssues(
 async function getTransferQueue(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<TransferActionQueueResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   const orgFilter = { organizationId: orgId };
 
@@ -899,8 +966,9 @@ async function getTransferQueue(
 async function getLoanDeadlines(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<LoanDeadlinesResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -909,11 +977,6 @@ async function getLoanDeadlines(
   tomorrowStart.setDate(tomorrowStart.getDate() + 1);
   const tomorrowEnd = new Date(todayEnd);
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
-
-  const instanceIdsAtLocation = await MaterialInstance.find({
-    organizationId: orgId,
-    locationId: locationId,
-  }).distinct("_id");
 
   const basePipeline = [
     {
@@ -946,9 +1009,7 @@ async function getLoanDeadlines(
 
   const baseMatch = {
     organizationId: orgId,
-    "materialInstances.materialInstanceId": {
-      $in: instanceIdsAtLocation,
-    },
+    locationId: locationId,
   };
 
   // Overdue loans
@@ -999,23 +1060,47 @@ async function getLoanDeadlines(
 async function getDamageQueue(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
+  skipValidation = false,
 ): Promise<DamageResolutionResult> {
-  await validateLocationBelongsToOrg(orgId, locationId);
+  if (!skipValidation) await validateLocationBelongsToOrg(orgId, locationId);
 
   // Find inspections with damaged items whose instances are at this location
-  const damageItems: DamageQueueItem[] = await Inspection.aggregate([
+  const [damagesByCategory] = await Inspection.aggregate([
     {
       $match: {
         organizationId: orgId,
       },
     },
+    // Early location pre-filter via loan lookup (avoids full-org collection scan)
+    {
+      $lookup: {
+        from: "loans",
+        let: { loanId: "$loanId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$_id", "$$loanId"] },
+                  { $eq: ["$locationId", locationId] },
+                ],
+              },
+            },
+          },
+          { $project: { _id: 1 } },
+          { $limit: 1 },
+        ],
+        as: "loanAtLocation",
+      },
+    },
+    { $match: { "loanAtLocation.0": { $exists: true } } },
     { $unwind: "$items" },
     {
       $match: {
         "items.conditionAfter": { $in: ["damaged", "lost", "poor"] },
       },
     },
-    // Lookup instance to check location
+    // Lookup instance to confirm current physical location
     {
       $lookup: {
         from: "materialinstances",
@@ -1053,27 +1138,41 @@ async function getDamageQueue(
         invoiceId: 1,
       },
     },
-    { $limit: 200 },
+    {
+      $facet: {
+        pendingAssessment: [
+          { $match: { inspectionStatus: { $in: ["pending", "in_progress"] } } },
+          { $sort: { estimatedRepairCost: -1 } },
+          { $limit: 100 },
+        ],
+        pendingRepair: [
+          {
+            $match: {
+              inspectionStatus: "completed",
+              repairRequired: true,
+              transitionedToStatus: { $in: ["maintenance", "damaged"] },
+            },
+          },
+          { $sort: { estimatedRepairCost: -1 } },
+          { $limit: 100 },
+        ],
+        pendingBilling: [
+          {
+            $match: {
+              inspectionStatus: "completed",
+              chargeToCustomer: { $gt: 0 },
+              invoiceId: { $exists: false },
+            },
+          },
+          { $sort: { chargeToCustomer: -1 } },
+          { $limit: 100 },
+        ],
+      },
+    },
   ]);
 
-  // Categorize by resolution stage
-  const pendingAssessment = damageItems.filter(
-    (d) =>
-      d.inspectionStatus === "pending" || d.inspectionStatus === "in_progress",
-  );
-  const pendingRepair = damageItems.filter(
-    (d) =>
-      d.inspectionStatus === "completed" &&
-      d.repairRequired === true &&
-      (d.transitionedToStatus === "maintenance" ||
-        d.transitionedToStatus === "damaged"),
-  );
-  const pendingBilling = damageItems.filter(
-    (d) =>
-      d.inspectionStatus === "completed" &&
-      d.chargeToCustomer > 0 &&
-      !d.invoiceId,
-  );
+  const { pendingAssessment, pendingRepair, pendingBilling } =
+    damagesByCategory;
 
   return { pendingAssessment, pendingRepair, pendingBilling };
 }
@@ -1086,15 +1185,18 @@ async function getTasks(
   orgId: Types.ObjectId,
   locationId: Types.ObjectId,
 ): Promise<TaskItem[]> {
-  // Run a lightweight version of each domain check in parallel
+  // Validate once; sub-functions receive pre-validated inputs
+  await validateLocationBelongsToOrg(orgId, locationId);
+
+  // Run all domain checks in parallel — location already validated above
   const [overview, inspections, financials, transfers, deadlines, damages] =
     await Promise.all([
-      getOverview(orgId, locationId),
-      getInspectionQueue(orgId, locationId),
-      getOverdueFinancials(orgId, locationId),
-      getTransferQueue(orgId, locationId),
-      getLoanDeadlines(orgId, locationId),
-      getDamageQueue(orgId, locationId),
+      getOverview(orgId, locationId, true),
+      getInspectionQueue(orgId, locationId, true),
+      getOverdueFinancials(orgId, locationId, true),
+      getTransferQueue(orgId, locationId, true),
+      getLoanDeadlines(orgId, locationId, true),
+      getDamageQueue(orgId, locationId, true),
     ]);
 
   const tasks: TaskItem[] = [];

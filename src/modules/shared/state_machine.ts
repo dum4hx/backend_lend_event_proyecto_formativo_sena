@@ -25,6 +25,14 @@ export const LOAN_TRANSITIONS: Record<string, readonly string[]> = {
   closed: [],
 };
 
+/** Allowed status transitions for incidents. */
+export const INCIDENT_TRANSITIONS: Record<string, readonly string[]> = {
+  open: ["acknowledged", "resolved", "dismissed"],
+  acknowledged: ["resolved", "dismissed"],
+  resolved: [],
+  dismissed: [],
+};
+
 /* ---------- Validation ---------- */
 
 /**

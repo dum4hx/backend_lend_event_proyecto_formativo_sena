@@ -53,6 +53,18 @@ interface ListRequestsQuery {
 
 /* ---------- Internal Helpers ---------- */
 
+/**
+ * Validates and applies a status transition on a request document.
+ * Does NOT save — caller is responsible for persisting.
+ */
+function transitionRequestStatus(
+  request: LoanRequestDocument & { status: string },
+  nextStatus: string,
+): void {
+  validateTransition(request.status, nextStatus, LOAN_REQUEST_TRANSITIONS);
+  request.status = nextStatus as any;
+}
+
 function normalizeRequestItem(
   item: RequestItemInput,
   itemIndex: number,
@@ -345,9 +357,7 @@ export const requestService = {
       throw AppError.notFound("Request not found");
     }
 
-    validateTransition(request.status, "approved", LOAN_REQUEST_TRANSITIONS);
-
-    request.status = "approved";
+    transitionRequestStatus(request, "approved");
     request.approvedBy = new Types.ObjectId(userId);
     request.approvedAt = new Date();
 
@@ -384,9 +394,7 @@ export const requestService = {
       throw AppError.notFound("Request not found");
     }
 
-    validateTransition(request.status, "rejected", LOAN_REQUEST_TRANSITIONS);
-
-    request.status = "rejected";
+    transitionRequestStatus(request, "rejected");
     request.rejectionReason = reason;
     await request.save();
 
@@ -433,7 +441,7 @@ export const requestService = {
           throw AppError.notFound("Request not found");
         }
 
-        validateTransition(request.status, "ready", LOAN_REQUEST_TRANSITIONS);
+        transitionRequestStatus(request, "assigned");
 
         const mappedAssignments = mapAssignmentsToRequestItemIndexes(
           request,
@@ -491,9 +499,7 @@ export const requestService = {
         }
 
         // Double-booking protection: check for temporal overlap
-        const instanceOids = mappedAssignments.map(
-          (a) => a.materialInstanceId,
-        );
+        const instanceOids = mappedAssignments.map((a) => a.materialInstanceId);
         const overlapping = await LoanRequest.find(
           {
             organizationId,
@@ -536,7 +542,6 @@ export const requestService = {
           mappedAssignments as unknown as LoanRequestDocument["assignedMaterials"];
         request.assignedBy = new Types.ObjectId(userId);
         request.assignedAt = new Date();
-        request.status = "ready";
         await request.save({ session });
 
         updatedRequest = (await LoanRequest.findById(request._id, null, {
@@ -600,7 +605,7 @@ export const requestService = {
       itemIndex: index, // Since we don't have a direct link yet, we use index
     })) as any;
 
-    request.status = "assigned";
+    transitionRequestStatus(request, "assigned");
     await request.save();
 
     logger.info("Materials assigned to request", {
@@ -627,13 +632,11 @@ export const requestService = {
       throw AppError.notFound("Request not found");
     }
 
-    validateTransition(request.status, "ready", LOAN_REQUEST_TRANSITIONS);
+    transitionRequestStatus(request, "ready");
 
     if (!request.assignedMaterials || request.assignedMaterials.length === 0) {
       throw AppError.badRequest("No materials assigned to this request");
     }
-
-    request.status = "ready";
     await request.save();
 
     logger.info("Request marked as ready for pickup", {
@@ -738,7 +741,7 @@ export const requestService = {
       throw AppError.notFound("Request not found");
     }
 
-    validateTransition(request.status, "cancelled", LOAN_REQUEST_TRANSITIONS);
+    transitionRequestStatus(request, "cancelled");
 
     // If materials were assigned, release them
     if (request.assignedMaterials && request.assignedMaterials.length > 0) {
@@ -750,8 +753,6 @@ export const requestService = {
         { $set: { status: "available" } },
       );
     }
-
-    request.status = "cancelled";
     await request.save();
 
     logger.info("Request cancelled", {

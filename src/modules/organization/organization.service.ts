@@ -411,7 +411,12 @@ export const organizationService = {
   async updateSettings(
     organizationId: Types.ObjectId | string,
     data: OrganizationSettingsInput,
-  ): Promise<{ settings: { damageDueDays: number; requireFullPaymentBeforeCheckout: boolean } }> {
+  ): Promise<{
+    settings: {
+      damageDueDays: number;
+      requireFullPaymentBeforeCheckout: boolean;
+    };
+  }> {
     const updateFields: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
@@ -443,7 +448,10 @@ export const organizationService = {
    */
   async getSettings(
     organizationId: Types.ObjectId | string,
-  ): Promise<{ damageDueDays: number; requireFullPaymentBeforeCheckout: boolean }> {
+  ): Promise<{
+    damageDueDays: number;
+    requireFullPaymentBeforeCheckout: boolean;
+  }> {
     const org = await Organization.findById(organizationId).select("settings");
     if (!org) {
       throw AppError.notFound("Organization not found");

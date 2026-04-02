@@ -34,6 +34,11 @@ Each section explains the purpose of a permission and the action it allows.
 - [`materials:delete`](#materialsdelete)
 - [`materials:read`](#materialsread)
 - [`materials:update`](#materialsupdate)
+- [`maintenance:create`](#maintenancecreate)
+- [`maintenance:delete`](#maintenancedelete)
+- [`maintenance:read`](#maintenanceread)
+- [`maintenance:resolve`](#maintenanceresolve)
+- [`maintenance:update`](#maintenanceupdate)
 - [`operations:read`](#operationsread)
 - [`organization:delete`](#organizationdelete)
 - [`organization:read`](#organizationread)
@@ -162,6 +167,36 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows editing existing inspection reports.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Inspections
+
+### `incidents:create`
+
+- **Display Name:** Create Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating new incident reports for loans.
+- **Allowed Action:** Create new records in this resource.
+- **Resource Target:** Incidents
+
+### `incidents:read`
+
+- **Display Name:** View Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing incident reports and their status.
+- **Allowed Action:** View/list records and details for this resource.
+- **Resource Target:** Incidents
+
+### `incidents:update`
+
+- **Display Name:** Update Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows acknowledging, resolving, or dismissing incidents.
+- **Allowed Action:** Modify existing records in this resource.
+- **Resource Target:** Incidents
 
 ### `invoices:create`
 
@@ -633,6 +668,61 @@ Each section explains the purpose of a permission and the action it allows.
 - **Allowed Action:** Create, modify, and delete rejection reason records.
 - **Resource Target:** TransferRejectionReason
 - **Roles:** super_admin, owner, manager
+
+### `maintenance:read`
+
+- **Display Name:** View Maintenance Batches
+- **Category:** Maintenance
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing maintenance batches, their items, and status.
+- **Allowed Action:** View/list records and details for this resource.
+- **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner, manager, warehouse_operator
+
+### `maintenance:create`
+
+- **Display Name:** Create Maintenance Batches
+- **Category:** Maintenance
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating new maintenance batches for damaged or lost items.
+- **Allowed Action:** Create new records in this resource.
+- **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner, warehouse_operator
+
+### `maintenance:update`
+
+- **Display Name:** Update Maintenance Batches
+- **Category:** Maintenance
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows editing batch details, adding/removing items, starting and cancelling batches.
+- **Allowed Action:** Modify existing records in this resource.
+- **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner, warehouse_operator
+
+### `maintenance:resolve`
+
+- **Display Name:** Resolve Maintenance Items
+- **Category:** Maintenance
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows resolving individual maintenance items as repaired or unrecoverable.
+- **Allowed Action:** Transition maintenance items to terminal states.
+- **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner, warehouse_operator
+
+### `maintenance:delete`
+
+- **Display Name:** Delete Maintenance Batches
+- **Category:** Maintenance
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows permanently removing maintenance batch records.
+- **Allowed Action:** Remove records from this resource.
+- **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner
 
 ### `users:create`
 

@@ -371,6 +371,27 @@
     "isPlatformPermission": false
   },
   {
+    "_id": "incidents:create",
+    "displayName": "Create Incidents",
+    "description": "Allows creating new incident reports for loans.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "incidents:read",
+    "displayName": "View Incidents",
+    "description": "Allows viewing incident reports and their status.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "incidents:update",
+    "displayName": "Update Incidents",
+    "description": "Allows acknowledging, resolving, or dismissing incidents.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
     "_id": "invoices:create",
     "displayName": "Create Invoices",
     "description": "Allows generating new invoices for customers.",
@@ -508,6 +529,41 @@
     "displayName": "Manage Transfer Rejection Reasons",
     "description": "Allows creating, editing, and deleting the catalogue of transfer request rejection reasons.",
     "category": "Transfers",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "maintenance:read",
+    "displayName": "View Maintenance Batches",
+    "description": "Allows viewing maintenance batches, their items, and status.",
+    "category": "Maintenance",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "maintenance:create",
+    "displayName": "Create Maintenance Batches",
+    "description": "Allows creating new maintenance batches for damaged or lost items.",
+    "category": "Maintenance",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "maintenance:update",
+    "displayName": "Update Maintenance Batches",
+    "description": "Allows editing batch details, adding/removing items, starting and cancelling batches.",
+    "category": "Maintenance",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "maintenance:resolve",
+    "displayName": "Resolve Maintenance Items",
+    "description": "Allows resolving individual maintenance items as repaired or unrecoverable.",
+    "category": "Maintenance",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "maintenance:delete",
+    "displayName": "Delete Maintenance Batches",
+    "description": "Allows permanently removing maintenance batch records.",
+    "category": "Maintenance",
     "isPlatformPermission": false
   }
 ]

@@ -102,7 +102,10 @@ export const incidentService = {
 
     // Validate location exists when locationId is provided
     if (locationId) {
-      const locationQuery = Location.findOne({ _id: locationId, organizationId });
+      const locationQuery = Location.findOne({
+        _id: locationId,
+        organizationId,
+      });
       if (session) locationQuery.session(session);
       const location = await locationQuery;
 
@@ -113,7 +116,12 @@ export const incidentService = {
 
     // Idempotency check when sourceId is provided
     if (sourceId) {
-      const existingQuery = Incident.findOne({ organizationId, sourceType, sourceId, type });
+      const existingQuery = Incident.findOne({
+        organizationId,
+        sourceType,
+        sourceId,
+        type,
+      });
       if (session) existingQuery.session(session);
       const existing = await existingQuery;
       if (existing) {
@@ -130,7 +138,8 @@ export const incidentService = {
     };
 
     if (loanId) createPayload.loanId = new Types.ObjectId(String(loanId));
-    if (locationId) createPayload.locationId = new Types.ObjectId(String(locationId));
+    if (locationId)
+      createPayload.locationId = new Types.ObjectId(String(locationId));
 
     if (sourceId) createPayload.sourceId = new Types.ObjectId(String(sourceId));
     if (severity) createPayload.severity = severity;

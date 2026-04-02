@@ -334,7 +334,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Materials assigned and request marked as ready",
+        message: "Materials assigned and request marked as assigned",
       });
     } catch (err) {
       next(err);

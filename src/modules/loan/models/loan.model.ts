@@ -331,17 +331,6 @@ loanSchema.index({ organizationId: 1, createdAt: -1 });
 loanSchema.index({ organizationId: 1, locationId: 1 });
 loanSchema.index({ "materialInstances.materialInstanceId": 1 });
 
-/* ---------- Pre-save Middleware ---------- */
-
-loanSchema.pre("save", function () {
-  const now = new Date();
-
-  // Auto-update to overdue if past end date and still active
-  if (this.status === "active" && this.endDate < now && !this.returnedAt) {
-    this.status = "overdue";
-  }
-});
-
 /* ---------- Export ---------- */
 
 export type LoanDocument = InferSchemaType<typeof loanSchema>;

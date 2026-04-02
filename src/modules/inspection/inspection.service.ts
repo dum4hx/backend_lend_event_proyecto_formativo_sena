@@ -244,7 +244,7 @@ export const inspectionService = {
           }));
 
           const invoiceNumber = `INV-${Date.now()}`;
-          const invoiceTotal = totalDamageCost * 1.19; // 19% IVA
+          const invoiceTotal = totalDamageCost * 1; // 19% IVA
 
           const [createdInvoice]: any = await (Invoice as any).create(
             [
@@ -256,8 +256,8 @@ export const inspectionService = {
                 type: "damage",
                 lineItems: invoiceLineItems,
                 subtotal: totalDamageCost,
-                taxRate: 0.19,
-                taxAmount: totalDamageCost * 0.19,
+                taxRate: 0,
+                taxAmount: 0,
                 totalAmount: invoiceTotal,
                 status: "pending",
                 dueDate: invoiceDueDate,
