@@ -142,6 +142,84 @@ class TransferService {
   }
 
   /**
+   * Cancel a transfer request
+   * Only the user who created the request can cancel it, and only when status is "requested"
+   */
+  async cancelRequest(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    requestId: string | Types.ObjectId,
+  ) {
+    const request = await TransferRequest.findOne({
+      _id: requestId,
+      organizationId,
+    });
+    if (!request) throw AppError.notFound("Transfer request not found");
+
+    if (request.requestedBy.toString() !== userId.toString()) {
+      throw AppError.forbidden(
+        "Only the user who created the request can cancel it",
+      );
+    }
+
+    if (request.status !== "requested") {
+      throw AppError.badRequest(
+        `Cannot cancel a request that is already in ${request.status} status`,
+      );
+    }
+
+    request.status = "cancelled";
+    await request.save();
+
+    return request;
+  }
+
+  /**
+   * Edit a transfer request (items and notes)
+   * Only the user who created the request can edit it, and only when status is "requested"
+   */
+  async updateRequest(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    requestId: string | Types.ObjectId,
+    payload: Partial<
+      Pick<TransferRequestInput, "items" | "notes" | "neededBy">
+    >,
+  ) {
+    const request = await TransferRequest.findOne({
+      _id: requestId,
+      organizationId,
+    });
+    if (!request) throw AppError.notFound("Transfer request not found");
+
+    if (request.requestedBy.toString() !== userId.toString()) {
+      throw AppError.forbidden(
+        "Only the user who created the request can edit it",
+      );
+    }
+
+    if (request.status !== "requested") {
+      throw AppError.badRequest(
+        `Cannot edit a request that is already in ${request.status} status`,
+      );
+    }
+
+    if (payload.items !== undefined) {
+      (request as any).items = payload.items;
+    }
+    if (payload.notes !== undefined) {
+      (request as any).notes = payload.notes;
+    }
+    if (payload.neededBy !== undefined) {
+      (request as any).neededBy = new Date(payload.neededBy);
+    }
+
+    await request.save();
+
+    return request;
+  }
+
+  /**
    * Initiate a physical transfer (Shipment)
    */
   async initiateTransfer(
@@ -518,9 +596,7 @@ class TransferService {
     });
     if (!reason) throw AppError.notFound("Rejection reason not found");
     if (reason.isDefault)
-      throw AppError.badRequest(
-        "Default rejection reasons cannot be deleted",
-      );
+      throw AppError.badRequest("Default rejection reasons cannot be deleted");
 
     await reason.deleteOne();
   }

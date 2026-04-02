@@ -16,6 +16,7 @@ export const TransferRequestStatusEnum = z.enum([
   "approved",
   "rejected",
   "fulfilled",
+  "cancelled",
 ]);
 
 export type TransferRequestStatus = z.infer<typeof TransferRequestStatusEnum>;
@@ -67,7 +68,7 @@ const transferRequestSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["requested", "approved", "rejected", "fulfilled"],
+      enum: ["requested", "approved", "rejected", "fulfilled", "cancelled"],
       default: "requested",
       index: true,
     },

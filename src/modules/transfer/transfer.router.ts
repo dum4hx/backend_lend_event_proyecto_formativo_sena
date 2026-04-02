@@ -91,6 +91,70 @@ transferRouter.get(
 );
 
 /**
+ * PATCH /transfers/requests/:id/cancel
+ * Cancel a transfer request — only the request creator can cancel it, and only when status is "requested"
+ */
+transferRouter.patch(
+  "/requests/:id/cancel",
+  requirePermission("transfers:update"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await transferService.cancelRequest(
+        getOrgId(req),
+        getUserId(req),
+        req.params.id,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /transfers/requests/:id
+ * Edit a transfer request (items, notes, neededBy) — only the request creator can edit it, and only when status is "requested"
+ */
+transferRouter.patch(
+  "/requests/:id",
+  requirePermission("transfers:update"),
+  validateBody(
+    z.object({
+      items: z
+        .array(
+          z.object({
+            modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+              message: "Invalid Model ID format",
+            }),
+            quantity: z.number().int().min(1, "Quantity must be at least 1"),
+            fulfilledQuantity: z.number().int().default(0),
+          }),
+        )
+        .min(1, "At least one item must be requested")
+        .optional(),
+      notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+      neededBy: z
+        .string()
+        .datetime({ message: "neededBy must be a valid ISO date" })
+        .optional(),
+    }),
+  ),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await transferService.updateRequest(
+        getOrgId(req),
+        getUserId(req),
+        req.params.id,
+        req.body,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
  * PATCH /transfers/requests/:id/respond
  * Approve, reject or cancel a request
  */
@@ -102,7 +166,10 @@ transferRouter.patch(
       status: z.enum(["approved", "rejected"]),
       rejectionReasonId: z
         .string()
-        .refine((val) => Types.ObjectId.isValid(val), "Invalid rejection reason ID")
+        .refine(
+          (val) => Types.ObjectId.isValid(val),
+          "Invalid rejection reason ID",
+        )
         .optional(),
       rejectionNote: z.string().max(500).trim().optional(),
     }),
@@ -305,11 +372,7 @@ transferRouter.patch(
   "/rejection-reasons/:id",
   requirePermission("transfer_rejection_reasons:manage"),
   validateBody(TransferRejectionReasonZodSchema.partial()),
-  async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const data = await transferService.updateRejectionReason(
         getOrgId(req),
@@ -331,11 +394,7 @@ transferRouter.patch(
 transferRouter.delete(
   "/rejection-reasons/:id",
   requirePermission("transfer_rejection_reasons:manage"),
-  async (
-    req: Request<{ id: string }>,
-    res: Response,
-    next: NextFunction,
-  ) => {
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       await transferService.deleteRejectionReason(getOrgId(req), req.params.id);
       res.status(200).json({ status: "success", data: null });

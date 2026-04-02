@@ -3903,12 +3903,63 @@ Creates a new transfer request to move materials between locations. Items are sp
 
 Lists all transfer requests for the organization. By default, **fulfilled** requests are excluded from the results unless `fulfilled=true` is provided.
 
-| Parameter | Location | Type    | Required | Description                                                   |
-| --------- | -------- | ------- | -------- | ------------------------------------------------------------- |
-| status    | query    | string  | No       | Filter by `requested`, `approved`, `rejected`, or `fulfilled` |
-| fulfilled | query    | boolean | No       | If `true`, includes fulfilled requests. Default: `false`.     |
+| Parameter | Location | Type    | Required | Description                                                                           |
+| --------- | -------- | ------- | -------- | ------------------------------------------------------------------------------------- |
+| status    | query    | string  | No       | Filter by `requested`, `approved`, `rejected`, `fulfilled`, or `cancelled`            |
+| fulfilled | query    | boolean | No       | If `true`, includes fulfilled requests. Default: `false`.                             |
 
 **Permission Required:** `transfers:read`
+
+---
+
+#### PATCH /transfers/requests/:id
+
+Edits the `items`, `notes`, and/or `neededBy` of a transfer request. **Only the user who created the request can edit it, and only while its status is `requested`.**
+
+> This endpoint does **not** allow changing the `status` field. To approve/reject, use `/respond`. To cancel, use `/cancel`.
+
+| Parameter | Location | Type   | Required | Description                                                   |
+| --------- | -------- | ------ | -------- | ------------------------------------------------------------- |
+| items     | body     | array  | No       | Replacement list of `{ modelId, quantity }` (min 1 if provided) |
+| notes     | body     | string | No       | Updated request notes (max 500 characters)                    |
+| neededBy  | body     | string | No       | Updated ISO 8601 deadline date                                |
+
+**Permission Required:** `transfers:update`
+
+**Error Responses:**
+
+- `400` — Request is not in `requested` status
+- `403` — Caller is not the request creator
+- `404` — Transfer request not found
+
+---
+
+#### PATCH /transfers/requests/:id/cancel
+
+Cancels a transfer request. **Only the user who created the request can cancel it, and only while its status is `requested`.** Sets the status to `cancelled`.
+
+> This is distinct from **rejection**, which is performed by a location-assigned user via `/respond`. Cancellation is an action by the requester themselves.
+
+**Permission Required:** `transfers:update`
+
+**Error Responses:**
+
+- `400` — Request is not in `requested` status
+- `403` — Caller is not the request creator
+- `404` — Transfer request not found
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "_id": "64f1a2...",
+    "status": "cancelled",
+    "...": "..."
+  }
+}
+```
 
 ---
 
@@ -5052,6 +5103,323 @@ Checks whether a package can be fulfilled for a given date range. Returns per-it
 
 - `400` — `BAD_REQUEST`: Missing or invalid date parameters, or `endDate` not after `startDate`.
 - `404` — `NOT_FOUND`: Package not found in this organization.
+
+---
+
+### Incident Endpoints
+
+Manage incident reports (novedades) linked to loans. Incidents track damage, loss, overdue, and other notable events in the loan lifecycle. They can be created manually, automatically by inspections, or by the scheduler.
+
+#### GET /incidents
+
+Lists all incidents for the organization with optional filters and pagination.
+
+| Parameter  | Location | Type   | Required | Description                                                              |
+| ---------- | -------- | ------ | -------- | ------------------------------------------------------------------------ |
+| page       | query    | number | No       | Page number (default: 1)                                                 |
+| limit      | query    | number | No       | Page size (default: 20)                                                  |
+| loanId     | query    | string | No       | Filter by loan ID                                                        |
+| type       | query    | string | No       | `damage`, `lost`, `overdue`, `issue`, `replacement`, `extended`, `other` |
+| status     | query    | string | No       | `open`, `acknowledged`, `resolved`, `dismissed`                          |
+| severity   | query    | string | No       | `low`, `medium`, `high`, `critical`                                      |
+| sourceType | query    | string | No       | `inspection`, `scheduler`, `manual`                                      |
+| sortBy     | query    | string | No       | Field to sort by                                                         |
+| sortOrder  | query    | string | No       | `asc` or `desc`                                                          |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incidents": [
+      {
+        "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+        "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+        "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+        "type": "damage",
+        "status": "open",
+        "severity": "medium",
+        "sourceType": "inspection",
+        "sourceId": "65e2f3c0e1a2b3c4d5e6f7d4",
+        "relatedMaterialInstances": ["65e2f3c0e1a2b3c4d5e6f7e5"],
+        "description": "Scratches found on surface during return inspection",
+        "financialImpact": {
+          "estimated": 50000,
+          "currency": "COP"
+        },
+        "createdBy": "65e2f3c0e1a2b3c4d5e6f7f6",
+        "createdAt": "2026-03-10T14:20:00.000Z",
+        "updatedAt": "2026-03-10T14:20:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Invalid query parameters.
+
+---
+
+#### GET /incidents/:id
+
+Gets a specific incident by ID.
+
+| Parameter | Location | Type   | Required | Description |
+| --------- | -------- | ------ | -------- | ----------- |
+| id        | path     | string | Yes      | Incident ID |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:read`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incident": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+      "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "type": "damage",
+      "status": "acknowledged",
+      "severity": "medium",
+      "sourceType": "inspection",
+      "sourceId": "65e2f3c0e1a2b3c4d5e6f7d4",
+      "relatedMaterialInstances": ["65e2f3c0e1a2b3c4d5e6f7e5"],
+      "description": "Scratches found on surface during return inspection",
+      "financialImpact": {
+        "estimated": 50000,
+        "currency": "COP"
+      },
+      "createdBy": "65e2f3c0e1a2b3c4d5e6f7f6",
+      "resolvedAt": null,
+      "resolvedBy": null,
+      "resolution": null,
+      "createdAt": "2026-03-10T14:20:00.000Z",
+      "updatedAt": "2026-03-10T16:00:00.000Z"
+    }
+  }
+}
+```
+
+**Errors:**
+
+- `404` — `NOT_FOUND`: Incident not found in this organization.
+
+---
+
+#### POST /incidents
+
+Creates a new incident manually.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:create`
+
+**Request Body:**
+
+| Field                    | Type     | Required | Description                                                              |
+| ------------------------ | -------- | -------- | ------------------------------------------------------------------------ |
+| loanId                   | string   | Yes      | ID of the related loan                                                   |
+| type                     | string   | Yes      | `damage`, `lost`, `overdue`, `issue`, `replacement`, `extended`, `other` |
+| severity                 | string   | No       | `low`, `medium`, `high`, `critical` (default: `medium`)                  |
+| relatedMaterialInstances | string[] | No       | Array of material instance IDs                                           |
+| description              | string   | No       | Description (max 2000 chars)                                             |
+| financialImpact          | object   | No       | `{ estimated?: number, actual?: number, currency?: string }`             |
+| metadata                 | object   | No       | Arbitrary additional data                                                |
+
+**Example Request:**
+
+```json
+{
+  "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+  "type": "damage",
+  "severity": "medium",
+  "relatedMaterialInstances": ["65e2f3c0e1a2b3c4d5e6f7e5"],
+  "description": "Client reported a dent on equipment casing",
+  "financialImpact": {
+    "estimated": 75000,
+    "currency": "COP"
+  }
+}
+```
+
+**Response:** `201 Created`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incident": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+      "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "type": "damage",
+      "status": "open",
+      "severity": "medium",
+      "sourceType": "manual",
+      "relatedMaterialInstances": ["65e2f3c0e1a2b3c4d5e6f7e5"],
+      "description": "Client reported a dent on equipment casing",
+      "financialImpact": {
+        "estimated": 75000,
+        "currency": "COP"
+      },
+      "createdBy": "65e2f3c0e1a2b3c4d5e6f7f6",
+      "createdAt": "2026-03-12T09:00:00.000Z",
+      "updatedAt": "2026-03-12T09:00:00.000Z"
+    }
+  },
+  "message": "Incident created successfully"
+}
+```
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Invalid or missing fields.
+- `409` — `CONFLICT`: Duplicate incident (same loanId + type + sourceId combination).
+
+---
+
+#### POST /incidents/:id/acknowledge
+
+Acknowledges an open incident.
+
+| Parameter | Location | Type   | Required | Description |
+| --------- | -------- | ------ | -------- | ----------- |
+| id        | path     | string | Yes      | Incident ID |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incident": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "status": "acknowledged",
+      "type": "damage",
+      "severity": "medium",
+      "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "createdAt": "2026-03-12T09:00:00.000Z",
+      "updatedAt": "2026-03-12T10:30:00.000Z"
+    }
+  },
+  "message": "Incident acknowledged"
+}
+```
+
+**Errors:**
+
+- `404` — `NOT_FOUND`: Incident not found in this organization.
+- `409` — `CONFLICT`: Invalid status transition (e.g., incident is already resolved).
+
+---
+
+#### POST /incidents/:id/resolve
+
+Resolves an incident with a resolution note.
+
+| Parameter  | Location | Type   | Required | Description        |
+| ---------- | -------- | ------ | -------- | ------------------ |
+| id         | path     | string | Yes      | Incident ID        |
+| resolution | body     | string | Yes      | Resolution details |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+
+**Example Request:**
+
+```json
+{
+  "resolution": "Equipment repaired and returned to inventory. Customer charged COP 50,000."
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incident": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "status": "resolved",
+      "type": "damage",
+      "severity": "medium",
+      "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "resolution": "Equipment repaired and returned to inventory. Customer charged COP 50,000.",
+      "resolvedAt": "2026-03-15T11:00:00.000Z",
+      "resolvedBy": "65e2f3c0e1a2b3c4d5e6f7f6",
+      "createdAt": "2026-03-12T09:00:00.000Z",
+      "updatedAt": "2026-03-15T11:00:00.000Z"
+    }
+  },
+  "message": "Incident resolved"
+}
+```
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Missing resolution text.
+- `404` — `NOT_FOUND`: Incident not found in this organization.
+- `409` — `CONFLICT`: Invalid status transition (e.g., incident is already resolved or dismissed).
+
+---
+
+#### POST /incidents/:id/dismiss
+
+Dismisses an open or acknowledged incident.
+
+| Parameter  | Location | Type   | Required | Description          |
+| ---------- | -------- | ------ | -------- | -------------------- |
+| id         | path     | string | Yes      | Incident ID          |
+| resolution | body     | string | Yes      | Reason for dismissal |
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+
+**Example Request:**
+
+```json
+{
+  "resolution": "False alarm — item was misidentified during inspection."
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "incident": {
+      "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+      "status": "dismissed",
+      "type": "damage",
+      "severity": "medium",
+      "loanId": "65e2f3c0e1a2b3c4d5e6f7c3",
+      "resolution": "False alarm — item was misidentified during inspection.",
+      "resolvedAt": "2026-03-13T08:00:00.000Z",
+      "resolvedBy": "65e2f3c0e1a2b3c4d5e6f7f6",
+      "createdAt": "2026-03-12T09:00:00.000Z",
+      "updatedAt": "2026-03-13T08:00:00.000Z"
+    }
+  },
+  "message": "Incident dismissed"
+}
+```
+
+**Errors:**
+
+- `400` — `BAD_REQUEST`: Missing resolution text.
+- `404` — `NOT_FOUND`: Incident not found in this organization.
+- `409` — `CONFLICT`: Invalid status transition (e.g., incident is already resolved or dismissed).
 
 ---
 
