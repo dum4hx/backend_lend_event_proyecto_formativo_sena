@@ -1,31 +1,23 @@
 import nodemailer from "nodemailer";
+import BrevoTransport from "nodemailer-brevo-transport";
 import { logger } from "./logger.ts";
 
 /* ---------- Email Configuration ---------- */
 
-const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
-const SMTP_USER = process.env.SMTP_USER || "";
-const SMTP_PASS = process.env.SMTP_PASS || "";
+const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
 const SMTP_FROM = process.env.SMTP_FROM || "noreply@lendevent.com";
 
-if (!SMTP_USER || !SMTP_PASS) {
-  logger.warn(
-    "SMTP_USER or SMTP_PASS not set. Email features will be unavailable.",
-  );
+if (!BREVO_API_KEY) {
+  logger.warn("BREVO_API_KEY not set. Email features will be unavailable.");
 }
 
-/* ---------- Transporter ---------- */
+/* ---------- Transporter (Brevo API over HTTPS / port 443) ---------- */
 
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-});
+const transporter = nodemailer.createTransport(
+  new (BrevoTransport as unknown as new (opts: {
+    apiKey: string;
+  }) => nodemailer.Transport)({ apiKey: BREVO_API_KEY }),
+);
 
 /* ---------- Email Service ---------- */
 
