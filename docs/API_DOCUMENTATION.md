@@ -296,20 +296,40 @@ The API uses **secure HttpOnly cookies** for authentication, providing protectio
 | `access_token`  | JWT for API authorization | 15 minutes | `/`            |
 | `refresh_token` | JWT for token refresh     | 7 days     | `/api/v1/auth` |
 
-### Authentication Flow
+### Authentication Flow (Mandatory 2FA)
+
+Every login requires two steps: credential verification followed by a one-time password (OTP) sent to the user's email.
 
 ```
-┌─────────────┐     POST /auth/login       ┌─────────────┐
-│   Client    │ ────────────────────────▶ │    API      │
-│             │◀──────────────────────────│             │
-└─────────────┘   Set-Cookie: access_token └─────────────┘
+Step 1 — Credentials
+┌─────────────┐     POST /auth/login              ┌─────────────┐
+│   Client    │ ──────────────────────────────────▶│    API      │
+│             │◀──────────────────────────────────│             │
+└─────────────┘   { pendingOtp: true, email }      └─────────────┘
+                  (no cookies — OTP sent via email)
+
+Step 2 — OTP Verification
+┌─────────────┐  POST /auth/verify-login-otp       ┌─────────────┐
+│   Client    │ ──────────────────────────────────▶│    API      │
+│             │◀──────────────────────────────────│             │
+└─────────────┘   Set-Cookie: access_token         └─────────────┘
+                  Set-Cookie: refresh_token
+                  + user / permissions / backupCodes (first login)
+
+Alternative Step 2 — Backup Code (if OTP unavailable)
+┌─────────────┐  POST /auth/verify-backup-code     ┌─────────────┐
+│   Client    │ ──────────────────────────────────▶│    API      │
+│             │◀──────────────────────────────────│             │
+└─────────────┘   Set-Cookie: access_token         └─────────────┘
                   Set-Cookie: refresh_token
 
-┌─────────────┐    GET /any-endpoint       ┌─────────────┐
-│   Client    │ ──────────────────────────▶│    API      │
-│             │   Cookie: access_token     │             │
-└─────────────┘                            └─────────────┘
+┌─────────────┐    GET /any-endpoint               ┌─────────────┐
+│   Client    │ ──────────────────────────────────▶│    API      │
+│             │   Cookie: access_token             │             │
+└─────────────┘                                    └─────────────┘
 ```
+
+**Backup Codes:** On the very first successful 2FA login, the server generates 10 single-use backup codes and returns them in the response. These codes can be used instead of an OTP if the user cannot access their email. Each code can only be used once.
 
 ### Cookie Configuration
 
@@ -488,7 +508,7 @@ Verifies the 6-digit OTP sent to the owner's email during registration. On succe
 
 #### POST /auth/login
 
-Authenticates user and sets JWT cookies.
+Authenticates user credentials and sends a one-time password (OTP) to the user's email. **Does not issue auth cookies.** The client must complete login by calling `/auth/verify-login-otp` or `/auth/verify-backup-code`.
 
 | Parameter | Location | Type   | Required | Description   |
 | --------- | -------- | ------ | -------- | ------------- |
@@ -501,19 +521,129 @@ Authenticates user and sets JWT cookies.
 {
   "status": "success",
   "data": {
+    "pendingOtp": true,
+    "email": "user@example.com"
+  },
+  "message": "OTP sent to your email. Please verify to complete login."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                        |
+| ------ | -------------------------------- |
+| 400    | Missing or invalid fields        |
+| 401    | Invalid email or password        |
+| 403    | Account deactivated or not found |
+
+---
+
+#### POST /auth/verify-login-otp
+
+Verifies the 6-digit OTP sent to the user's email during login. On success, issues auth cookies and returns user data. On the **first 2FA login**, the response includes 10 single-use backup codes.
+
+| Parameter | Location | Type   | Required | Description                          |
+| --------- | -------- | ------ | -------- | ------------------------------------ |
+| email     | body     | string | Yes      | Email used during login              |
+| code      | body     | string | Yes      | 6-digit OTP received via email       |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
     "user": {
       "id": "...",
-      "email": "...",
-      "name": { ... },
+      "email": "user@example.com",
+      "name": { "firstName": "...", "lastName": "..." },
       "roleId": "...",
-      "roleName": "...",
+      "roleName": "owner",
       "locations": ["..."],
-      "permissions": ["organization:read", "users:create", "users:read"]
+      "permissions": ["organization:read", "users:create", "..."]
     },
-    "permissions": ["organization:read", "users:create", "users:read"]
+    "permissions": ["organization:read", "users:create", "..."],
+    "backupCodes": ["a1b2c3d4", "e5f6a7b8", "..."]
   }
 }
 ```
+
+> **Note:** `backupCodes` is only present on the first 2FA login. On subsequent logins it is omitted.
+
+**Error Responses:**
+
+| Status | Condition                                |
+| ------ | ---------------------------------------- |
+| 400    | Invalid/expired OTP, max attempts (5), or no pending OTP |
+
+---
+
+#### POST /auth/verify-backup-code
+
+Completes login using a single-use backup code instead of the email OTP. Issues auth cookies on success.
+
+| Parameter  | Location | Type   | Required | Description                     |
+| ---------- | -------- | ------ | -------- | ------------------------------- |
+| email      | body     | string | Yes      | Email used during login         |
+| backupCode | body     | string | Yes      | One of the 10 issued backup codes |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "user": {
+      "id": "...",
+      "email": "user@example.com",
+      "name": { "firstName": "...", "lastName": "..." },
+      "roleId": "...",
+      "roleName": "owner",
+      "locations": ["..."],
+      "permissions": ["organization:read", "users:create", "..."]
+    },
+    "permissions": ["organization:read", "users:create", "..."],
+    "remainingBackupCodes": 9
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                                       |
+| ------ | ----------------------------------------------- |
+| 400    | Invalid or already-used backup code, user not found |
+
+---
+
+#### POST /auth/resend-login-otp
+
+Re-validates credentials and sends a new OTP to the user's email. Use when the original OTP was not received or has expired.
+
+| Parameter | Location | Type   | Required | Description   |
+| --------- | -------- | ------ | -------- | ------------- |
+| email     | body     | string | Yes      | User email    |
+| password  | body     | string | Yes      | User password |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "pendingOtp": true,
+    "email": "user@example.com"
+  },
+  "message": "A new OTP has been sent to your email."
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                 |
+| ------ | ------------------------- |
+| 400    | Missing or invalid fields |
+| 401    | Invalid credentials       |
 
 ---
 
