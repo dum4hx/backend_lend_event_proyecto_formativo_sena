@@ -10,6 +10,7 @@
     "generate-keys": "node --env-file=.env src/scripts/generate_keys.ts",
     "permissions:doc": "node --env-file=.env src/scripts/export_permissions_doc.ts",
     "seed:admin": "node --env-file=.env src/modules/super_admin/seeders/super_admin.seeder.ts",
+    "seed:admin:cli": "node --env-file=.env src/modules/super_admin/seeders/super_admin_cli.ts",
     "seed:stripe-prices": "node --env-file=.env src/scripts/seeders/seed_stripe_prices.ts",
     "seed:permissions": "node --env-file=.env src/modules/roles/seeders/permissions.seeder.ts",
     "seed:loan-request": "npx tsx --env-file=.env src/modules/request/seeders/loan_request.seeder.ts",

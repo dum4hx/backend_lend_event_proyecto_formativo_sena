@@ -1,59 +1,74 @@
 import mongoose from "mongoose";
+import readline from "readline";
 import { User } from "../../user/models/user.model.ts";
 import { Organization } from "../../organization/models/organization.model.ts";
 import { Role, rolePermissions } from "../../roles/models/role.model.ts";
 import { logger } from "../../../utils/logger.ts";
 
 /**
- * One-time seeder to create the initial super admin user.
- * Uses INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD environment variables.
+ * Interactive CLI script to create a super admin account.
+ * Asks for email and password via command line prompts.
  *
- * Run with: npm run seed:admin
+ * Usage: node --env-file=.env src/modules/super_admin/seeders/super_admin_cli.ts
  */
 
 const DB_URI =
   process.env.DB_CONNECTION_STRING || "mongodb://localhost:27017/lend-event";
-const ADMIN_EMAIL = process.env.INITIAL_ADMIN_EMAIL;
-const ADMIN_PASSWORD = process.env.INITIAL_ADMIN_PASSWORD;
 
-async function seedSuperAdmin() {
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-    logger.error(
-      "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD environment variables are required",
-    );
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+const question = (query: string): Promise<string> =>
+  new Promise((resolve) => rl.question(query, resolve));
+
+async function createSuperAdminInteractive() {
+  console.log("\n--- Super Admin Manual Creation ---\n");
+
+  const email = await question("Enter Super Admin Email: ");
+  if (!email || !email.includes("@")) {
+    console.error("Invalid email address.");
     process.exit(1);
   }
 
+  // Hide password input is tricky in plain readline without external libs,
+  // but for a dev/admin script we'll keep it simple or note it.
+  const password = await question("Enter Super Admin Password: ");
+  if (!password || password.length < 8) {
+    console.error("Password must be at least 8 characters long.");
+    process.exit(1);
+  }
+
+  const confirm = await question(`Create super admin for ${email}? (y/n): `);
+  if (confirm.toLowerCase() !== "y") {
+    console.log("Operation cancelled.");
+    process.exit(0);
+  }
+
   try {
-    // Connect to MongoDB
     await mongoose.connect(DB_URI);
     logger.info("Connected to MongoDB");
 
-    // Check if super admin already exists (match by email only).
     const existingAdminByEmail = await User.findOne({
-      email: ADMIN_EMAIL.toLowerCase().trim(),
+      email: email.toLowerCase().trim(),
     });
 
     if (existingAdminByEmail) {
-      logger.info(
-        "Super admin user already exists with this email, skipping seed",
-      );
-      return;
+      logger.error(`User with email ${email} already exists.`);
+      process.exit(1);
     }
 
-    // Create or get the platform organization (required for super admin)
     // Match any existing platform org regardless of which random suffix was used.
     let platformOrg = await Organization.findOne({
       email: /^platform\d{6}@system\.internal$/,
     });
 
     if (!platformOrg) {
-      // Create a special admin ObjectId for platform organization owner
       const newPlatformAdminId = new mongoose.Types.ObjectId();
       const randomSuffix = Math.floor(100000 + Math.random() * 900000);
       const platformEmail = `platform${randomSuffix}@system.internal`;
       const orgPhone = `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-
       const orgDoc = new Organization({
         name: "Platform Administration",
         legalName: "Platform Administration",
@@ -77,15 +92,12 @@ async function seedSuperAdmin() {
     const existingAdminById = await User.findById(platformAdminId);
 
     if (existingAdminById) {
-      logger.info(
-        `User already exists with ID ${platformAdminId} (linked to platform org), skipping seed`,
+      logger.error(
+        `User already exists with ID ${platformAdminId} (linked to platform org). Cannot create another.`,
       );
-      return;
+      process.exit(1);
     }
 
-    // Ensure the platform super_admin Role document exists (upsert by org + name).
-    // This mirrors how register() seeds org roles via Role.insertMany() before
-    // creating the user, ensuring roleId always points to a real Role document.
     let superAdminRole = await Role.findOne({
       organizationId: platformOrg._id,
       name: "super_admin",
@@ -98,14 +110,11 @@ async function seedSuperAdmin() {
         permissions: rolePermissions.super_admin,
         isReadOnly: true,
         type: "SYSTEM",
-        description:
-          "Platform super admin — full access. System role, non-editable and non-deletable.",
+        description: "Platform super admin — full access.",
       });
       logger.info(`Created super_admin role with ID: ${superAdminRole._id}`);
     }
 
-    // Create the super admin user using the real Role _id, matching the pattern
-    // used by register() which sets roleId: ownerRole._id.toString().
     const superAdminUser = new User({
       _id: platformAdminId,
       organizationId: platformOrg._id,
@@ -115,33 +124,22 @@ async function seedSuperAdmin() {
         firstSurname: "Admin",
         secondSurname: "",
       },
-      email: ADMIN_EMAIL.toLowerCase().trim(),
+      email: email.toLowerCase().trim(),
       phone: `+1${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-      password: ADMIN_PASSWORD,
+      password: password,
       roleId: superAdminRole._id.toString(),
       status: "active",
     });
 
     await superAdminUser.save();
-    logger.info(
-      `Super admin user created successfully with email: ${ADMIN_EMAIL}`,
-    );
+    console.log(`\nSUCCESS: Super admin created for ${email}\n`);
   } catch (error) {
-    logger.error("Error seeding super admin:", error);
+    logger.error("Error creating super admin:", error);
     process.exit(1);
   } finally {
     await mongoose.connection.close();
-    logger.info("Database connection closed");
+    rl.close();
   }
 }
 
-// Run the seeder
-seedSuperAdmin()
-  .then(() => {
-    logger.info("Seeding completed successfully");
-    process.exit(0);
-  })
-  .catch((error) => {
-    logger.error("Seeding failed:", error);
-    process.exit(1);
-  });
+createSuperAdminInteractive();
