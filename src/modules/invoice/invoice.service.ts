@@ -102,7 +102,7 @@ export const invoiceService = {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            total: { $sum: "$total" },
+            total: { $sum: "$totalAmount" },
           },
         },
       ]),
@@ -112,14 +112,16 @@ export const invoiceService = {
           $group: {
             _id: null,
             count: { $sum: 1 },
-            total: { $sum: "$total" },
+            total: { $sum: "$totalAmount" },
           },
         },
       ]),
       Invoice.countDocuments({
         organizationId,
-        status: "pending",
-        dueDate: { $lt: new Date() },
+        $or: [
+          { status: "overdue" },
+          { status: "pending", dueDate: { $lt: new Date() } },
+        ],
       }),
     ]);
 
