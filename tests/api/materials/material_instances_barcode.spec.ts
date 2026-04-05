@@ -50,6 +50,14 @@ test.describe.serial("Material Instances – Barcode & Scan", () => {
     });
     expect(loginRes.status()).toBe(200);
 
+    const otpRes = await ctx.post("auth/verify-login-otp", {
+      data: {
+        email: payload.owner.email,
+        code: "123456",
+      },
+    });
+    expect(otpRes.status()).toBe(200);
+
     return ctx;
   };
 

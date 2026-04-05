@@ -42,8 +42,8 @@ test.describe.serial("Auth Module", () => {
       expect(body.data.user.email).toBe(createdUserEmail);
     });
 
-    // Login step
-    await test.step("Login", async () => {
+    // Login step (now returns pending OTP instead of tokens)
+    await test.step("Login - receive OTP pending", async () => {
       const response = await request.post("auth/login", {
         data: {
           email: createdUserEmail,
@@ -54,7 +54,28 @@ test.describe.serial("Auth Module", () => {
       expect(response.status()).toBe(200);
       const body = await response.json();
       expect(body.status).toBe("success");
+      expect(body.data.pendingOtp).toBe(true);
+      expect(body.data.email).toBe(createdUserEmail);
+    });
+
+    // Verify Login OTP step (completes the 2FA login)
+    await test.step("Verify Login OTP - complete login", async () => {
+      const response = await request.post("auth/verify-login-otp", {
+        data: {
+          email: createdUserEmail,
+          code: "123456",
+        },
+      });
+
+      expect(response.status()).toBe(200);
+      const body = await response.json();
+      expect(body.status).toBe("success");
       expect(body.data.user.email).toBe(createdUserEmail);
+      expect(body.data.permissions).toBeDefined();
+
+      // First login should include backup codes
+      expect(body.data.backupCodes).toBeDefined();
+      expect(body.data.backupCodes.length).toBe(10);
 
       // Validate cookies are set
       validateAuthCookies(response, ["access_token", "refresh_token"]);
@@ -71,15 +92,6 @@ test.describe.serial("Auth Module", () => {
   test("GET /auth/me - should return current user details", async ({
     request,
   }) => {
-    // // Login to get session
-    // const loginRes = await request.post("auth/login", {
-    //   data: {
-    //     email: createdUserEmail,
-    //     password: createdUserPassword,
-    //   },
-    // });
-
-    // request context should store cookies automatically from the login response
     const response = await request.get("auth/me");
 
     expect(response.status()).toBe(200);
