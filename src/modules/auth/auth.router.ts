@@ -626,8 +626,7 @@ authRouter.post(
 
       res.json({
         status: "success",
-        message:
-          "A new verification code has been sent to your email.",
+        message: "A new verification code has been sent to your email.",
       });
     } catch (err) {
       next(err);

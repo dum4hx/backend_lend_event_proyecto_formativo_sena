@@ -42,14 +42,11 @@ export const twoFactorService = {
       userId,
       email: email.toLowerCase().trim(),
       code: hashedCode,
-      expiresAt: new Date(
-        Date.now() + LOGIN_OTP_EXPIRY_MINUTES * 60 * 1000,
-      ),
+      expiresAt: new Date(Date.now() + LOGIN_OTP_EXPIRY_MINUTES * 60 * 1000),
     });
 
-    if (process.env.NODE_ENV !== "test") {
-      await emailService.sendLoginOtpCode(email, code, firstName);
-    }
+    // Send email (same pattern as forgotPassword — always call the service)
+    await emailService.sendLoginOtpCode(email, code, firstName);
 
     logger.info("Login OTP sent", { userId: userId.toString(), email });
   },
@@ -96,7 +93,7 @@ export const twoFactorService = {
       const remaining = MAX_OTP_ATTEMPTS - record.attempts;
       throw AppError.badRequest(
         `Invalid verification code. ${remaining} attempt(s) remaining.`,
-        { code: "OTP_INVALID" },
+        { code: "OTP_INVALID", attemptsLeft: remaining },
       );
     }
 
@@ -121,7 +118,11 @@ export const twoFactorService = {
       [];
 
     for (let i = 0; i < BACKUP_CODE_COUNT; i++) {
-      const raw = crypto.randomBytes(BACKUP_CODE_LENGTH).toString("hex").slice(0, BACKUP_CODE_LENGTH).toUpperCase();
+      const raw = crypto
+        .randomBytes(BACKUP_CODE_LENGTH)
+        .toString("hex")
+        .slice(0, BACKUP_CODE_LENGTH)
+        .toUpperCase();
       codes.push(raw);
       hashed.push({
         codeHash: await argon2.hash(raw),
@@ -189,9 +190,8 @@ export const twoFactorService = {
         logger.info("Backup code used", {
           userId: user._id.toString(),
           remainingCodes:
-            user.backupCodes.filter(
-              (c: { used: boolean }) => !c.used,
-            ).length - 1,
+            user.backupCodes.filter((c: { used: boolean }) => !c.used).length -
+            1,
         });
 
         return { userId: user._id.toString() };
@@ -211,8 +211,6 @@ export const twoFactorService = {
   ): Promise<number> {
     const user = await User.findById(userId).select("+backupCodes").lean();
     if (!user || !user.backupCodes) return 0;
-    return user.backupCodes.filter(
-      (c: { used: boolean }) => !c.used,
-    ).length;
+    return user.backupCodes.filter((c: { used: boolean }) => !c.used).length;
   },
 };

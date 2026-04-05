@@ -542,10 +542,10 @@ Authenticates user credentials and sends a one-time password (OTP) to the user's
 
 Verifies the 6-digit OTP sent to the user's email during login. On success, issues auth cookies and returns user data. On the **first 2FA login**, the response includes 10 single-use backup codes.
 
-| Parameter | Location | Type   | Required | Description                          |
-| --------- | -------- | ------ | -------- | ------------------------------------ |
-| email     | body     | string | Yes      | Email used during login              |
-| code      | body     | string | Yes      | 6-digit OTP received via email       |
+| Parameter | Location | Type   | Required | Description                    |
+| --------- | -------- | ------ | -------- | ------------------------------ |
+| email     | body     | string | Yes      | Email used during login        |
+| code      | body     | string | Yes      | 6-digit OTP received via email |
 
 **Response:** `200 OK`
 
@@ -572,9 +572,12 @@ Verifies the 6-digit OTP sent to the user's email during login. On success, issu
 
 **Error Responses:**
 
-| Status | Condition                                |
-| ------ | ---------------------------------------- |
-| 400    | Invalid/expired OTP, max attempts (5), or no pending OTP |
+| Status | Condition                                | Details |
+| ------ | ---------------------------------------- | ------- |
+| 400    | Invalid OTP | `code: "OTP_INVALID"`, `attemptsLeft: number` (remaining attempts) |
+| 400    | OTP expired after 5 minutes | `code: "OTP_EXPIRED"` |
+| 400    | Too many failed attempts (5 max) | `code: "OTP_MAX_ATTEMPTS"` |
+| 400    | No pending OTP verification found | `code: "OTP_NOT_FOUND"` |
 
 ---
 
@@ -582,9 +585,9 @@ Verifies the 6-digit OTP sent to the user's email during login. On success, issu
 
 Completes login using a single-use backup code instead of the email OTP. Issues auth cookies on success.
 
-| Parameter  | Location | Type   | Required | Description                     |
-| ---------- | -------- | ------ | -------- | ------------------------------- |
-| email      | body     | string | Yes      | Email used during login         |
+| Parameter  | Location | Type   | Required | Description                       |
+| ---------- | -------- | ------ | -------- | --------------------------------- |
+| email      | body     | string | Yes      | Email used during login           |
 | backupCode | body     | string | Yes      | One of the 10 issued backup codes |
 
 **Response:** `200 OK`
@@ -610,8 +613,8 @@ Completes login using a single-use backup code instead of the email OTP. Issues 
 
 **Error Responses:**
 
-| Status | Condition                                       |
-| ------ | ----------------------------------------------- |
+| Status | Condition                                           |
+| ------ | --------------------------------------------------- |
 | 400    | Invalid or already-used backup code, user not found |
 
 ---
