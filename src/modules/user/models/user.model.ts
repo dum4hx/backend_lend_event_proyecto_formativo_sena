@@ -150,6 +150,17 @@ const userSchema = new Schema(
     invitedAt: { type: Date, default: null },
     invitedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     lastLoginAt: { type: Date, default: null },
+    backupCodes: {
+      type: [
+        {
+          codeHash: { type: String, required: true },
+          used: { type: Boolean, default: false },
+          usedAt: { type: Date, default: null },
+        },
+      ],
+      select: false,
+      default: undefined,
+    },
   },
   {
     timestamps: true,

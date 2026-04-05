@@ -25,7 +25,7 @@ import {
 } from "../../middleware/auth.ts";
 import { verifyRefreshToken } from "../../utils/auth/jwt.ts";
 import { AppError } from "../../errors/AppError.ts";
-import { access } from "node:fs";
+import { twoFactorService } from "./two_factor.service.ts";
 
 const authRouter = Router();
 
@@ -104,6 +104,24 @@ const verifyEmailSchema = z.object({
     .regex(/^\d{6}$/, "Verification code must be numeric"),
 });
 
+const verifyLoginOtpSchema = z.object({
+  email: z.email("Invalid email format"),
+  code: z
+    .string()
+    .length(6, "Verification code must be 6 digits")
+    .regex(/^\d{6}$/, "Verification code must be numeric"),
+});
+
+const verifyBackupCodeSchema = z.object({
+  email: z.email("Invalid email format"),
+  backupCode: z.string().min(1, "Backup code is required"),
+});
+
+const resendLoginOtpSchema = z.object({
+  email: z.email("Invalid email format"),
+  password: z.string().min(1),
+});
+
 /* ---------- Routes ---------- */
 
 /**
@@ -146,7 +164,8 @@ authRouter.post(
 
 /**
  * POST /api/v1/auth/login
- * Authenticates user and sets JWT cookies.
+ * Authenticates user with email/password and sends a 2FA OTP to their email.
+ * Does NOT issue auth tokens — the client must verify the OTP first.
  */
 authRouter.post(
   "/login",
@@ -158,32 +177,13 @@ authRouter.post(
 
       const result = await authService.login(email, password);
 
-      // Set cookies
-      res.cookie(
-        COOKIE_NAME,
-        result.tokens.accessToken,
-        accessTokenCookieOptions,
-      );
-      res.cookie(
-        REFRESH_COOKIE_NAME,
-        result.tokens.refreshToken,
-        refreshTokenCookieOptions,
-      );
-
       res.json({
         status: "success",
         data: {
-          user: {
-            id: result.user._id,
-            email: result.user.email,
-            name: result.user.name,
-            roleId: result.user.roleId,
-            roleName: result.roleName,
-            locations: result.user.locations,
-            permissions: result.permissions,
-          },
-          permissions: result.permissions,
+          pendingOtp: result.pendingOtp,
+          email: result.email,
         },
+        message: result.message,
       });
     } catch (err) {
       next(err);
@@ -488,6 +488,146 @@ authRouter.post(
           },
           permissions: result.permissions,
         },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/verify-login-otp
+ * Verifies the 6-digit OTP sent to the user's email during login.
+ * On success, issues auth cookies and returns the full profile.
+ * On first login, also returns one-time backup codes.
+ */
+authRouter.post(
+  "/verify-login-otp",
+  authRateLimiter,
+  validateBody(verifyLoginOtpSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, code } = req.body;
+
+      const { userId } = await twoFactorService.verifyLoginOtp(email, code);
+      const result = await authService.completeLogin(userId);
+
+      // Set cookies
+      res.cookie(
+        COOKIE_NAME,
+        result.tokens.accessToken,
+        accessTokenCookieOptions,
+      );
+      res.cookie(
+        REFRESH_COOKIE_NAME,
+        result.tokens.refreshToken,
+        refreshTokenCookieOptions,
+      );
+
+      const responseData: Record<string, unknown> = {
+        user: {
+          id: result.user._id,
+          email: result.user.email,
+          name: result.user.name,
+          roleId: result.user.roleId,
+          roleName: result.roleName,
+          locations: result.user.locations,
+          permissions: result.permissions,
+        },
+        permissions: result.permissions,
+      };
+
+      // Include backup codes only on first 2FA login
+      if (result.backupCodes) {
+        responseData.backupCodes = result.backupCodes;
+      }
+
+      res.json({
+        status: "success",
+        data: responseData,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/verify-backup-code
+ * Authenticates using a one-time backup code instead of OTP.
+ * Useful when the user cannot access their email.
+ */
+authRouter.post(
+  "/verify-backup-code",
+  authRateLimiter,
+  validateBody(verifyBackupCodeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, backupCode } = req.body;
+
+      const { userId } = await twoFactorService.verifyBackupCode(
+        email,
+        backupCode,
+      );
+      const result = await authService.completeLogin(userId);
+
+      // Set cookies
+      res.cookie(
+        COOKIE_NAME,
+        result.tokens.accessToken,
+        accessTokenCookieOptions,
+      );
+      res.cookie(
+        REFRESH_COOKIE_NAME,
+        result.tokens.refreshToken,
+        refreshTokenCookieOptions,
+      );
+
+      const remainingCodes =
+        await twoFactorService.getRemainingBackupCodeCount(userId);
+
+      res.json({
+        status: "success",
+        data: {
+          user: {
+            id: result.user._id,
+            email: result.user.email,
+            name: result.user.name,
+            roleId: result.user.roleId,
+            roleName: result.roleName,
+            locations: result.user.locations,
+            permissions: result.permissions,
+          },
+          permissions: result.permissions,
+          remainingBackupCodes: remainingCodes,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/resend-login-otp
+ * Re-authenticates with email/password and sends a fresh login OTP.
+ * Requires the same credentials to prevent abuse.
+ */
+authRouter.post(
+  "/resend-login-otp",
+  authRateLimiter,
+  validateBody(resendLoginOtpSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password } = req.body;
+
+      // Re-validate credentials (prevents enumeration / abuse)
+      await authService.login(email, password);
+
+      res.json({
+        status: "success",
+        message:
+          "A new verification code has been sent to your email.",
       });
     } catch (err) {
       next(err);

@@ -29,6 +29,8 @@ import { pricingService } from "../pricing/pricing.service.ts";
 import { paymentMethodService } from "../payment/payment_method.service.ts";
 import { transferService } from "../transfer/transfer.service.ts";
 
+import { twoFactorService } from "./two_factor.service.ts";
+
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -449,15 +451,16 @@ export const authService = {
 
   /**
    * Authenticates a user with email and password.
+   * On success, sends a login OTP to the user's email rather than
+   * issuing tokens immediately (mandatory 2FA).
    */
   async login(
     email: string,
     password: string,
   ): Promise<{
-    user: InstanceType<typeof User>;
-    tokens: TokenPair;
-    roleName: string;
-    permissions: string[];
+    pendingOtp: true;
+    email: string;
+    message: string;
   }> {
     // Find user with password field
     const user = await User.findOne({ email: email.toLowerCase().trim() })
@@ -512,27 +515,91 @@ export const authService = {
     // Update last login
     await User.updateOne({ _id: user._id }, { lastLoginAt: new Date() });
 
-    // Generate tokens - extract _id from populated organizationId
+    // Send login OTP
+    const firstName =
+      (user.name as unknown as { firstName: string })?.firstName ?? "User";
+    await twoFactorService.sendLoginOtp(user._id, user.email, firstName);
+
+    logger.info("Login OTP sent, awaiting verification", {
+      userId: user._id.toString(),
+    });
+
+    // Remove password from response
+    user.password = undefined as unknown as string;
+
+    return {
+      pendingOtp: true,
+      email: user.email,
+      message:
+        "A verification code has been sent to your email. Please enter it to complete login.",
+    };
+  },
+
+  /**
+   * Completes the login flow after OTP verification.
+   * Generates tokens and returns the full auth response.
+   */
+  async completeLogin(userId: string): Promise<{
+    user: InstanceType<typeof User>;
+    tokens: TokenPair;
+    roleName: string;
+    permissions: string[];
+    backupCodes?: string[];
+  }> {
+    const user = await User.findById(userId)
+      .select("+backupCodes")
+      .populate("organizationId", "status");
+
+    if (!user) {
+      throw AppError.notFound("User not found");
+    }
+
+    const org = user.organizationId as unknown as {
+      _id: Types.ObjectId;
+      status: string;
+    };
+
     const roleName = await roleService.getRoleName(user.roleId);
     const tokens = await generateTokenPair({
       sub: user._id.toString(),
       org: org._id.toString(),
       roleId: user.roleId,
-      roleName: roleName,
+      roleName,
       email: user.email,
     });
 
-    // Get role permissions for logging (not included in token to save space)
     const permissions = await roleService.getRolePermissions(
       user.roleId,
       org._id.toString(),
     );
-    logger.info("User logged in", { userId: user._id.toString() });
 
-    // Remove password from response
+    // Generate backup codes on first 2FA login if not yet generated
+    let backupCodes: string[] | undefined = undefined;
+    if (!user.backupCodes || user.backupCodes.length === 0) {
+      backupCodes = await twoFactorService.generateBackupCodes(user._id);
+    }
+
+    // Remove sensitive fields
     user.password = undefined as unknown as string;
+    user.backupCodes = undefined as any;
 
-    return { user, tokens, roleName, permissions };
+    logger.info("User logged in (2FA verified)", {
+      userId: user._id.toString(),
+    });
+
+    const result: {
+      user: InstanceType<typeof User>;
+      tokens: TokenPair;
+      roleName: string;
+      permissions: string[];
+      backupCodes?: string[];
+    } = { user, tokens, roleName, permissions };
+
+    if (backupCodes) {
+      result.backupCodes = backupCodes;
+    }
+
+    return result;
   },
 
   /**

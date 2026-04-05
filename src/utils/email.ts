@@ -342,4 +342,37 @@ export const emailService = {
       loanId: loan.loanId,
     });
   },
+
+  /**
+   * Sends a login verification OTP code for two-factor authentication.
+   */
+  async sendLoginOtpCode(
+    to: string,
+    code: string,
+    firstName: string,
+  ): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #1a1a2e;">LendEvent Login Verification</h2>
+        <p>Hi <strong>${firstName}</strong>,</p>
+        <p>Use the following code to complete your login:</p>
+        <div style="background: #f4f4f8; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a1a2e;">${code}</span>
+        </div>
+        <p>This code expires in <strong>5 minutes</strong>.</p>
+        <p style="color: #888; font-size: 13px;">If you did not attempt to log in, someone may be trying to access your account. You can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="color: #aaa; font-size: 12px;">LendEvent &mdash; Event Rental Management</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"LendEvent" <${SMTP_FROM}>`,
+      to,
+      subject: "LendEvent Login Verification Code",
+      html,
+    });
+
+    logger.info("Login OTP code sent", { to });
+  },
 };
