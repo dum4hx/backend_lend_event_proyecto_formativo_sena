@@ -889,11 +889,24 @@ export const authService = {
       return response;
     }
 
+    const plan = organization.subscription?.plan ?? "free";
+
+    // Free/new organizations can have no billing period and must remain active.
+    if (plan === "free") {
+      response.isActive = true;
+      return response;
+    }
+
     // Check subscription expiration
     if (
       !organization.subscription?.currentPeriodEnd ||
       organization.subscription.currentPeriodEnd < new Date()
     ) {
+      // If billing cycle hasn't been synced yet, avoid mutating org status.
+      if (!organization.subscription?.currentPeriodEnd) {
+        return response;
+      }
+
       await Organization.updateOne(
         { _id: profile.user.organizationId },
         { status: "suspended" },
