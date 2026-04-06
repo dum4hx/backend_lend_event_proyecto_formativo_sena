@@ -207,11 +207,13 @@ incidentSchema.index({ organizationId: 1, type: 1 });
 incidentSchema.index({ organizationId: 1, context: 1, status: 1 });
 incidentSchema.index({ organizationId: 1, createdAt: -1 });
 
-// Idempotency: prevents duplicate incidents from the same source
-incidentSchema.index(
-  { organizationId: 1, sourceType: 1, sourceId: 1, type: 1 },
-  { unique: true, sparse: true },
-);
+// Source lookup index (performance only; no uniqueness constraints)
+incidentSchema.index({
+  organizationId: 1,
+  sourceType: 1,
+  sourceId: 1,
+  type: 1,
+});
 
 /* ---------- Export ---------- */
 

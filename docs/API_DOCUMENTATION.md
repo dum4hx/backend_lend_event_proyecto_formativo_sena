@@ -4910,6 +4910,17 @@ Creates an inspection for a returned loan. If damages or lost items are reported
 
 The server automatically populates `conditionBefore` from the material instance's `conditionAtCheckout` recorded when the loan was created, and computes `conditionDegraded` (boolean) by comparing the severity index of `conditionBefore` against the submitted `condition`. If no damages are found, the loan is auto-transitioned to `inspected` status.
 
+**Material instance status side-effects:** After the inspection is saved, each inspected material instance is automatically transitioned to a new status based on the reported condition:
+
+| `condition` reported | MaterialInstance status set to |
+| -------------------- | ------------------------------ |
+| `excellent`, `good`, `fair` | `available` |
+| `poor` | `maintenance` |
+| `damaged` | `damaged` |
+| `lost` | `lost` |
+
+The resulting status is also stored in the `transitionedToStatus` field on each inspection item sub-document for auditability.
+
 | Parameter                | Location | Type     | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------ | -------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | loanId                   | body     | string   | Yes      | ID of the loan being inspected (must be in `returned` status)                                                                                                                                                                                                                                                                                                                                                     |
@@ -5439,6 +5450,16 @@ Creates a new incident manually.
 
 **Note:** `loanId` is required when `context` is `"loan"`. For non-loan incidents (e.g., transit damage, warehouse storage issues), use the appropriate `context` value and optionally provide `locationId`.
 
+**Material instance status side-effects:** Each ID in `relatedMaterialInstances` is automatically transitioned based on incident `type` when the incident is created:
+
+| `type` | MaterialInstance status set to |
+| ------ | ------------------------------ |
+| `damage` | `damaged` |
+| `lost` | `lost` |
+| `issue` | `maintenance` |
+| `replacement` | `retired` |
+| `overdue`, `extended`, `other` | _(no automatic change)_ |
+
 **Response:** `201 Created`
 
 ```json
@@ -5485,7 +5506,7 @@ Acknowledges an open incident.
 | --------- | -------- | ------ | -------- | ----------- |
 | id        | path     | string | Yes      | Incident ID |
 
-**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:acknowledge`
 
 **Response:** `200 OK`
 
@@ -5523,7 +5544,15 @@ Resolves an incident with a resolution note.
 | id         | path     | string | Yes      | Incident ID        |
 | resolution | body     | string | Yes      | Resolution details |
 
-**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:resolve`
+
+**Material instance status side-effects:** Related material instances are automatically transitioned based on the incident `type` when resolution is saved:
+
+| `type` | MaterialInstance status set to |
+| ------ | ------------------------------ |
+| `damage` | `maintenance` |
+| `issue` | `available` |
+| `lost`, `replacement`, others | _(no automatic change)_ |
 
 **Example Request:**
 
@@ -5566,14 +5595,14 @@ Resolves an incident with a resolution note.
 
 #### POST /incidents/:id/dismiss
 
-Dismisses an open or acknowledged incident.
+Dismisses an open or acknowledged incident. Dismissal means the incident was a false alarm — no automatic material instance status changes are applied. Any instance status corrections must be made manually.
 
 | Parameter  | Location | Type   | Required | Description          |
 | ---------- | -------- | ------ | -------- | -------------------- |
 | id         | path     | string | Yes      | Incident ID          |
 | resolution | body     | string | Yes      | Reason for dismissal |
 
-**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:update`
+**Auth:** `authenticate` + `requireActiveOrganization` + `incidents:dismiss`
 
 **Example Request:**
 

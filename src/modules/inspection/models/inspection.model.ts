@@ -26,7 +26,7 @@ export type ItemCondition = (typeof conditionOptions)[number];
 
 /* ---------- Item Inspection Schema ---------- */
 
-const itemInspectionZodSchema = z.object({
+const itemInspectionBaseZodSchema = z.object({
   materialInstanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Invalid Material Instance ID format",
   }),
@@ -38,6 +38,30 @@ const itemInspectionZodSchema = z.object({
   estimatedRepairCost: z.number().min(0).optional(),
   chargeToCustomer: z.number().min(0).optional(),
 });
+
+const itemInspectionZodSchema = itemInspectionBaseZodSchema.superRefine(
+  (item, ctx) => {
+    if (item.conditionAfter === "damaged" && !item.damageDescription?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["damageDescription"],
+        message: "damageDescription is required when conditionAfter is damaged",
+      });
+    }
+  },
+);
+
+const itemInspectionUpdateZodSchema = itemInspectionBaseZodSchema
+  .partial()
+  .superRefine((item, ctx) => {
+    if (item.conditionAfter === "damaged" && !item.damageDescription?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["damageDescription"],
+        message: "damageDescription is required when conditionAfter is damaged",
+      });
+    }
+  });
 
 /* ---------- Zod Schema for API Validation ---------- */
 
@@ -59,7 +83,7 @@ export const InspectionUpdateZodSchema = z.object({
   notes: z.string().max(1000).trim().optional(),
 });
 
-export const ItemInspectionUpdateZodSchema = itemInspectionZodSchema.partial();
+export const ItemInspectionUpdateZodSchema = itemInspectionUpdateZodSchema;
 
 export type InspectionInput = z.infer<typeof InspectionZodSchema>;
 

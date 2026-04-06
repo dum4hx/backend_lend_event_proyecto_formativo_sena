@@ -152,11 +152,11 @@ incidentRouter.post(
 /**
  * POST /api/v1/incidents/:id/acknowledge
  * Acknowledges an open incident.
- * Permission: incidents:update
+ * Permission: incidents:acknowledge
  */
 incidentRouter.post(
   "/:id/acknowledge",
-  requirePermission("incidents:update"),
+  requirePermission("incidents:acknowledge"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
@@ -187,11 +187,11 @@ incidentRouter.post(
 /**
  * POST /api/v1/incidents/:id/resolve
  * Resolves an incident with a resolution note.
- * Permission: incidents:update
+ * Permission: incidents:resolve
  */
 incidentRouter.post(
   "/:id/resolve",
-  requirePermission("incidents:update"),
+  requirePermission("incidents:resolve"),
   validateBody(ResolveIncidentZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -224,11 +224,11 @@ incidentRouter.post(
 /**
  * POST /api/v1/incidents/:id/dismiss
  * Dismisses an open or acknowledged incident.
- * Permission: incidents:update
+ * Permission: incidents:dismiss
  */
 incidentRouter.post(
   "/:id/dismiss",
-  requirePermission("incidents:update"),
+  requirePermission("incidents:dismiss"),
   validateBody(DismissIncidentZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

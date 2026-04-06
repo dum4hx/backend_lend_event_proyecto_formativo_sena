@@ -392,6 +392,27 @@
     "isPlatformPermission": false
   },
   {
+    "_id": "incidents:acknowledge",
+    "displayName": "Acknowledge Incidents",
+    "description": "Allows acknowledging open incidents, confirming they are being investigated.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "incidents:resolve",
+    "displayName": "Resolve Incidents",
+    "description": "Allows resolving incidents with a resolution note, closing the investigation.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
+    "_id": "incidents:dismiss",
+    "displayName": "Dismiss Incidents",
+    "description": "Allows dismissing incidents deemed invalid or not actionable.",
+    "category": "Incidents",
+    "isPlatformPermission": false
+  },
+  {
     "_id": "invoices:create",
     "displayName": "Create Invoices",
     "description": "Allows generating new invoices for customers.",

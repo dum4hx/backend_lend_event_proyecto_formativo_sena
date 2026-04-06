@@ -34,13 +34,23 @@ const listInspectionsQuerySchema = paginationSchema.extend({
   loanId: z.string().optional(),
 });
 
-const inspectionItemSchema = z.object({
-  materialInstanceId: z.string(),
-  condition: z.enum(["good", "damaged", "lost"]),
-  notes: z.string().max(500).optional(),
-  damageDescription: z.string().max(1000).optional(),
-  damageCost: z.number().min(0).optional(),
-});
+const inspectionItemSchema = z
+  .object({
+    materialInstanceId: z.string(),
+    condition: z.enum(["good", "damaged", "lost"]),
+    notes: z.string().max(500).optional(),
+    damageDescription: z.string().max(1000).optional(),
+    damageCost: z.number().min(0).optional(),
+  })
+  .superRefine((item, ctx) => {
+    if (item.condition === "damaged" && !item.damageDescription?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["damageDescription"],
+        message: "damageDescription is required when condition is damaged",
+      });
+    }
+  });
 
 const createInspectionSchema = z.object({
   loanId: z.string(),

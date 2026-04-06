@@ -18,6 +18,12 @@ Each section explains the purpose of a permission and the action it allows.
 - [`inspections:create`](#inspectionscreate)
 - [`inspections:read`](#inspectionsread)
 - [`inspections:update`](#inspectionsupdate)
+- [`incidents:create`](#incidentscreate)
+- [`incidents:read`](#incidentsread)
+- [`incidents:update`](#incidentsupdate)
+- [`incidents:acknowledge`](#incidentsacknowledge)
+- [`incidents:resolve`](#incidentsresolve)
+- [`incidents:dismiss`](#incidentsdismiss)
 - [`invoices:create`](#invoicescreate)
 - [`invoices:read`](#invoicesread)
 - [`invoices:update`](#invoicesupdate)
@@ -197,6 +203,39 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows acknowledging, resolving, or dismissing incidents.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Incidents
+
+### `incidents:acknowledge`
+
+- **Display Name:** Acknowledge Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows acknowledging open incidents, confirming they are being investigated. Granted to warehouse operators and above. Acknowledging an incident does **not** automatically change material instance statuses.
+- **Allowed Action:** Transition incident from `open` → `acknowledged`.
+- **Resource Target:** Incidents
+- **Roles:** `super_admin`, `owner`, `warehouse_operator`
+
+### `incidents:resolve`
+
+- **Display Name:** Resolve Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows resolving incidents with a resolution note. Resolving a `damage` or `issue` incident automatically transitions the related material instances to `maintenance` or `available` respectively.
+- **Allowed Action:** Transition incident from `open`/`acknowledged` → `resolved`.
+- **Resource Target:** Incidents
+- **Roles:** `super_admin`, `owner`, `manager`
+
+### `incidents:dismiss`
+
+- **Display Name:** Dismiss Incidents
+- **Category:** Incidents
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows dismissing incidents deemed invalid or not actionable. Dismissal does **not** automatically change material instance statuses — manual correction is expected.
+- **Allowed Action:** Transition incident from `open`/`acknowledged` → `dismissed`.
+- **Resource Target:** Incidents
+- **Roles:** `super_admin`, `owner`, `manager`
 
 ### `invoices:create`
 

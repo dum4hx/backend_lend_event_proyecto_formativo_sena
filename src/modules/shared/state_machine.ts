@@ -33,6 +33,25 @@ export const INCIDENT_TRANSITIONS: Record<string, readonly string[]> = {
   dismissed: [],
 };
 
+/** Allowed status transitions for material instances. */
+export const MATERIAL_TRANSITIONS: Record<string, readonly string[]> = {
+  available: ["reserved", "maintenance", "damaged", "lost", "retired"],
+  reserved: ["available", "loaned"],
+  loaned: ["returned"],
+  returned: ["available", "maintenance", "damaged", "lost"],
+  maintenance: ["available", "retired", "damaged", "lost"],
+  damaged: ["maintenance", "retired", "lost"],
+  lost: ["retired"],
+  retired: [],
+};
+
+/** Allowed status transitions for inspections. */
+export const INSPECTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ["in_progress", "completed"],
+  in_progress: ["completed"],
+  completed: [],
+};
+
 /* ---------- Validation ---------- */
 
 /**

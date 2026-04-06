@@ -14,6 +14,12 @@ import {
   validateTransition,
   INCIDENT_TRANSITIONS,
 } from "../shared/state_machine.ts";
+import {
+  incidentTypeOnCreateToInstanceStatus,
+  incidentTypeOnResolveToInstanceStatus,
+} from "../shared/instance_status_mapper.ts";
+import { materialService } from "../material/material.service.ts";
+import { logger } from "../../utils/logger.ts";
 
 /* ---------- Types ---------- */
 
@@ -62,6 +68,58 @@ function transitionIncidentStatus(
 ): void {
   validateTransition(incident.status, nextStatus, INCIDENT_TRANSITIONS);
   incident.status = nextStatus as any;
+}
+
+const ACTIVE_INCIDENT_STATUSES = ["open", "acknowledged"] as const;
+
+async function assertNoActiveIncidentMaterialConflict(params: {
+  organizationId: string | Types.ObjectId;
+  materialInstanceIds?: (string | Types.ObjectId)[] | undefined;
+  excludeIncidentId?: string | Types.ObjectId | undefined;
+  session?: ClientSession | undefined;
+}) {
+  const { organizationId, materialInstanceIds, excludeIncidentId, session } =
+    params;
+
+  if (!materialInstanceIds || materialInstanceIds.length === 0) {
+    return;
+  }
+
+  const normalizedIds = Array.from(
+    new Set(materialInstanceIds.map((id) => String(id))),
+  ).map((id) => new Types.ObjectId(id));
+
+  const filter: Record<string, unknown> = {
+    organizationId,
+    status: { $in: ACTIVE_INCIDENT_STATUSES },
+    relatedMaterialInstances: { $in: normalizedIds },
+  };
+
+  if (excludeIncidentId) {
+    filter._id = { $ne: new Types.ObjectId(String(excludeIncidentId)) };
+  }
+
+  const conflictQuery = Incident.findOne(filter)
+    .select("_id type status relatedMaterialInstances")
+    .lean();
+
+  if (session) {
+    conflictQuery.session(session);
+  }
+
+  const conflictingIncident = await conflictQuery;
+  if (!conflictingIncident) {
+    return;
+  }
+
+  throw AppError.conflict(
+    "One or more material instances are already linked to an active incident",
+    {
+      conflictingIncidentId: String(conflictingIncident._id),
+      conflictingIncidentType: conflictingIncident.type,
+      conflictingIncidentStatus: conflictingIncident.status,
+    },
+  );
 }
 
 /* ---------- Service ---------- */
@@ -129,6 +187,12 @@ export const incidentService = {
       }
     }
 
+    await assertNoActiveIncidentMaterialConflict({
+      organizationId,
+      materialInstanceIds: relatedMaterialInstances,
+      session,
+    });
+
     const createPayload: Record<string, unknown> = {
       organizationId,
       context,
@@ -155,6 +219,122 @@ export const incidentService = {
     const [incident] = await (Incident as any).create([createPayload], {
       session: session ?? undefined,
     });
+
+    // Transition related material instances based on the incident type
+    const createTargetStatus = incidentTypeOnCreateToInstanceStatus(type);
+    if (
+      createTargetStatus &&
+      relatedMaterialInstances &&
+      relatedMaterialInstances.length > 0
+    ) {
+      for (const instanceId of relatedMaterialInstances) {
+        try {
+          await materialService.updateInstanceStatus(
+            organizationId,
+            String(instanceId),
+            createTargetStatus,
+            `Status updated by incident (${type})`,
+            String(createdBy),
+            "system",
+          );
+        } catch (err) {
+          logger.warn(
+            "Failed to transition material instance status on incident creation",
+            {
+              instanceId: String(instanceId),
+              targetStatus: createTargetStatus,
+              incidentType: type,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
+      }
+    }
+
+    return incident;
+  },
+
+  /**
+   * Adds related material instances to an existing incident.
+   */
+  async addRelatedMaterialInstances(
+    incidentId: string,
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    materialInstanceIds: (string | Types.ObjectId)[],
+    session?: ClientSession,
+  ) {
+    if (!materialInstanceIds.length) {
+      throw AppError.badRequest("At least one material instance is required");
+    }
+
+    const incidentQuery = Incident.findOne({
+      _id: incidentId,
+      organizationId,
+    });
+    if (session) incidentQuery.session(session);
+    const incident = await incidentQuery;
+
+    if (!incident) {
+      throw AppError.notFound("Incident not found");
+    }
+
+    await assertNoActiveIncidentMaterialConflict({
+      organizationId,
+      materialInstanceIds,
+      excludeIncidentId: incident._id,
+      session,
+    });
+
+    const existingIds = new Set(
+      (
+        (incident.relatedMaterialInstances as Types.ObjectId[] | undefined) ??
+        []
+      ).map((id) => String(id)),
+    );
+    const newIds = Array.from(
+      new Set(materialInstanceIds.map((id) => String(id))),
+    );
+
+    for (const id of newIds) {
+      if (!existingIds.has(id)) {
+        incident.relatedMaterialInstances.push(new Types.ObjectId(id));
+      }
+    }
+
+    if (session) {
+      await incident.save({ session });
+    } else {
+      await incident.save();
+    }
+
+    const createTargetStatus = incidentTypeOnCreateToInstanceStatus(
+      incident.type as IncidentType,
+    );
+    if (createTargetStatus) {
+      for (const instanceId of newIds) {
+        try {
+          await materialService.updateInstanceStatus(
+            organizationId,
+            String(instanceId),
+            createTargetStatus,
+            `Status updated by incident (${incident.type})`,
+            String(userId),
+            "system",
+          );
+        } catch (err) {
+          logger.warn(
+            "Failed to transition material instance status on instance add",
+            {
+              instanceId: String(instanceId),
+              targetStatus: createTargetStatus,
+              incidentType: incident.type,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
+      }
+    }
 
     return incident;
   },
@@ -284,6 +464,42 @@ export const incidentService = {
     incident.resolvedAt = new Date();
     incident.resolvedBy = new Types.ObjectId(String(userId));
     await incident.save();
+
+    // Transition related material instances back based on resolution
+    const resolveTargetStatus = incidentTypeOnResolveToInstanceStatus(
+      incident.type as IncidentType,
+    );
+    const resolveInstances = (incident as any).relatedMaterialInstances as
+      | Types.ObjectId[]
+      | undefined;
+    if (
+      resolveTargetStatus &&
+      resolveInstances &&
+      resolveInstances.length > 0
+    ) {
+      for (const instanceId of resolveInstances) {
+        try {
+          await materialService.updateInstanceStatus(
+            incident.organizationId as Types.ObjectId,
+            String(instanceId),
+            resolveTargetStatus,
+            `Status updated by incident resolution (${incident.type})`,
+            String(userId),
+            "system",
+          );
+        } catch (err) {
+          logger.warn(
+            "Failed to transition material instance status on incident resolution",
+            {
+              instanceId: String(instanceId),
+              targetStatus: resolveTargetStatus,
+              incidentType: incident.type,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
+      }
+    }
 
     return incident;
   },

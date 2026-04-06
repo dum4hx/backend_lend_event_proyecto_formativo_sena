@@ -10,6 +10,8 @@ import {
   validateTransition,
   LOAN_TRANSITIONS,
 } from "../shared/state_machine.ts";
+import { conditionAfterToInstanceStatus } from "../shared/instance_status_mapper.ts";
+import { materialService } from "../material/material.service.ts";
 
 export const inspectionService = {
   /**
@@ -35,6 +37,7 @@ export const inspectionService = {
         .limit(limit)
         .populate("loanId", "customerId startDate endDate")
         .populate("inspectedBy", "email profile.firstName")
+        .populate("items.materialInstanceId", "serialNumber modelId")
         .sort({ createdAt: -1 }),
       Inspection.countDocuments(query),
     ]);
@@ -186,6 +189,8 @@ export const inspectionService = {
             damageDescription: item.damageDescription,
             chargeToCustomer: item.damageCost ?? 0,
             repairRequired: item.condition === "damaged",
+            transitionedToStatus:
+              conditionAfterToInstanceStatus(item.condition) ?? undefined,
           };
         });
 
@@ -202,6 +207,21 @@ export const inspectionService = {
           ],
           { session },
         );
+
+        // Transition each material instance status according to its inspected condition
+        for (const item of items) {
+          const targetStatus = conditionAfterToInstanceStatus(item.condition);
+          if (targetStatus) {
+            await materialService.updateInstanceStatus(
+              organizationId,
+              item.materialInstanceId,
+              targetStatus,
+              item.damageDescription ?? `Status updated by inspection`,
+              userId,
+              "system",
+            );
+          }
+        }
 
         // If there are damages, create an invoice
         const damagedItems = items.filter(

@@ -10,6 +10,7 @@ import { logger } from "../../utils/logger.ts";
 import { renameProperty } from "../../utils/renameProperty.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { User } from "../user/models/user.model.ts";
+import { MATERIAL_TRANSITIONS } from "../shared/state_machine.ts";
 
 type MaterialInstanceWritePayload = {
   modelId?: string;
@@ -1399,17 +1400,6 @@ export const materialService = {
       throw AppError.notFound("Material instance not found");
     }
 
-    const validTransitions: Record<string, string[]> = {
-      available: ["reserved", "maintenance", "damaged", "retired"],
-      reserved: ["available", "loaned"],
-      loaned: ["returned"],
-      returned: ["available", "maintenance", "damaged"],
-      maintenance: ["available", "retired"],
-      damaged: ["maintenance", "retired"],
-      lost: ["retired"],
-      retired: [],
-    };
-
     const currentStatus = instance.status;
 
     // Idempotent: same status requested → return success without recording movement
@@ -1417,7 +1407,8 @@ export const materialService = {
       return renameProperty(instance, "modelId", "model");
     }
 
-    const allowedTransitions = validTransitions[currentStatus] ?? [];
+    const allowedTransitions = (MATERIAL_TRANSITIONS[currentStatus] ??
+      []) as readonly string[];
 
     if (!allowedTransitions.includes(status)) {
       throw AppError.badRequest(
