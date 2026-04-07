@@ -151,7 +151,7 @@ export const invoiceService = {
       .populate("inspectionId");
 
     if (!invoice) {
-      throw AppError.notFound("Invoice not found");
+      throw AppError.notFound("Factura no encontrada");
     }
 
     return invoice;
@@ -223,7 +223,7 @@ export const invoiceService = {
     });
 
     if (!invoice) {
-      throw AppError.notFound("Invoice not found or not in a payable status");
+      throw AppError.notFound("Factura no encontrada o no está en estado de pago");
     }
 
     // Validate paymentMethodId belongs to this organization and is active
@@ -234,7 +234,7 @@ export const invoiceService = {
     });
     if (!paymentMethod) {
       throw AppError.notFound(
-        "Payment method not found or inactive in this organization",
+        "Método de pago no encontrado o inactivo en esta organización",
       );
     }
 
@@ -243,7 +243,7 @@ export const invoiceService = {
 
     if (amount > remainingAmount) {
       throw AppError.badRequest(
-        `Payment amount exceeds remaining balance of $${remainingAmount.toFixed(2)}`,
+        `El monto del pago excede el saldo restante de $${remainingAmount.toFixed(2)}`,
       );
     }
 
@@ -293,7 +293,7 @@ export const invoiceService = {
     });
 
     if (!invoice) {
-      throw AppError.notFound("Invoice not found or cannot be voided");
+      throw AppError.notFound("Factura no encontrada o no se puede anular");
     }
 
     invoice.status = "cancelled";
@@ -313,7 +313,7 @@ export const invoiceService = {
     }).populate("customerId", "email name");
 
     if (!invoice) {
-      throw AppError.notFound("Invoice not found");
+      throw AppError.notFound("Factura no encontrada");
     }
 
     const customer = invoice.customerId as unknown as {

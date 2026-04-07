@@ -23,7 +23,7 @@ export const userService = {
     });
 
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     return user;
@@ -121,7 +121,7 @@ export const userService = {
     );
 
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     logger.info("User updated", { userId: userId.toString() });
@@ -141,18 +141,18 @@ export const userService = {
   ): Promise<InstanceType<typeof User>> {
     const user = await User.findOne({ _id: userId, organizationId });
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     // Cannot change own role
     if (userId.toString() === requestingUserId.toString()) {
-      throw AppError.badRequest("You cannot change your own role");
+      throw AppError.badRequest("No puedes cambiar tu propio rol");
     }
 
     // Cannot demote the owner
     if ((await user.getRoleName()) === "owner") {
       throw AppError.badRequest(
-        "Cannot change the role of the organization owner",
+        "No se puede cambiar el rol del propietario de la organización",
       );
     }
 
@@ -161,7 +161,7 @@ export const userService = {
     const orgRoles = await org.getOrgRoles();
     if (!orgRoles.some((role) => role._id.toString() === newRoleId)) {
       throw AppError.badRequest(
-        "Invalid roleId: Role does not belong to organization",
+        "roleId inválido: El rol no pertenece a la organización",
       );
     }
 
@@ -170,7 +170,9 @@ export const userService = {
       (role) => role._id.toString() === newRoleId,
     )?.name;
     if (newRoleName === "owner") {
-      throw AppError.badRequest("Cannot promote user to owner role");
+      throw AppError.badRequest(
+        "No se puede promover a un usuario al rol de propietario",
+      );
     }
 
     user.roleId = newRoleId;
@@ -195,17 +197,19 @@ export const userService = {
   ): Promise<void> {
     const user = await User.findOne({ _id: userId, organizationId });
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     // Cannot deactivate self
     if (userId.toString() === requestingUserId.toString()) {
-      throw AppError.badRequest("You cannot deactivate your own account");
+      throw AppError.badRequest("No puedes desactivar tu propia cuenta");
     }
 
     // Cannot deactivate owner
     if ((await user.getRoleName()) === "owner") {
-      throw AppError.badRequest("Cannot deactivate the organization owner");
+      throw AppError.badRequest(
+        "No se puede desactivar al propietario de la organización",
+      );
     }
 
     user.status = "inactive";
@@ -238,7 +242,7 @@ export const userService = {
     const canAddSeat = await organizationService.canAddSeat(organizationId);
     if (!canAddSeat) {
       throw AppError.badRequest(
-        "Seat limit reached. Please upgrade your plan.",
+        "Límite de puestos alcanzado. Por favor mejora tu plan.",
         { code: "PLAN_LIMIT_REACHED" },
       );
     }
@@ -249,7 +253,7 @@ export const userService = {
     );
 
     if (!user) {
-      throw AppError.notFound("User not found or not inactive");
+      throw AppError.notFound("Usuario no encontrado o no está inactivo");
     }
 
     // Update seat count
@@ -271,17 +275,19 @@ export const userService = {
   ): Promise<void> {
     const user = await User.findOne({ _id: userId, organizationId });
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     // Cannot delete self
     if (userId.toString() === requestingUserId.toString()) {
-      throw AppError.badRequest("You cannot delete your own account");
+      throw AppError.badRequest("No puedes eliminar tu propia cuenta");
     }
 
     // Cannot delete owner
     if ((await user.getRoleName()) === "owner") {
-      throw AppError.badRequest("Cannot delete the organization owner");
+      throw AppError.badRequest(
+        "No se puede eliminar al propietario de la organización",
+      );
     }
 
     await User.deleteOne({ _id: userId });
@@ -316,7 +322,7 @@ export const userService = {
     );
 
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     // Since organizationId is populated, it's an object. We need the ID string.

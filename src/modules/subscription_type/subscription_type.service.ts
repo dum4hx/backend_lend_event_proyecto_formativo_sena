@@ -46,7 +46,7 @@ export const subscriptionTypeService = {
     }).session(session ?? null);
     if (existing) {
       throw AppError.conflict(
-        `Subscription type with plan "${data.plan}" already exists`,
+        `El tipo de suscripción con plan "${data.plan}" ya existe`,
       );
     }
 
@@ -80,7 +80,7 @@ export const subscriptionTypeService = {
     );
 
     if (!subscriptionType) {
-      throw AppError.notFound(`Subscription type "${plan}" not found`);
+      throw AppError.notFound(`Tipo de suscripción "${plan}" no encontrado`);
     }
 
     // Invalidate cache
@@ -102,7 +102,7 @@ export const subscriptionTypeService = {
     );
 
     if (result.matchedCount === 0) {
-      throw AppError.notFound(`Subscription type "${plan}" not found`);
+      throw AppError.notFound(`Tipo de suscripción "${plan}" no encontrado`);
     }
 
     // Invalidate cache
@@ -139,7 +139,7 @@ export const subscriptionTypeService = {
     const limits = cache.get(plan.toLowerCase());
 
     if (!limits) {
-      throw AppError.notFound(`Subscription plan "${plan}" not found`);
+      throw AppError.notFound(`Plan de suscripción "${plan}" no encontrado`);
     }
 
     return limits;
@@ -211,7 +211,7 @@ export const subscriptionTypeService = {
     if (limits.billingModel === "fixed") {
       if (limits.maxSeats !== -1 && seatCount > limits.maxSeats) {
         throw AppError.badRequest(
-          `Plan "${plan}" allows maximum ${limits.maxSeats} seats`,
+          `El plan "${plan}" permite un máximo de ${limits.maxSeats} puestos`,
           { code: "PLAN_LIMIT_REACHED", resource: "seats" },
         );
       }
@@ -235,7 +235,7 @@ export const subscriptionTypeService = {
       currentCount + addingCount > limits.maxCatalogItems
     ) {
       throw AppError.badRequest(
-        `Catalog item limit reached. Plan "${plan}" allows maximum ${limits.maxCatalogItems} items.`,
+        `Límite de ítems del catálogo alcanzado. El plan "${plan}" permite un máximo de ${limits.maxCatalogItems} ítems.`,
         { code: "PLAN_LIMIT_REACHED", resource: "catalog_items" },
       );
     }

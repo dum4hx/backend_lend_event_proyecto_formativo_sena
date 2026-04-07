@@ -191,7 +191,7 @@ async function validateLocationBelongsToOrg(
   }).select("_id");
   if (!location) {
     throw AppError.notFound(
-      "Location not found or does not belong to this organization",
+      "Ubicación no encontrada o no pertenece a esta organización",
     );
   }
 }

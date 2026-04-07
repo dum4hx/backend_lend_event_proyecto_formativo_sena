@@ -63,7 +63,7 @@ export const inspectionService = {
       .populate("items.materialInstanceId", "serialNumber modelId");
 
     if (!inspection) {
-      throw AppError.notFound("Inspection not found");
+      throw AppError.notFound("Inspección no encontrada");
     }
 
     return inspection;
@@ -133,7 +133,7 @@ export const inspectionService = {
         }).session(session);
 
         if (!loan) {
-          throw AppError.notFound("Loan not found or not in returned status");
+          throw AppError.notFound("Préstamo no encontrado o no está en estado de devuelto");
         }
 
         // Check if inspection already exists
@@ -141,7 +141,7 @@ export const inspectionService = {
           loanId: loan._id,
         }).session(session);
         if (existingInspection) {
-          throw AppError.conflict("Inspection already exists for this loan");
+          throw AppError.conflict("Ya existe una inspección para este préstamo");
         }
 
         // Validate all items match loan materials
@@ -157,7 +157,7 @@ export const inspectionService = {
         );
 
         if (missingMaterials.length > 0) {
-          throw AppError.badRequest("All loan materials must be inspected", {
+          throw AppError.badRequest("Todos los materiales del préstamo deben ser inspeccionados", {
             missingMaterialIds: missingMaterials,
           });
         }
@@ -216,7 +216,7 @@ export const inspectionService = {
               organizationId,
               item.materialInstanceId,
               targetStatus,
-              item.damageDescription ?? `Status updated by inspection`,
+              item.damageDescription ?? `Estado actualizado por inspección`,
               userId,
               "system",
             );
@@ -230,7 +230,7 @@ export const inspectionService = {
 
         if (dueDate && damagedItems.length === 0) {
           throw AppError.badRequest(
-            "dueDate provided but no damaged items present; dueDate is only allowed when a damage invoice will be generated",
+            "Se proporcionó dueDate pero no hay artículos dañados; dueDate solo se permite cuando se generará una factura por daños",
           );
         }
 
@@ -240,7 +240,7 @@ export const inspectionService = {
           if (dueDate) {
             invoiceDueDate = new Date(dueDate as any);
             if (isNaN(invoiceDueDate.getTime())) {
-              throw AppError.badRequest("Invalid dueDate format");
+              throw AppError.badRequest("Formato de fecha de vencimiento no válido");
             }
           } else {
             // Use org-level policy for damage due days
@@ -255,7 +255,7 @@ export const inspectionService = {
           const invoiceLineItems = damagedItems.map((item) => ({
             description:
               item.damageDescription ??
-              `${item.condition === "lost" ? "Lost" : "Damaged"} material`,
+              `Material ${item.condition === "lost" ? "perdido" : "dañado"}`,
             quantity: 1,
             unitPrice: item.damageCost ?? 0,
             totalPrice: item.damageCost ?? 0,
@@ -302,7 +302,7 @@ export const inspectionService = {
               invoiceService.applyDepositPayment(
                 invoiceDoc,
                 depositApplied,
-                `Deposit applied to invoice ${invoiceNumber}`,
+                `Depósito aplicado a la factura ${invoiceNumber}`,
               );
               await invoiceDoc.save({ session });
             }
@@ -314,7 +314,7 @@ export const inspectionService = {
               type: "applied",
               amount: depositApplied,
               date: new Date(),
-              reference: `Applied to invoice ${invoiceNumber}`,
+              reference: `Aplicado a la factura ${invoiceNumber}`,
             });
             loanDeposit.status = newDepositStatus;
             await loan.save({ session });
@@ -329,7 +329,7 @@ export const inspectionService = {
               type: "refund",
               amount: depositAmt,
               date: new Date(),
-              reference: "No damages found — deposit pending physical refund",
+              reference: "Sin daños encontrados — depósito pendiente de reembolso físico",
             });
             loanDeposit.status = "refund_pending";
           }

@@ -57,7 +57,7 @@ export const packageService = {
     );
 
     if (!pkg) {
-      throw AppError.notFound("Package not found");
+      throw AppError.notFound("Paquete no encontrado");
     }
 
     return pkg;
@@ -79,7 +79,7 @@ export const packageService = {
       });
 
       if (existingTypes.length !== materialTypeIds.length) {
-        throw AppError.badRequest("One or more material types not found");
+        throw AppError.badRequest("Uno o más tipos de material no encontrados");
       }
     }
 
@@ -89,7 +89,7 @@ export const packageService = {
       name: payload.name,
     });
     if (existing) {
-      throw AppError.conflict("A package with this name already exists");
+      throw AppError.conflict("Ya existe un paquete con este nombre");
     }
 
     const pkg = await Package.create({
@@ -118,7 +118,7 @@ export const packageService = {
         });
 
         if (existingTypes.length !== materialTypeIds.length) {
-          throw AppError.badRequest("One or more material types not found");
+          throw AppError.badRequest("Uno o más tipos de material no encontrados");
         }
       }
     }
@@ -130,7 +130,7 @@ export const packageService = {
     );
 
     if (!pkg) {
-      throw AppError.notFound("Package not found");
+      throw AppError.notFound("Paquete no encontrado");
     }
 
     return pkg;
@@ -143,7 +143,7 @@ export const packageService = {
       { new: true },
     );
 
-    if (!pkg) throw AppError.notFound("Package not found");
+    if (!pkg) throw AppError.notFound("Paquete no encontrado");
     return pkg;
   },
 
@@ -154,7 +154,7 @@ export const packageService = {
       { new: true },
     );
 
-    if (!pkg) throw AppError.notFound("Package not found");
+    if (!pkg) throw AppError.notFound("Paquete no encontrado");
     return pkg;
   },
 
@@ -173,7 +173,7 @@ export const packageService = {
       .populate("items.materialTypeId", "name pricePerDay")
       .lean();
 
-    if (!pkg) throw AppError.notFound("Package not found");
+    if (!pkg) throw AppError.notFound("Paquete no encontrado");
 
     const materialTypeIds = pkg.items.map(
       (item) => new Types.ObjectId(String(item.materialTypeId._id ?? item.materialTypeId)),
@@ -292,11 +292,11 @@ export const packageService = {
     });
 
     if (activeRequests > 0) {
-      throw AppError.badRequest("Cannot delete package with active requests");
+      throw AppError.badRequest("No se puede eliminar un paquete con solicitudes activas");
     }
 
     const pkg = await Package.findOneAndDelete({ _id: id, organizationId });
-    if (!pkg) throw AppError.notFound("Package not found");
+    if (!pkg) throw AppError.notFound("Paquete no encontrado");
 
     return;
   },

@@ -73,7 +73,7 @@ const resolveEffectiveSerialAndBarcode = (opts: {
   if (useBarcodeAsSerial === true) {
     if (!barcode) {
       throw AppError.badRequest(
-        "barcode is required when useBarcodeAsSerial is true",
+        "barcode es requerido cuando useBarcodeAsSerial es true",
       );
     }
     return { serialNumber: barcode, barcode };
@@ -83,7 +83,7 @@ const resolveEffectiveSerialAndBarcode = (opts: {
     const serialNumber = payloadSerial ?? currentSerial;
     if (!serialNumber) {
       throw AppError.badRequest(
-        "serialNumber is required when useBarcodeAsSerial is false",
+        "serialNumber es requerido cuando useBarcodeAsSerial es false",
       );
     }
     return { serialNumber, barcode };
@@ -93,9 +93,9 @@ const resolveEffectiveSerialAndBarcode = (opts: {
   const serialNumber = payloadSerial ?? currentSerial;
   if (!serialNumber) {
     if (isCreate) {
-      throw AppError.badRequest("serialNumber is required");
+      throw AppError.badRequest("serialNumber es requerido");
     }
-    throw AppError.badRequest("serialNumber is required to update this record");
+    throw AppError.badRequest("serialNumber es requerido para actualizar este registro");
   }
 
   return { serialNumber, barcode };
@@ -137,7 +137,7 @@ async function validateMaterialTypeAttributes(
 
   if (categories.length === 0) {
     throw AppError.badRequest(
-      `No valid categories found for this material type`,
+      `No se encontraron categorías válidas para este tipo de material`,
       { code: "INVALID_CATEGORIES" },
     );
   }
@@ -172,7 +172,7 @@ async function validateMaterialTypeAttributes(
 
     if (!attr) {
       throw AppError.badRequest(
-        `Attribute '${entry.attributeId}' not found in this organization`,
+        `Atributo '${entry.attributeId}' no encontrado en esta organización`,
         { code: "ATTRIBUTE_NOT_FOUND", attributeId: entry.attributeId },
       );
     }
@@ -180,7 +180,7 @@ async function validateMaterialTypeAttributes(
     // Check if this attribute is available from the type's categories
     if (!categoryAttributeMap.has(entry.attributeId)) {
       throw AppError.badRequest(
-        `Attribute '${attr.name}' is not available for these categories`,
+        `Atributo '${attr.name}' no está disponible para estas categorías`,
         {
           code: "ATTRIBUTE_NOT_IN_CATEGORY",
           attributeName: attr.name,
@@ -196,8 +196,8 @@ async function validateMaterialTypeAttributes(
       !attr.allowedValues.includes(entry.value)
     ) {
       throw AppError.badRequest(
-        `Value '${entry.value}' is not allowed for attribute '${attr.name}'. ` +
-          `Allowed values: ${attr.allowedValues.join(", ")}`,
+        `Valor '${entry.value}' no está permitido para el atributo '${attr.name}'. ` +
+          `Valores permitidos: ${attr.allowedValues.join(", ")}`,
         {
           code: "INVALID_ATTRIBUTE_VALUE",
           attributeName: attr.name,
@@ -225,7 +225,7 @@ export const materialService = {
       organizationId,
     });
     if (!category) {
-      throw AppError.notFound("Category not found");
+      throw AppError.notFound("Categoría no encontrada");
     }
 
     // If any material types reference this category, prevent deletion
@@ -236,7 +236,7 @@ export const materialService = {
 
     if (linkedCount > 0) {
       throw AppError.badRequest(
-        "Cannot delete category while material types exist",
+        "No se puede eliminar la categoría mientras existan tipos de material",
         { code: "CATEGORY_HAS_MATERIALS" },
       );
     }
@@ -271,11 +271,11 @@ export const materialService = {
   ) {
     const category = await Category.findById(categoryId);
     if (!category) {
-      throw AppError.notFound("Category not found");
+      throw AppError.notFound("Categoría no encontrada");
     }
 
     if (category.organizationId.toString() !== organizationId.toString()) {
-      throw AppError.notFound("Category not found");
+      throw AppError.notFound("Categoría no encontrada");
     }
 
     Object.assign(category, updates);
@@ -338,7 +338,7 @@ export const materialService = {
     }).populate("categoryId", "name");
 
     if (!materialType) {
-      throw AppError.notFound("Material type not found");
+      throw AppError.notFound("Tipo de material no encontrado");
     }
 
     return materialType;
@@ -363,7 +363,7 @@ export const materialService = {
             !category ||
             category.organizationId.toString() !== organizationId.toString()
           ) {
-            throw AppError.notFound("Category not found");
+            throw AppError.notFound("Categoría no encontrada");
           }
           categoryIds.push(String(id));
         }
@@ -401,7 +401,7 @@ export const materialService = {
     if (updates.attributes !== undefined) {
       const existing = await MaterialModel.findOne({ _id: id, organizationId });
       if (!existing) {
-        throw AppError.notFound("Material type not found");
+        throw AppError.notFound("Tipo de material no encontrado");
       }
 
       // Merge category IDs: use updated list if provided, otherwise fall back to existing
@@ -430,7 +430,7 @@ export const materialService = {
     );
 
     if (!materialType) {
-      throw AppError.notFound("Material type not found");
+      throw AppError.notFound("Tipo de material no encontrado");
     }
 
     return materialType;
@@ -447,7 +447,7 @@ export const materialService = {
 
     if (instanceCount > 0) {
       throw AppError.badRequest(
-        "Cannot delete material type with existing instances",
+        "No se puede eliminar el tipo de material con instancias existentes",
         { instanceCount },
       );
     }
@@ -458,7 +458,7 @@ export const materialService = {
     });
 
     if (!materialType) {
-      throw AppError.notFound("Material type not found");
+      throw AppError.notFound("Tipo de material no encontrado");
     }
 
     await organizationService.decrementCatalogItemCount(organizationId);
@@ -597,7 +597,7 @@ export const materialService = {
 
     const user = await User.findById(userId).select("locations").lean();
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     const userLocationIds: Types.ObjectId[] = (user.locations ?? []).map(
@@ -1153,7 +1153,7 @@ export const materialService = {
     );
 
     if (!instance) {
-      throw AppError.notFound("Material instance not found");
+      throw AppError.notFound("Instancia de material no encontrada");
     }
 
     return renameProperty(instance, "modelId", "model");
@@ -1166,12 +1166,12 @@ export const materialService = {
     const writePayload = payload as MaterialInstanceWritePayload;
 
     if (!payload.modelId) {
-      throw AppError.badRequest("Material type (modelId) is required");
+      throw AppError.badRequest("Tipo de material (modelId) es requerido");
     }
 
     const materialType = await MaterialModel.findById(String(payload.modelId));
     if (!materialType) {
-      throw AppError.notFound("Material type not found");
+      throw AppError.notFound("Tipo de material no encontrado");
     }
 
     if (payload.locationId) {
@@ -1182,7 +1182,7 @@ export const materialService = {
       );
       if (!locationActive) {
         throw AppError.badRequest(
-          "Target location is either not found or inactive",
+          "La ubicación de destino no se encontró o está inactiva",
           { locationId: payload.locationId },
         );
       }
@@ -1220,11 +1220,11 @@ export const materialService = {
     } catch (err: unknown) {
       const duplicateField = parseDuplicateKeyError(err);
       if (duplicateField === "barcode") {
-        throw AppError.conflict("Barcode already exists in this organization");
+        throw AppError.conflict("El código de barras ya existe en esta organización");
       }
       if (duplicateField === "serialNumber") {
         throw AppError.conflict(
-          "A material instance with that serial number already exists in this organization",
+          "Ya existe una instancia de material con ese número de serie en esta organización",
         );
       }
       throw err;
@@ -1250,7 +1250,7 @@ export const materialService = {
     });
 
     if (!instance) {
-      throw AppError.notFound("Material instance not found");
+      throw AppError.notFound("Instancia de material no encontrada");
     }
 
     if (writePayload.modelId) {
@@ -1258,7 +1258,7 @@ export const materialService = {
         String(writePayload.modelId),
       );
       if (!materialType) {
-        throw AppError.notFound("Material type not found");
+        throw AppError.notFound("Tipo de material no encontrado");
       }
     }
 
@@ -1270,7 +1270,7 @@ export const materialService = {
       );
       if (!locationActive) {
         throw AppError.badRequest(
-          "Target location is either not found or inactive",
+          "La ubicación de destino no se encontró o está inactiva",
           { locationId: writePayload.locationId },
         );
       }
@@ -1324,18 +1324,18 @@ export const materialService = {
     } catch (err: unknown) {
       const duplicateField = parseDuplicateKeyError(err);
       if (duplicateField === "barcode") {
-        throw AppError.conflict("Barcode already exists in this organization");
+        throw AppError.conflict("El código de barras ya existe en esta organización");
       }
       if (duplicateField === "serialNumber") {
         throw AppError.conflict(
-          "A material instance with that serial number already exists in this organization",
+          "Ya existe una instancia de material con ese número de serie en esta organización",
         );
       }
       throw err;
     }
 
     if (!updated) {
-      throw AppError.notFound("Material instance not found");
+      throw AppError.notFound("Instancia de material no encontrada");
     }
 
     return renameProperty(updated, "modelId", "model");
@@ -1381,7 +1381,7 @@ export const materialService = {
       };
     }
 
-    throw AppError.notFound("No material instance found for scanned code");
+    throw AppError.notFound("No se encontró instancia de material para el código escaneado");
   },
 
   async updateInstanceStatus(
@@ -1397,7 +1397,7 @@ export const materialService = {
       organizationId,
     });
     if (!instance) {
-      throw AppError.notFound("Material instance not found");
+      throw AppError.notFound("Instancia de material no encontrada");
     }
 
     const currentStatus = instance.status;
@@ -1412,7 +1412,7 @@ export const materialService = {
 
     if (!allowedTransitions.includes(status)) {
       throw AppError.badRequest(
-        `Invalid status transition from '${currentStatus}' to '${status}'`,
+        `Transición de estado inválida de '${currentStatus}' a '${status}'`,
         { currentStatus, requestedStatus: status, allowedTransitions },
       );
     }
@@ -1447,12 +1447,12 @@ export const materialService = {
     });
 
     if (!instance) {
-      throw AppError.notFound("Material instance not found");
+      throw AppError.notFound("Instancia de material no encontrada");
     }
 
     if (!["available", "retired"].includes(instance.status)) {
       throw AppError.badRequest(
-        "Can only delete available or retired material instances",
+        "Solo se pueden eliminar instancias de material disponibles o retiradas",
       );
     }
 
@@ -1480,7 +1480,7 @@ export const materialService = {
       organizationId,
     });
     if (!attribute) {
-      throw AppError.notFound("Material attribute not found");
+      throw AppError.notFound("Atributo de material no encontrado");
     }
     return attribute;
   },
@@ -1501,7 +1501,7 @@ export const materialService = {
         (err as { code: number }).code === 11000
       ) {
         throw AppError.conflict(
-          "An attribute with that name already exists in this organization",
+          "Ya existe un atributo con ese nombre en esta organización",
         );
       }
       throw err;
@@ -1518,7 +1518,7 @@ export const materialService = {
       organizationId,
     });
     if (!attribute) {
-      throw AppError.notFound("Material attribute not found");
+      throw AppError.notFound("Atributo de material no encontrado");
     }
 
     // Block narrowing of allowedValues when existing material types would become invalid
@@ -1534,8 +1534,8 @@ export const materialService = {
       });
       if (invalid) {
         throw AppError.badRequest(
-          "Cannot restrict allowedValues: one or more material types have values " +
-            "that are not in the new allowed list. Update those material types first.",
+          "No se pueden restringir los valores permitidos: uno o más tipos de material tienen valores " +
+            "que no están en la nueva lista de valores permitidos. Actualiza esos tipos de material primero.",
           { code: "ALLOWED_VALUES_IN_USE" },
         );
       }
@@ -1552,7 +1552,7 @@ export const materialService = {
         (err as { code: number }).code === 11000
       ) {
         throw AppError.conflict(
-          "An attribute with that name already exists in this organization",
+          "Ya existe un atributo con ese nombre en esta organización",
         );
       }
       throw err;
@@ -1566,7 +1566,7 @@ export const materialService = {
       organizationId,
     });
     if (!attribute) {
-      throw AppError.notFound("Material attribute not found");
+      throw AppError.notFound("Atributo de material no encontrado");
     }
 
     const usageCount = await MaterialModel.countDocuments({
@@ -1576,8 +1576,8 @@ export const materialService = {
 
     if (usageCount > 0) {
       throw AppError.conflict(
-        `Cannot delete attribute '${attribute.name}': it is used by ${usageCount} material type(s). ` +
-          "Remove the attribute from those material types first.",
+        `No se puede eliminar el atributo '${attribute.name}': es utilizado por ${usageCount} tipo(s) de material. ` +
+          "Elimina el atributo de esos tipos de material primero.",
       );
     }
 
@@ -1647,7 +1647,7 @@ export const materialService = {
       organizationId,
     });
     if (!attribute) {
-      throw AppError.notFound("Material attribute not found");
+      throw AppError.notFound("Atributo de material no encontrado");
     }
 
     const affectedMaterials = await MaterialModel.find({

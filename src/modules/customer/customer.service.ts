@@ -74,7 +74,7 @@ export const customerService = {
     });
 
     if (!customer) {
-      throw AppError.notFound("Customer not found");
+      throw AppError.notFound("Cliente no encontrado");
     }
 
     return customer;
@@ -94,7 +94,7 @@ export const customerService = {
     });
 
     if (existingEmail) {
-      throw AppError.conflict("A customer with this email already exists");
+      throw AppError.conflict("Ya existe un cliente con este correo electrónico");
     }
 
     // Check for duplicate phone within the organization
@@ -105,7 +105,7 @@ export const customerService = {
 
     if (existingPhone) {
       throw AppError.conflict(
-        "A customer with this phone number already exists in this organization",
+        "Ya existe un cliente con este número de teléfono en esta organización",
       );
     }
 
@@ -132,7 +132,7 @@ export const customerService = {
     );
 
     if (!customer) {
-      throw AppError.notFound("Customer not found");
+      throw AppError.notFound("Cliente no encontrado");
     }
 
     return customer;
@@ -153,7 +153,7 @@ export const customerService = {
     );
 
     if (!customer) {
-      throw AppError.notFound("Customer not found");
+      throw AppError.notFound("Cliente no encontrado");
     }
 
     return customer;
@@ -172,7 +172,7 @@ export const customerService = {
     });
 
     if (activeLoans > 0) {
-      throw AppError.badRequest("Cannot delete customer with active loans", {
+      throw AppError.badRequest("No se puede eliminar un cliente con préstamos activos", {
         activeLoansCount: activeLoans,
       });
     }
@@ -184,7 +184,7 @@ export const customerService = {
     );
 
     if (!customer) {
-      throw AppError.notFound("Customer not found");
+      throw AppError.notFound("Cliente no encontrado");
     }
 
     return customer;

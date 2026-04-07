@@ -25,7 +25,7 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 const ensureStripe = (): Stripe => {
   if (!stripe) {
-    throw AppError.internal("Stripe is not configured");
+    throw AppError.internal("Stripe no está configurado");
   }
   return stripe;
 };
@@ -152,17 +152,17 @@ export const billingService = {
     const stripeClient = ensureStripe();
 
     if (plan === "free") {
-      throw AppError.badRequest("Cannot create checkout for free plan");
+      throw AppError.badRequest("No se puede crear un checkout para el plan gratuito");
     }
 
     const priceIds = await getOrCreateStripePriceIds(plan);
     if (!priceIds) {
-      throw AppError.internal(`Could not resolve Stripe prices for plan: ${plan}`);
+      throw AppError.internal(`No se pudieron resolver los precios de Stripe para el plan: ${plan}`);
     }
 
     const org = await Organization.findById(organizationId);
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     // Create or get Stripe customer
@@ -225,7 +225,7 @@ export const billingService = {
     const org = await Organization.findById(organizationId);
     if (!org?.subscription?.stripeCustomerId) {
       throw AppError.badRequest(
-        "Organization does not have an active subscription",
+        "La organización no tiene una suscripción activa",
       );
     }
 
@@ -249,7 +249,7 @@ export const billingService = {
     const org = await Organization.findById(organizationId);
     if (!org?.subscription?.stripeSubscriptionId) {
       throw AppError.badRequest(
-        "Organization does not have an active subscription",
+        "La organización no tiene una suscripción activa",
       );
     }
 
@@ -260,7 +260,7 @@ export const billingService = {
 
     const priceIds = await getOrCreateStripePriceIds(plan);
     if (!priceIds?.seat) {
-      throw AppError.internal("Seat price not configured for this plan");
+      throw AppError.internal("Precio por puesto no configurado para este plan");
     }
 
     // Get subscription and update seat quantity
@@ -274,7 +274,7 @@ export const billingService = {
     );
 
     if (!seatItem) {
-      throw AppError.internal("Seat subscription item not found");
+      throw AppError.internal("Elemento de suscripción de puestos no encontrado");
     }
 
     await stripeClient.subscriptionItems.update(seatItem.id, {
@@ -302,7 +302,7 @@ export const billingService = {
     const org = await Organization.findById(organizationId);
     if (!org?.subscription?.stripeSubscriptionId) {
       throw AppError.badRequest(
-        "Organization does not have an active subscription",
+        "La organización no tiene una suscripción activa",
       );
     }
 
@@ -346,7 +346,7 @@ export const billingService = {
 
     const org = await Organization.findById(organizationId);
     if (!org?.subscription?.stripeCustomerId) {
-      throw AppError.badRequest("Organization does not have a Stripe customer");
+      throw AppError.badRequest("La organización no tiene un cliente de Stripe");
     }
 
     const paymentIntent = await stripeClient.paymentIntents.create({
@@ -375,7 +375,7 @@ export const billingService = {
     const stripeClient = ensureStripe();
 
     if (!STRIPE_WEBHOOK_SECRET) {
-      throw AppError.internal("Stripe webhook secret not configured");
+      throw AppError.internal("Secreto del webhook de Stripe no configurado");
     }
 
     return stripeClient.webhooks.constructEvent(
@@ -511,7 +511,7 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      throw AppError.badRequest("Missing organizationId in subscription metadata");
+      throw AppError.badRequest("Falta organizationId en los metadatos de la suscripción");
     }
 
     // Get billing cycle dates from the subscription items
@@ -549,7 +549,7 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      throw AppError.badRequest("Missing organizationId in subscription metadata");
+      throw AppError.badRequest("Falta organizationId en los metadatos de la suscripción");
     }
 
     // Downgrade to free plan - only set defined values
@@ -577,7 +577,7 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      throw AppError.notFound("Organization not found for Stripe customer");
+      throw AppError.notFound("Organización no encontrada para el cliente de Stripe");
     }
 
     await BillingEvent.create({
@@ -609,7 +609,7 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      throw AppError.notFound("Organization not found for Stripe customer");
+      throw AppError.notFound("Organización no encontrada para el cliente de Stripe");
     }
 
     await BillingEvent.create({

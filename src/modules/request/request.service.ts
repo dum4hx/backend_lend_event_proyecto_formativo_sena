@@ -79,7 +79,7 @@ function normalizeRequestItem(
   const resolvedType = item.type ?? fallbackType;
 
   if (resolvedType !== "material" && resolvedType !== "package") {
-    throw AppError.badRequest(`Invalid type for item at index ${itemIndex}`);
+    throw AppError.badRequest(`Tipo inválido para el elemento en el índice ${itemIndex}`);
   }
 
   const resolvedReferenceId =
@@ -88,7 +88,7 @@ function normalizeRequestItem(
 
   if (!resolvedReferenceId || !Types.ObjectId.isValid(resolvedReferenceId)) {
     throw AppError.badRequest(
-      `Invalid referenceId for ${resolvedType} item at index ${itemIndex}`,
+      `ID de referencia inválido para el elemento de tipo ${resolvedType} en el índice ${itemIndex}`,
     );
   }
 
@@ -146,7 +146,7 @@ function mapAssignmentsToRequestItemIndexes(
 
     if (!itemQueue || itemQueue.length === 0) {
       throw AppError.badRequest(
-        `Assignment at index ${index} does not match any request material item or exceeds requested quantity`,
+        `La asignación en el índice ${index} no coincide con ningún elemento de material de la solicitud o excede la cantidad solicitada`,
       );
     }
 
@@ -154,7 +154,7 @@ function mapAssignmentsToRequestItemIndexes(
 
     if (itemIndex === undefined) {
       throw AppError.badRequest(
-        `Unable to map assignment at index ${index} to request item`,
+        `No se pudo mapear la asignación en el índice ${index} al elemento de la solicitud`,
       );
     }
 
@@ -246,7 +246,7 @@ export const requestService = {
       );
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     return request as unknown as LoanRequestDocument;
@@ -268,7 +268,7 @@ export const requestService = {
     });
 
     if (!customer) {
-      throw AppError.notFound("Customer not found or inactive");
+      throw AppError.notFound("Cliente no encontrado o inactivo");
     }
 
     const normalizedItems = data.items.map((item, index) =>
@@ -285,7 +285,7 @@ export const requestService = {
 
         if (!material) {
           throw AppError.notFound(
-            `Material not found or inactive for item at index ${itemIndex}`,
+            `Material no encontrado o inactivo para el elemento en el índice ${itemIndex}`,
           );
         }
         continue;
@@ -299,7 +299,7 @@ export const requestService = {
 
       if (!pkg) {
         throw AppError.notFound(
-          `Package not found or inactive for item at index ${itemIndex}`,
+          `Paquete no encontrado o inactivo para el elemento en el índice ${itemIndex}`,
         );
       }
     }
@@ -311,11 +311,11 @@ export const requestService = {
     today.setHours(0, 0, 0, 0);
 
     if (startDate < today) {
-      throw AppError.badRequest("Start date cannot be in the past");
+      throw AppError.badRequest("La fecha de inicio no puede estar en el pasado");
     }
 
     if (endDate <= startDate) {
-      throw AppError.badRequest("End date must be after start date");
+      throw AppError.badRequest("La fecha de fin debe ser posterior a la fecha de inicio");
     }
 
     // Generate unique code for this request
@@ -362,7 +362,7 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     transitionRequestStatus(request, "approved");
@@ -399,7 +399,7 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     transitionRequestStatus(request, "rejected");
@@ -431,7 +431,7 @@ export const requestService = {
       (id, i, ids) => ids.indexOf(id) !== i,
     );
     if (duplicated.length > 0) {
-      throw AppError.badRequest("Duplicated materialInstanceId in assignments");
+      throw AppError.badRequest("materialInstanceId duplicado en las asignaciones");
     }
 
     const session = await startSession();
@@ -446,7 +446,7 @@ export const requestService = {
         );
 
         if (!request) {
-          throw AppError.notFound("Request not found");
+          throw AppError.notFound("Solicitud no encontrada");
         }
 
         transitionRequestStatus(request, "assigned");
@@ -470,7 +470,7 @@ export const requestService = {
 
         if (instances.length !== mappedAssignments.length) {
           throw AppError.notFound(
-            "One or more material instances do not exist in this organization",
+            "Una o más instancias de material no existen en esta organización",
           );
         }
 
@@ -485,7 +485,7 @@ export const requestService = {
           const input = assignments[i];
           if (!input) {
             throw AppError.badRequest(
-              `Invalid assignment payload at index ${i}`,
+              `Carga de asignación inválida en el índice ${i}`,
             );
           }
           const instance = instancesById.get(
@@ -493,7 +493,7 @@ export const requestService = {
           );
           if (!instance) {
             throw AppError.notFound(
-              `Material instance not found for assignment at index ${i}`,
+              `Instancia de material no encontrada para la asignación en el índice ${i}`,
             );
           }
           if (
@@ -501,7 +501,7 @@ export const requestService = {
             new Types.ObjectId(instance.modelId).toString()
           ) {
             throw AppError.badRequest(
-              `materialTypeId does not match the selected material instance at index ${i}`,
+              `materialTypeId no coincide con la instancia de material seleccionada en el índice ${i}`,
             );
           }
         }
@@ -523,7 +523,7 @@ export const requestService = {
 
         if (overlapping.length > 0) {
           throw AppError.conflict(
-            "One or more material instances are reserved for overlapping requests",
+            "Una o más instancias de material están reservadas para solicitudes que se superponen",
           );
         }
 
@@ -542,7 +542,7 @@ export const requestService = {
 
         if (updateResult.modifiedCount !== mappedAssignments.length) {
           throw AppError.conflict(
-            "One or more material instances are not available",
+            "Una o más instancias de material no están disponibles",
           );
         }
 
@@ -584,7 +584,7 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in approved status");
+      throw AppError.notFound("Solicitud no encontrada o no está en estado aprobado");
     }
 
     // Validate all material instances are available
@@ -597,7 +597,7 @@ export const requestService = {
 
     if (instances.length !== instanceIds.length) {
       throw AppError.badRequest(
-        "One or more material instances are not available",
+        "Una o más instancias de material no están disponibles",
       );
     }
 
@@ -637,13 +637,13 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     transitionRequestStatus(request, "ready");
 
     if (!request.assignedMaterials || request.assignedMaterials.length === 0) {
-      throw AppError.badRequest("No materials assigned to this request");
+      throw AppError.badRequest("No hay materiales asignados a esta solicitud");
     }
     await request.save();
 
@@ -671,17 +671,17 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in a payable status");
+      throw AppError.notFound("Solicitud no encontrada o no está en un estado facturable");
     }
 
     if ((request.depositAmount ?? 0) === 0) {
       throw AppError.badRequest(
-        "This request has no deposit amount; payment recording is not required",
+        "Esta solicitud no tiene monto de depósito; no se requiere registrar el pago",
       );
     }
 
     if (request.depositPaidAt) {
-      throw AppError.conflict("Deposit has already been recorded as paid");
+      throw AppError.conflict("El depósito ya ha sido registrado como pagado");
     }
 
     request.depositPaidAt = new Date();
@@ -710,17 +710,17 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found or not in a payable status");
+      throw AppError.notFound("Solicitud no encontrada o no está en un estado facturable");
     }
 
     if ((request.totalAmount ?? 0) === 0) {
       throw AppError.badRequest(
-        "This request has no rental amount; payment recording is not required",
+        "Esta solicitud no tiene monto de alquiler; no se requiere registrar el pago",
       );
     }
 
     if (request.rentalFeePaidAt) {
-      throw AppError.conflict("Rental fee has already been recorded as paid");
+      throw AppError.conflict("La tarifa de alquiler ya ha sido registrada como pagada");
     }
 
     request.rentalFeePaidAt = new Date();
@@ -746,7 +746,7 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     transitionRequestStatus(request, "cancelled");
@@ -793,7 +793,7 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Request not found");
+      throw AppError.notFound("Solicitud no encontrada");
     }
 
     // 2. Collect required material type IDs (resolve packages into their item types)

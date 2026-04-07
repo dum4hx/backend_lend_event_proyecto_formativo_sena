@@ -37,13 +37,13 @@ class TransferService {
     ]);
 
     if (!fromLocation)
-      throw AppError.notFound("Origin location not found or inactive");
+      throw AppError.notFound("Ubicación de origen no encontrada o inactiva");
     if (!toLocation)
-      throw AppError.notFound("Destination location not found or inactive");
+      throw AppError.notFound("Ubicación de destino no encontrada o inactiva");
 
     if (payload.fromLocationId === payload.toLocationId) {
       throw AppError.badRequest(
-        "Origin and destination locations must be different",
+        "Las ubicaciones de origen y destino deben ser diferentes",
       );
     }
 
@@ -79,31 +79,31 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Transfer request not found");
+    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
 
     // Validate that user is assigned to the source location
     const user = await User.findOne({ _id: userId, organizationId });
-    if (!user) throw AppError.notFound("User not found");
+    if (!user) throw AppError.notFound("Usuario no encontrado");
 
     const userHasAccessToSourceLocation = user.locations?.some(
       (locId) => locId.toString() === request.fromLocationId.toString(),
     );
     if (!userHasAccessToSourceLocation) {
       throw AppError.forbidden(
-        "Only users assigned to the source location can respond to transfer requests",
+        "Solo los usuarios asignados a la ubicación de origen pueden responder solicitudes de transferencia",
       );
     }
 
     if (request.status !== "requested") {
       throw AppError.badRequest(
-        `Cannot respond to a request in ${request.status} status`,
+        `No se puede responder a una solicitud en estado ${request.status}`,
       );
     }
 
     if (status === "rejected") {
       if (!rejectionReasonId) {
         throw AppError.badRequest(
-          "Rejection reason is required when rejecting a request",
+          "El motivo de rechazo es requerido al rechazar una solicitud",
         );
       }
       const reason = await TransferRejectionReason.findOne({
@@ -111,7 +111,7 @@ class TransferService {
         organizationId,
         isActive: true,
       });
-      if (!reason) throw AppError.notFound("Rejection reason not found");
+      if (!reason) throw AppError.notFound("Motivo de rechazo no encontrado");
 
       (request as any).rejectionReasonId = reason._id;
       if (rejectionNote !== undefined) {
@@ -156,7 +156,7 @@ class TransferService {
       .populate("fromLocationId", "name")
       .populate("toLocationId", "name");
 
-    if (!request) throw AppError.notFound("Transfer request not found");
+    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
     return request;
   }
 
@@ -173,17 +173,17 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Transfer request not found");
+    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
 
     if (request.requestedBy.toString() !== userId.toString()) {
       throw AppError.forbidden(
-        "Only the user who created the request can cancel it",
+        "Solo el usuario que creó la solicitud puede cancelarla",
       );
     }
 
     if (request.status !== "requested") {
       throw AppError.badRequest(
-        `Cannot cancel a request that is already in ${request.status} status`,
+        `No se puede cancelar una solicitud que ya está en estado ${request.status}`,
       );
     }
 
@@ -209,17 +209,17 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Transfer request not found");
+    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
 
     if (request.requestedBy.toString() !== userId.toString()) {
       throw AppError.forbidden(
-        "Only the user who created the request can edit it",
+        "Solo el usuario que creó la solicitud puede editarla",
       );
     }
 
     if (request.status !== "requested") {
       throw AppError.badRequest(
-        `Cannot edit a request that is already in ${request.status} status`,
+        `No se puede editar una solicitud que ya está en estado ${request.status}`,
       );
     }
 
@@ -261,9 +261,9 @@ class TransferService {
     ]);
 
     if (!fromLocation)
-      throw AppError.notFound("Origin location not found or inactive");
+      throw AppError.notFound("Ubicación de origen no encontrada o inactiva");
     if (!toLocation)
-      throw AppError.notFound("Destination location not found or inactive");
+      throw AppError.notFound("Ubicación de destino no encontrada o inactiva");
 
     // 2. If requestId is provided, validate it
     if (payload.requestId) {
@@ -271,10 +271,10 @@ class TransferService {
         _id: payload.requestId,
         organizationId,
       });
-      if (!request) throw AppError.notFound("Transfer request not found");
+      if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
       if (request.status !== "approved" && request.status !== "requested") {
         throw AppError.badRequest(
-          "Can only initiate a transfer for a requested or approved request",
+          "Solo se puede iniciar una transferencia para una solicitud solicitada o aprobada",
         );
       }
     }
@@ -289,7 +289,7 @@ class TransferService {
 
     if (instances.length !== payload.items.length) {
       throw AppError.badRequest(
-        "Some items are not at the origin location or belong to another organization",
+        "Algunos elementos no están en la ubicación de origen o pertenecen a otra organización",
       );
     }
 
@@ -299,7 +299,7 @@ class TransferService {
     );
     if (unavailableItems.length > 0) {
       throw AppError.badRequest(
-        "Some items are not in 'available' status and cannot be transferred",
+        "Algunos elementos no están en estado 'available' y no pueden ser transferidos",
       );
     }
 
@@ -396,11 +396,11 @@ class TransferService {
         _id: transferId,
         organizationId,
       }).session(session);
-      if (!transfer) throw AppError.notFound("Transfer not found");
+      if (!transfer) throw AppError.notFound("Transferencia no encontrada");
 
       if (transfer.status !== "in_transit") {
         throw AppError.badRequest(
-          `Cannot receive a transfer in ${transfer.status} status`,
+          `No se puede recibir una transferencia en estado ${transfer.status}`,
         );
       }
 
@@ -470,7 +470,7 @@ class TransferService {
       .populate("toLocationId", "name")
       .populate("items.instanceId");
 
-    if (!transfer) throw AppError.notFound("Transfer not found");
+    if (!transfer) throw AppError.notFound("Transferencia no encontrada");
     return transfer;
   }
 
@@ -543,7 +543,7 @@ class TransferService {
     });
     if (duplicate)
       throw AppError.conflict(
-        "A rejection reason with this label already exists",
+        "Ya existe un motivo de rechazo con esta etiqueta",
       );
 
     const reason = await TransferRejectionReason.create({
@@ -573,7 +573,7 @@ class TransferService {
       _id: reasonId,
       organizationId,
     });
-    if (!reason) throw AppError.notFound("Rejection reason not found");
+    if (!reason) throw AppError.notFound("Motivo de rechazo no encontrado");
 
     if (data.label !== undefined && data.label !== reason.label) {
       const duplicate = await TransferRejectionReason.findOne({
@@ -583,7 +583,7 @@ class TransferService {
       });
       if (duplicate)
         throw AppError.conflict(
-          "A rejection reason with this label already exists",
+          "Ya existe un motivo de rechazo con esta etiqueta",
         );
       reason.label = data.label;
     }
@@ -613,9 +613,9 @@ class TransferService {
       _id: reasonId,
       organizationId,
     });
-    if (!reason) throw AppError.notFound("Rejection reason not found");
+    if (!reason) throw AppError.notFound("Motivo de rechazo no encontrado");
     if (reason.isDefault)
-      throw AppError.badRequest("Default rejection reasons cannot be deleted");
+      throw AppError.badRequest("Los motivos de rechazo predeterminados no se pueden eliminar");
 
     await reason.deleteOne();
   }

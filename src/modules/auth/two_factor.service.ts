@@ -65,7 +65,7 @@ export const twoFactorService = {
 
     if (!record) {
       throw AppError.badRequest(
-        "No pending login verification found. Please log in again.",
+        "No se encontró verificación de inicio de sesión pendiente. Por favor inicia sesión nuevamente.",
         { code: "OTP_NOT_FOUND" },
       );
     }
@@ -73,7 +73,7 @@ export const twoFactorService = {
     if (record.expiresAt < new Date()) {
       await LoginOtp.deleteOne({ _id: record._id });
       throw AppError.badRequest(
-        "Verification code has expired. Please log in again to receive a new code.",
+        "El código de verificación ha expirado. Por favor inicia sesión nuevamente para recibir un nuevo código.",
         { code: "OTP_EXPIRED" },
       );
     }
@@ -81,7 +81,7 @@ export const twoFactorService = {
     if (record.attempts >= MAX_OTP_ATTEMPTS) {
       await LoginOtp.deleteOne({ _id: record._id });
       throw AppError.badRequest(
-        "Too many failed verification attempts. Please log in again to receive a new code.",
+        "Demasiados intentos de verificación fallidos. Por favor inicia sesión nuevamente para recibir un nuevo código.",
         { code: "OTP_MAX_ATTEMPTS" },
       );
     }
@@ -92,7 +92,7 @@ export const twoFactorService = {
       await record.save();
       const remaining = MAX_OTP_ATTEMPTS - record.attempts;
       throw AppError.badRequest(
-        `Invalid verification code. ${remaining} attempt(s) remaining.`,
+        `Código de verificación inválido. ${remaining} intento(s) restante(s).`,
         { code: "OTP_INVALID", attemptsLeft: remaining },
       );
     }
@@ -151,12 +151,14 @@ export const twoFactorService = {
     );
 
     if (!user) {
-      throw AppError.unauthorized("Invalid email or backup code");
+      throw AppError.unauthorized(
+        "Correo electrónico o código de respaldo inválido",
+      );
     }
 
     if (!user.backupCodes || user.backupCodes.length === 0) {
       throw AppError.badRequest(
-        "No backup codes are configured for this account.",
+        "No hay códigos de respaldo configurados para esta cuenta.",
         { code: "NO_BACKUP_CODES" },
       );
     }
@@ -198,7 +200,7 @@ export const twoFactorService = {
       }
     }
 
-    throw AppError.badRequest("Invalid or already used backup code.", {
+    throw AppError.badRequest("Código de respaldo inválido o ya utilizado.", {
       code: "BACKUP_CODE_INVALID",
     });
   },

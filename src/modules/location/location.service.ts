@@ -175,7 +175,7 @@ export class LocationService {
   static async getLocationById(id: string, organizationId: string) {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(id)) {
-      throw AppError.badRequest("Invalid location ID format");
+      throw AppError.badRequest("Formato de ID de ubicación no válido");
     }
 
     // Search with organization scope (multi-tenant security)
@@ -185,7 +185,7 @@ export class LocationService {
     });
 
     if (!location) {
-      throw AppError.notFound("Location not found");
+      throw AppError.notFound("Ubicación no encontrada");
     }
 
     return location;
@@ -213,7 +213,7 @@ export class LocationService {
     });
 
     if (existing) {
-      throw AppError.conflict("A location with this name already exists");
+      throw AppError.conflict("Ya existe una ubicación con este nombre");
     }
 
     // Create and return new location
@@ -250,7 +250,7 @@ export class LocationService {
   ) {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(id)) {
-      throw AppError.badRequest("Invalid location ID format");
+      throw AppError.badRequest("Formato de ID de ubicación no válido");
     }
 
     // Update with organization scope
@@ -261,7 +261,7 @@ export class LocationService {
     );
 
     if (!location) {
-      throw AppError.notFound("Location not found");
+      throw AppError.notFound("Ubicación no encontrada");
     }
 
     return location;
@@ -282,7 +282,7 @@ export class LocationService {
   static async deleteLocation(id: string, organizationId: string) {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(id)) {
-      throw AppError.badRequest("Invalid location ID format");
+      throw AppError.badRequest("Formato de ID de ubicación no válido");
     }
 
     // Check if in use by material instances (referential integrity)
@@ -294,7 +294,7 @@ export class LocationService {
 
     if (inUse > 0) {
       throw AppError.conflict(
-        "Location cannot be deactivated because it is currently assigned to material instances",
+        "La ubicación no se puede desactivar porque actualmente está asignada a instancias de material",
       );
     }
 
@@ -306,7 +306,7 @@ export class LocationService {
     );
 
     if (!location) {
-      throw AppError.notFound("Location not found");
+      throw AppError.notFound("Ubicación no encontrada");
     }
 
     return { success: true };
@@ -321,7 +321,7 @@ export class LocationService {
    */
   static async reactivateLocation(id: string, organizationId: string) {
     if (!Types.ObjectId.isValid(id)) {
-      throw AppError.badRequest("Invalid location ID format");
+      throw AppError.badRequest("Formato de ID de ubicación no válido");
     }
 
     const location = await Location.findOneAndUpdate(
@@ -331,7 +331,7 @@ export class LocationService {
     );
 
     if (!location) {
-      throw AppError.notFound("Location not found");
+      throw AppError.notFound("Ubicación no encontrada");
     }
 
     return location;
@@ -422,13 +422,13 @@ export class LocationService {
     if (currentOccupancy >= capacitySetting.maxQuantity) {
       if (!force) {
         throw AppError.conflict(
-          `The location "${location.name}" has reached its maximum capacity (${capacitySetting.maxQuantity}) for this material type.`,
+          `La ubicación "${location.name}" ha alcanzado su capacidad máxima (${capacitySetting.maxQuantity}) para este tipo de material.`,
           {
             type: "CAPACITY_WARNING",
             currentOccupancy,
             maxQuantity: capacitySetting.maxQuantity,
             message:
-              "Adding more items to this location is discouraged as it is already at full capacity. Please confirm if you want to proceed anyway.",
+              "No se recomienda agregar más ítems a esta ubicación ya que está a máxima capacidad. Confirme si desea continuar de todas formas.",
           },
         );
       }

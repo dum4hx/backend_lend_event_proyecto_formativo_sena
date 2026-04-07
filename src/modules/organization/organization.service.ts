@@ -49,7 +49,9 @@ export const organizationService = {
       session ?? null,
     );
     if (existing) {
-      throw AppError.conflict("An organization with this email already exists");
+      throw AppError.conflict(
+        "Ya existe una organización con este correo electrónico",
+      );
     }
 
     const orgDoc = new Organization(data);
@@ -71,12 +73,12 @@ export const organizationService = {
       requestingOrgId &&
       organizationId.toString() !== requestingOrgId.toString()
     ) {
-      throw AppError.unauthorized("Access denied to this organization");
+      throw AppError.unauthorized("Acceso denegado a esta organización");
     }
 
     const organization = await Organization.findById(organizationId);
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
     return organization;
   },
@@ -99,7 +101,7 @@ export const organizationService = {
     );
 
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
     return organization as InstanceType<typeof Organization>;
   },
@@ -113,7 +115,7 @@ export const organizationService = {
     const org =
       await Organization.findById(organizationId).select("subscription");
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
@@ -142,7 +144,7 @@ export const organizationService = {
       .select("subscription")
       .session(session ?? null);
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
@@ -159,7 +161,7 @@ export const organizationService = {
       currentCount + count > limits.maxCatalogItems
     ) {
       throw AppError.badRequest(
-        `Catalog item limit reached. Plan "${plan}" allows maximum ${limits.maxCatalogItems} items.`,
+        `Límite de ítems del catálogo alcanzado. El plan "${plan}" permite máximo ${limits.maxCatalogItems} ítems.`,
         { code: "PLAN_LIMIT_REACHED", resource: "catalog_items" },
       );
     }
@@ -195,7 +197,7 @@ export const organizationService = {
     const org =
       await Organization.findById(organizationId).select("subscription");
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
@@ -223,7 +225,7 @@ export const organizationService = {
       .select("subscription")
       .session(session ?? null);
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
@@ -236,7 +238,7 @@ export const organizationService = {
     );
     if (limits.maxSeats !== -1 && seatCount > limits.maxSeats) {
       throw AppError.badRequest(
-        `Plan "${plan}" allows maximum ${limits.maxSeats} seats`,
+        `El plan "${plan}" permite máximo ${limits.maxSeats} puestos`,
         { code: "PLAN_LIMIT_REACHED", resource: "seats" },
       );
     }
@@ -258,7 +260,7 @@ export const organizationService = {
     const org =
       await Organization.findById(organizationId).select("subscription");
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     const plan = (org.subscription?.plan ?? "free") as SubscriptionPlan;
@@ -393,14 +395,14 @@ export const organizationService = {
   ): Promise<void> {
     const org = await Organization.findById(organizationId).select("locations");
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
     const locations = await Location.find({
       _id: { $in: locationIds },
       organizationId,
     }).select("_id");
     if (locations.length !== locationIds.length) {
-      throw AppError.badRequest("One or more location IDs are invalid");
+      throw AppError.badRequest("Uno o más IDs de ubicación son inválidos");
     }
   },
 
@@ -431,7 +433,7 @@ export const organizationService = {
     ).select("settings");
 
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     return {
@@ -446,15 +448,13 @@ export const organizationService = {
   /**
    * Returns the current settings for an organization.
    */
-  async getSettings(
-    organizationId: Types.ObjectId | string,
-  ): Promise<{
+  async getSettings(organizationId: Types.ObjectId | string): Promise<{
     damageDueDays: number;
     requireFullPaymentBeforeCheckout: boolean;
   }> {
     const org = await Organization.findById(organizationId).select("settings");
     if (!org) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
     return {
       damageDueDays: org.settings?.damageDueDays ?? 30,

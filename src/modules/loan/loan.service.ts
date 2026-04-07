@@ -77,14 +77,14 @@ export const loanService = {
         }).session(session);
 
         if (!request) {
-          throw AppError.notFound("Request not found or not ready for pickup");
+          throw AppError.notFound("Solicitud no encontrada o no está lista para retiro");
         }
 
         // Enforce payment precondition: deposit must be paid when amount > 0
         const depositAmount = request.depositAmount ?? 0;
         if (depositAmount > 0 && !request.depositPaidAt) {
           throw AppError.badRequest(
-            "Cannot create a loan: the deposit for this request has not been paid yet",
+            "No se puede crear el préstamo: el depósito de esta solicitud no ha sido pagado aún",
           );
         }
 
@@ -98,7 +98,7 @@ export const loanService = {
           !request.rentalFeePaidAt
         ) {
           throw AppError.badRequest(
-            "Cannot create a loan: the rental fee has not been paid and the organization requires full payment before checkout",
+            "No se puede crear el préstamo: la tarifa de alquiler no ha sido pagada y la organización requiere pago completo antes del retiro",
           );
         }
 
@@ -145,7 +145,7 @@ export const loanService = {
 
         if (!loanLocationId) {
           throw AppError.badRequest(
-            "Cannot determine loan origin location: no valid material instances found",
+            "No se puede determinar la ubicación de origen del préstamo: no se encontraron instancias de material válidas",
           );
         }
 
@@ -229,7 +229,7 @@ export const loanService = {
         }).session(session);
 
         if (!loan) {
-          throw AppError.notFound("Loan not found or already returned");
+          throw AppError.notFound("Préstamo no encontrado o ya devuelto");
         }
 
         transitionLoanStatus(loan, "returned");
@@ -279,7 +279,7 @@ export const loanService = {
     });
 
     if (!loan) {
-      throw AppError.notFound("Loan not found or not in returned status");
+      throw AppError.notFound("Préstamo no encontrado o no está en estado devuelto");
     }
 
     transitionLoanStatus(loan, "closed");
@@ -291,8 +291,8 @@ export const loanService = {
         deposit.status === "applied" || deposit.status === "refunded";
       if (!resolved) {
         throw AppError.badRequest(
-          `Cannot close loan: deposit is not fully resolved. Current deposit status: "${deposit.status}". ` +
-            `Resolve the deposit (apply or refund) before closing the loan.`,
+          `No se puede cerrar el préstamo: el depósito no está completamente resuelto. Estado actual del depósito: "${deposit.status}". ` +
+            `Resuelva el depósito (aplicar o reembolsar) antes de cerrar el préstamo.`,
         );
       }
     }
@@ -305,7 +305,7 @@ export const loanService = {
     });
 
     if (!inspection) {
-      throw AppError.badRequest("Loan must be inspected before completion");
+      throw AppError.badRequest("El préstamo debe ser inspeccionado antes de completarse");
     }
 
     // Update materials to available (or damaged based on inspection)
@@ -350,11 +350,11 @@ export const loanService = {
     });
 
     if (!loan) {
-      throw AppError.notFound("Loan not found or cannot be extended");
+      throw AppError.notFound("Préstamo no encontrado o no se puede extender");
     }
 
     if (newEndDate <= loan.endDate) {
-      throw AppError.badRequest("New end date must be after current end date");
+      throw AppError.badRequest("La nueva fecha de fin debe ser posterior a la fecha de fin actual");
     }
 
     loan.endDate = newEndDate;
@@ -448,12 +448,12 @@ export const loanService = {
     });
 
     if (!loan) {
-      throw AppError.notFound("Loan not found");
+      throw AppError.notFound("Préstamo no encontrado");
     }
 
     const deposit = (loan as any).deposit;
     if (!deposit || deposit.amount === 0) {
-      throw AppError.badRequest("This loan has no deposit to refund");
+      throw AppError.badRequest("Este préstamo no tiene depósito para reembolsar");
     }
 
     // Ensure the loan has a completed inspection before allowing a refund
@@ -464,7 +464,7 @@ export const loanService = {
     });
     if (!completedInspection) {
       throw AppError.badRequest(
-        "Cannot refund the deposit until the loan has a completed inspection.",
+        "No se puede reembolsar el depósito hasta que el préstamo tenga una inspección completada.",
       );
     }
 
@@ -473,8 +473,8 @@ export const loanService = {
       deposit.status !== "partially_applied"
     ) {
       throw AppError.badRequest(
-        `Deposit cannot be refunded in its current status: "${deposit.status}". ` +
-          `Only deposits in "refund_pending" or "partially_applied" status can be refunded.`,
+        `El depósito no puede ser reembolsado en su estado actual: "${deposit.status}". ` +
+          `Solo los depósitos en estado "refund_pending" o "partially_applied" pueden ser reembolsados.`,
       );
     }
 
@@ -649,7 +649,7 @@ export const loanService = {
     const [loan] = await Loan.aggregate(pipeline);
 
     if (!loan) {
-      throw AppError.notFound("Loan not found");
+      throw AppError.notFound("Préstamo no encontrado");
     }
 
     const loanObj = loan as any;

@@ -334,7 +334,7 @@ export const pricingService = {
     configId: string,
   ): Promise<PricingConfigDocument> {
     if (!Types.ObjectId.isValid(configId)) {
-      throw AppError.badRequest("Invalid pricing config ID format");
+      throw AppError.badRequest("Formato de ID de configuración de precios no válido");
     }
 
     const orgId = new Types.ObjectId(organizationId.toString());
@@ -344,7 +344,7 @@ export const pricingService = {
     });
 
     if (!config) {
-      throw AppError.notFound("Pricing config not found");
+      throw AppError.notFound("Configuración de precios no encontrada");
     }
 
     return config as unknown as PricingConfigDocument;
@@ -370,7 +370,7 @@ export const pricingService = {
 
     if (existing) {
       throw AppError.conflict(
-        `A pricing config for this ${data.scope} already exists. Update the existing one instead.`,
+        `Ya existe una configuración de precios para este ${data.scope}. Actualice la existente.`,
       );
     }
 
@@ -453,7 +453,7 @@ export const pricingService = {
       doc.referenceId.toString() === doc.organizationId.toString()
     ) {
       throw AppError.badRequest(
-        "Cannot delete the organization default pricing config. Update it instead.",
+        "No se puede eliminar la configuración de precios predeterminada de la organización. Actualícela en su lugar.",
       );
     }
 
@@ -503,7 +503,7 @@ export const pricingService = {
         .lean();
 
       if (!materialType) {
-        throw AppError.notFound("Material type not found");
+        throw AppError.notFound("Tipo de material no encontrado");
       }
       basePricePerDay = (materialType as any).pricePerDay ?? 0;
     } else {
@@ -515,7 +515,7 @@ export const pricingService = {
         .lean();
 
       if (!pkg) {
-        throw AppError.notFound("Package not found");
+        throw AppError.notFound("Paquete no encontrado");
       }
       basePricePerDay = (pkg as any).pricePerDay ?? 0;
     }

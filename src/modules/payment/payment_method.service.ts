@@ -69,7 +69,7 @@ async function createPaymentMethod(
   });
   if (duplicate) {
     throw AppError.conflict(
-      `A payment method named "${data.name}" already exists in this organization`,
+      `Ya existe un método de pago llamado "${data.name}" en esta organización`,
     );
   }
 
@@ -96,12 +96,12 @@ async function updatePaymentMethod(
 ) {
   const method = await PaymentMethod.findOne({ _id: id, organizationId });
   if (!method) {
-    throw AppError.notFound("Payment method not found");
+    throw AppError.notFound("Método de pago no encontrado");
   }
 
   if (method.isDefault && data.name && data.name !== method.name) {
     throw AppError.badRequest(
-      "The name of a default payment method cannot be changed",
+      "No se puede cambiar el nombre de un método de pago predeterminado",
     );
   }
 
@@ -113,7 +113,7 @@ async function updatePaymentMethod(
     });
     if (duplicate) {
       throw AppError.conflict(
-        `A payment method named "${data.name}" already exists in this organization`,
+        `Ya existe un método de pago llamado "${data.name}" en esta organización`,
       );
     }
   }
@@ -137,11 +137,11 @@ async function deactivatePaymentMethod(
 ) {
   const method = await PaymentMethod.findOne({ _id: id, organizationId });
   if (!method) {
-    throw AppError.notFound("Payment method not found");
+    throw AppError.notFound("Método de pago no encontrado");
   }
 
   if (method.status === "inactive") {
-    throw AppError.badRequest("Payment method is already inactive");
+    throw AppError.badRequest("El método de pago ya está inactivo");
   }
 
   method.status = "inactive";

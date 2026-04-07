@@ -131,11 +131,11 @@ export const authService = {
       if (existingUser) {
         if (existingUser.status === "pending_email_verification") {
           throw AppError.conflict(
-            "A registration with this email is already pending email verification. Please check your inbox or wait 5 minutes to try again.",
+            "Ya existe un registro con este correo pendiente de verificación. Por favor revisa tu bandeja de entrada o espera 5 minutos para intentar de nuevo.",
             { code: "PENDING_EMAIL_VERIFICATION" },
           );
         }
-        throw AppError.conflict("A user with this email already exists", {
+        throw AppError.conflict("Ya existe un usuario con este correo electrónico", {
           code: "USER_EMAIL_ALREADY_EXISTS",
         });
       }
@@ -148,7 +148,7 @@ export const authService = {
         }).session(session);
         if (existingOrgWithTaxId) {
           throw AppError.conflict(
-            "An organization with this tax ID already exists",
+            "Ya existe una organización con este NIT/identificación tributaria",
             {
               code: "TAX_ID_ALREADY_EXISTS",
             },
@@ -162,7 +162,7 @@ export const authService = {
       }).session(session);
       if (existingOrgWithEmail) {
         throw AppError.conflict(
-          "An organization with this email already exists",
+          "Ya existe una organización con este correo electrónico",
           {
             code: "ORG_EMAIL_ALREADY_EXISTS",
           },
@@ -179,7 +179,7 @@ export const authService = {
       }).session(session);
       if (existingUserWithPhone) {
         throw AppError.conflict(
-          "A user with this phone number already exists",
+          "Ya existe un usuario con este número de teléfono",
           {
             code: "USER_PHONE_ALREADY_EXISTS",
           },
@@ -193,7 +193,7 @@ export const authService = {
 
       if (existingOrgWithPhone) {
         throw AppError.conflict(
-          "An organization with this phone number already exists",
+          "Ya existe una organización con este número de teléfono",
           { code: "ORG_PHONE_ALREADY_EXISTS" },
         );
       }
@@ -215,7 +215,7 @@ export const authService = {
         }).session(session);
         if (!defaultPlan) {
           throw AppError.badRequest(
-            "Starter subscription plan not found or inactive",
+            "Plan de suscripción starter no encontrado o inactivo",
           );
         }
         // Snapshot plan limits so org operations remain functional even if
@@ -248,7 +248,7 @@ export const authService = {
         logger.error("Owner role not found after insert", {
           organizationId: organization._id.toString(),
         });
-        throw AppError.internal("Failed to initialize owner role");
+        throw AppError.internal("Error al inicializar el rol de propietario");
       }
 
       // Create the owner user with roleId already set — no second save needed.
@@ -313,7 +313,7 @@ export const authService = {
         error: emailErr,
       });
       throw AppError.internal(
-        "Failed to send verification email. Please try again.",
+        "No se pudo enviar el correo de verificación. Por favor intenta de nuevo.",
       );
     }
 
@@ -347,7 +347,7 @@ export const authService = {
 
     if (!record) {
       throw AppError.badRequest(
-        "No pending email verification found for this address.",
+        "No se encontró verificación de correo pendiente para esta dirección.",
       );
     }
 
@@ -357,7 +357,7 @@ export const authService = {
         record.organizationId as Types.ObjectId | string,
       );
       throw AppError.badRequest(
-        "Verification code has expired. Your registration data has been removed. Please register again.",
+        "El código de verificación ha expirado. Tus datos de registro han sido eliminados. Por favor regístrate de nuevo.",
       );
     }
 
@@ -367,7 +367,7 @@ export const authService = {
         record.organizationId as Types.ObjectId | string,
       );
       throw AppError.badRequest(
-        "Too many failed verification attempts. Please register again.",
+        "Demasiados intentos de verificación fallidos. Por favor regístrate de nuevo.",
       );
     }
 
@@ -377,7 +377,7 @@ export const authService = {
       await record.save();
       const remaining = MAX_EMAIL_VERIFY_ATTEMPTS - record.attempts;
       throw AppError.badRequest(
-        `Invalid verification code. ${remaining} attempt(s) remaining.`,
+        `Código de verificación inválido. ${remaining} intento(s) restante(s).`,
       );
     }
 
@@ -389,12 +389,12 @@ export const authService = {
     );
 
     if (!user) {
-      throw AppError.notFound("User account not found");
+      throw AppError.notFound("Cuenta de usuario no encontrada");
     }
 
     const organization = await Organization.findById(record.organizationId);
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     // Clean up the verification token
@@ -470,29 +470,29 @@ export const authService = {
       .populate("organizationId", "status");
 
     if (!user) {
-      throw AppError.unauthorized("Invalid email or password");
+      throw AppError.unauthorized("Correo electrónico o contraseña inválidos");
     }
 
     // Verify password
     const isValidPassword = await user.verifyPassword(password);
     if (!isValidPassword) {
-      throw AppError.unauthorized("Invalid email or password");
+      throw AppError.unauthorized("Correo electrónico o contraseña inválidos");
     }
 
     // Check user status
     if (user.status === "pending_email_verification") {
       throw AppError.unauthorized(
-        "Please verify your email address before logging in. Check your inbox for a verification code.",
+        "Por favor verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada para el código de verificación.",
         { code: "EMAIL_NOT_VERIFIED" },
       );
     }
 
     if (user.status === "suspended") {
-      throw AppError.unauthorized("Your account has been suspended");
+      throw AppError.unauthorized("Tu cuenta ha sido suspendida");
     }
 
     if (user.status === "inactive") {
-      throw AppError.unauthorized("Your account is inactive");
+      throw AppError.unauthorized("Tu cuenta está inactiva");
     }
 
     // Check organization status
@@ -502,14 +502,14 @@ export const authService = {
     };
     if (org?.status === "suspended") {
       throw AppError.unauthorized(
-        "Organization is suspended. Please contact the organization owner.",
+        "La organización está suspendida. Por favor contacta al propietario de la organización.",
         { code: "ORGANIZATION_SUSPENDED" },
       );
     }
 
     if (org?.status === "cancelled") {
       throw AppError.unauthorized(
-        "Organization subscription has been cancelled.",
+        "La suscripción de la organización ha sido cancelada.",
         { code: "ORGANIZATION_CANCELLED" },
       );
     }
@@ -533,7 +533,7 @@ export const authService = {
       pendingOtp: true,
       email: user.email,
       message:
-        "A verification code has been sent to your email. Please enter it to complete login.",
+        "Se ha enviado un código de verificación a tu correo. Por favor ingrésalo para completar el inicio de sesión.",
     };
   },
 
@@ -553,7 +553,7 @@ export const authService = {
       .populate("organizationId", "status");
 
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     const org = user.organizationId as unknown as {
@@ -613,11 +613,11 @@ export const authService = {
   ): Promise<TokenPair> {
     const user = await User.findById(userId);
     if (!user) {
-      throw AppError.unauthorized("User not found");
+      throw AppError.unauthorized("Usuario no encontrado");
     }
 
     if (user.status !== "active") {
-      throw AppError.unauthorized("Account is not active");
+      throw AppError.unauthorized("La cuenta no está activa");
     }
 
     return generateTokenPair({
@@ -643,7 +643,7 @@ export const authService = {
     const canAddSeat = await organizationService.canAddSeat(organizationId);
     if (!canAddSeat) {
       throw AppError.badRequest(
-        "Seat limit reached. Please upgrade your plan to add more users.",
+        "Límite de puestos alcanzado. Por favor mejora tu plan para agregar más usuarios.",
         { code: "PLAN_LIMIT_REACHED", resource: "seats" },
       );
     }
@@ -655,7 +655,7 @@ export const authService = {
 
     if (existingUser) {
       throw AppError.conflict(
-        "A user with this email already exists in this organization",
+        "Ya existe un usuario con este correo electrónico en esta organización",
         { code: "USER_EMAIL_ALREADY_EXISTS" },
       );
     }
@@ -668,7 +668,7 @@ export const authService = {
       );
     } else {
       throw AppError.badRequest(
-        "At least one location must be assigned to the user",
+        "Se debe asignar al menos una ubicación al usuario",
       );
     }
 
@@ -754,24 +754,24 @@ export const authService = {
 
     if (!inviteToken) {
       throw AppError.badRequest(
-        "Invalid or expired invite link. Please ask your administrator to send a new invitation.",
+        "Enlace de invitación inválido o expirado. Por favor solicita a tu administrador que envíe una nueva invitación.",
       );
     }
 
     if (inviteToken.expiresAt < new Date()) {
       await InviteToken.deleteOne({ _id: inviteToken._id });
       throw AppError.badRequest(
-        "This invite link has expired. Please ask your administrator to send a new invitation.",
+        "Este enlace de invitación ha expirado. Por favor solicita a tu administrador que envíe una nueva invitación.",
       );
     }
 
     const user = await User.findById(inviteToken.userId);
     if (!user) {
-      throw AppError.notFound("User account not found");
+      throw AppError.notFound("Cuenta de usuario no encontrada");
     }
 
     if (user.status !== "invited") {
-      throw AppError.badRequest("This account has already been activated");
+      throw AppError.badRequest("Esta cuenta ya ha sido activada");
     }
 
     // Update user password and status
@@ -799,12 +799,12 @@ export const authService = {
   ): Promise<void> {
     const user = await User.findOne({ _id: userId, organizationId });
     if (!user) {
-      throw AppError.notFound("User not found in this organization");
+      throw AppError.notFound("Usuario no encontrado en esta organización");
     }
 
     if (user.status !== "invited") {
       throw AppError.badRequest(
-        "Only users with invited status can receive a new invite",
+        "Solo los usuarios con estado invitado pueden recibir una nueva invitación",
       );
     }
 
@@ -881,7 +881,7 @@ export const authService = {
       .lean();
 
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     response.status = organization.status;
@@ -931,13 +931,13 @@ export const authService = {
   ): Promise<void> {
     const user = await User.findById(userId).select("+password");
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     // Verify current password
     const isValid = await argon2.verify(user.password, currentPassword);
     if (!isValid) {
-      throw AppError.unauthorized("Current password is incorrect");
+      throw AppError.unauthorized("La contraseña actual es incorrecta");
     }
 
     user.password = newPassword;
@@ -1010,21 +1010,21 @@ export const authService = {
 
     if (!record) {
       throw AppError.badRequest(
-        "No password reset request found for this email",
+        "No se encontró solicitud de restablecimiento de contraseña para este correo",
       );
     }
 
     if (record.expiresAt < new Date()) {
       await PasswordResetToken.deleteOne({ _id: record._id });
       throw AppError.badRequest(
-        "Verification code has expired. Please request a new one.",
+        "El código de verificación ha expirado. Por favor solicita uno nuevo.",
       );
     }
 
     if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
       await PasswordResetToken.deleteOne({ _id: record._id });
       throw AppError.badRequest(
-        "Too many failed attempts. Please request a new code.",
+        "Demasiados intentos fallidos. Por favor solicita un nuevo código.",
       );
     }
 
@@ -1032,7 +1032,7 @@ export const authService = {
     if (!isValid) {
       record.attempts += 1;
       await record.save();
-      throw AppError.badRequest("Invalid verification code");
+      throw AppError.badRequest("Código de verificación inválido");
     }
 
     // Mark as verified
@@ -1060,20 +1060,20 @@ export const authService = {
       !record.verified
     ) {
       throw AppError.badRequest(
-        "Invalid or expired reset token. Please restart the password reset process.",
+        "Token de restablecimiento inválido o expirado. Por favor reinicia el proceso de restablecimiento de contraseña.",
       );
     }
 
     if (record.expiresAt < new Date()) {
       await PasswordResetToken.deleteOne({ _id: record._id });
       throw AppError.badRequest(
-        "Reset token has expired. Please request a new code.",
+        "El token de restablecimiento ha expirado. Por favor solicita un nuevo código.",
       );
     }
 
     const user = await User.findById(record.userId);
     if (!user) {
-      throw AppError.notFound("User not found");
+      throw AppError.notFound("Usuario no encontrado");
     }
 
     user.password = newPassword;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createRequire } from "node:module";
 import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 /* ---------- User Roles (RBAC) ---------- */
@@ -353,6 +354,40 @@ export const defaultOrganizationRoleDefs: Array<{
       "Rol de asesor comercial predeterminado — puede ser personalizado por el propietario.",
   },
 ];
+
+/* ---------- Startup: validate default role permission dependencies ---------- */
+
+const _require = createRequire(import.meta.url);
+const _permissionsJson: Array<{ _id: string; requires?: string[] }> =
+  _require("../seeders/permissions.json");
+
+const _PERMISSION_REQUIRES = new Map<string, string[]>(
+  _permissionsJson
+    .filter((p) => p.requires && p.requires.length > 0)
+    .map((p) => [p._id, p.requires!]),
+);
+
+for (const roleDef of defaultOrganizationRoleDefs) {
+  const permSet = new Set(roleDef.permissions);
+  const issues: string[] = [];
+
+  for (const perm of roleDef.permissions) {
+    const deps = _PERMISSION_REQUIRES.get(perm);
+    if (!deps) continue;
+    const missing = deps.filter((d) => !permSet.has(d));
+    if (missing.length > 0) {
+      issues.push(
+        `  - '${perm}' requiere: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  if (issues.length > 0) {
+    throw new Error(
+      `[role.model] El rol por defecto '${roleDef.name}' tiene dependencias de permisos incompletas:\n${issues.join("\n")}`,
+    );
+  }
+}
 
 /**
  * Flat, sorted, deduplicated list of every permission that can appear on an

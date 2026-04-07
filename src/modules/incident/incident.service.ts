@@ -113,7 +113,7 @@ async function assertNoActiveIncidentMaterialConflict(params: {
   }
 
   throw AppError.conflict(
-    "One or more material instances are already linked to an active incident",
+    "Una o más instancias de material ya están vinculadas a un incidente activo",
     {
       conflictingIncidentId: String(conflictingIncident._id),
       conflictingIncidentType: conflictingIncident.type,
@@ -154,7 +154,7 @@ export const incidentService = {
       const loan = await loanQuery;
 
       if (!loan) {
-        throw AppError.notFound("Loan not found in this organization");
+        throw AppError.notFound("Préstamo no encontrado en esta organización");
       }
     }
 
@@ -168,7 +168,7 @@ export const incidentService = {
       const location = await locationQuery;
 
       if (!location) {
-        throw AppError.notFound("Location not found in this organization");
+        throw AppError.notFound("Ubicación no encontrada en esta organización");
       }
     }
 
@@ -265,7 +265,7 @@ export const incidentService = {
     session?: ClientSession,
   ) {
     if (!materialInstanceIds.length) {
-      throw AppError.badRequest("At least one material instance is required");
+      throw AppError.badRequest("Se requiere al menos una instancia de material");
     }
 
     const incidentQuery = Incident.findOne({
@@ -276,7 +276,7 @@ export const incidentService = {
     const incident = await incidentQuery;
 
     if (!incident) {
-      throw AppError.notFound("Incident not found");
+      throw AppError.notFound("Incidente no encontrado");
     }
 
     await assertNoActiveIncidentMaterialConflict({
@@ -412,7 +412,7 @@ export const incidentService = {
       .populate("relatedMaterialInstances", "serialNumber modelId status");
 
     if (!incident) {
-      throw AppError.notFound("Incident not found");
+      throw AppError.notFound("Incidente no encontrado");
     }
 
     return incident;
@@ -432,7 +432,7 @@ export const incidentService = {
     });
 
     if (!incident) {
-      throw AppError.notFound("Incident not found");
+      throw AppError.notFound("Incidente no encontrado");
     }
 
     transitionIncidentStatus(incident, "acknowledged");
@@ -456,7 +456,7 @@ export const incidentService = {
     });
 
     if (!incident) {
-      throw AppError.notFound("Incident not found");
+      throw AppError.notFound("Incidente no encontrado");
     }
 
     transitionIncidentStatus(incident, "resolved");
@@ -519,7 +519,7 @@ export const incidentService = {
     });
 
     if (!incident) {
-      throw AppError.notFound("Incident not found");
+      throw AppError.notFound("Incidente no encontrado");
     }
 
     transitionIncidentStatus(incident, "dismissed");

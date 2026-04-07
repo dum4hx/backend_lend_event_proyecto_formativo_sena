@@ -40,7 +40,7 @@ function assertNotSuperAdmin(data: {
 }): void {
   if (data.name === "super_admin") {
     throw AppError.badRequest(
-      "The 'super_admin' role is platform-only and cannot be assigned to an organization",
+      "El rol 'super_admin' es exclusivo de la plataforma y no puede asignarse a una organización",
     );
   }
 
@@ -50,7 +50,7 @@ function assertNotSuperAdmin(data: {
     );
     if (forbidden.length > 0) {
       throw AppError.badRequest(
-        `The following permissions are restricted to the platform super-admin and cannot be used: ${forbidden.join(", ")}`,
+        `Los siguientes permisos están restringidos al super-administrador de la plataforma y no pueden ser utilizados: ${forbidden.join(", ")}`,
       );
     }
   }
@@ -71,9 +71,9 @@ function assertNotReadOnly(role: {
 }): void {
   if (role.isReadOnly) {
     throw AppError.forbidden(
-      `The '${
+      `El rol '${
         role.name ?? "owner"
-      }' role is a system role and cannot be modified or deleted`,
+      }' es un rol del sistema y no puede ser modificado o eliminado`,
     );
   }
 }
@@ -139,7 +139,7 @@ export const rolesService = {
       } catch (err: unknown) {
         // Handle duplicate key (unique per-organization)
         if ((err as any)?.code === 11000) {
-          throw AppError.conflict("Role with that name already exists");
+          throw AppError.conflict("Ya existe un rol con ese nombre");
         }
         throw err;
       }
@@ -190,7 +190,7 @@ export const rolesService = {
      */
     const role = await Role.findOne({ _id: id, organizationId });
     if (!role) {
-      throw AppError.notFound("Role not found");
+      throw AppError.notFound("Rol no encontrado");
     }
     return role;
   },
@@ -210,7 +210,7 @@ export const rolesService = {
         session,
       );
       if (!role) {
-        throw AppError.notFound("Role not found");
+        throw AppError.notFound("Rol no encontrado");
       }
 
       // Prevent modifying system roles (e.g. owner) and super_admin names/perms
@@ -231,7 +231,7 @@ export const rolesService = {
         return role;
       } catch (err: unknown) {
         if ((err as any)?.code === 11000) {
-          throw AppError.conflict("Role with that name already exists");
+          throw AppError.conflict("Ya existe un rol con ese nombre");
         }
         throw err;
       }
@@ -249,7 +249,7 @@ export const rolesService = {
         session,
       );
       if (!role) {
-        throw AppError.notFound("Role not found");
+        throw AppError.notFound("Rol no encontrado");
       }
 
       // Prevent deleting system roles (e.g. owner) — every organization
@@ -318,7 +318,7 @@ export const rolesService = {
       organizationId: organizationId,
     });
     if (!role) {
-      throw AppError.notFound("Role not found");
+      throw AppError.notFound("Rol no encontrado");
     }
     return role.permissions;
   },
@@ -331,7 +331,7 @@ export const rolesService = {
   async getRoleName(roleId: string) {
     const role = await Role.findById(roleId).select("name");
     if (!role) {
-      throw AppError.notFound("Role not found");
+      throw AppError.notFound("Rol no encontrado");
     }
     return role.name;
   },

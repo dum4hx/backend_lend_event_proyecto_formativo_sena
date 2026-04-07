@@ -31,7 +31,7 @@ function validateBatchTransition(current: string, next: string): void {
   const allowed = BATCH_TRANSITIONS[current];
   if (!allowed || !allowed.includes(next)) {
     throw AppError.conflict(
-      `Invalid batch status transition from "${current}" to "${next}"`,
+      `Transición de estado de lote no válida de "${current}" a "${next}"`,
     );
   }
 }
@@ -40,7 +40,7 @@ function validateItemTransition(current: string, next: string): void {
   const allowed = ITEM_TRANSITIONS[current];
   if (!allowed || !allowed.includes(next)) {
     throw AppError.conflict(
-      `Invalid item status transition from "${current}" to "${next}"`,
+      `Transición de estado de ítem no válida de "${current}" a "${next}"`,
     );
   }
 }
@@ -100,7 +100,7 @@ export const maintenanceService = {
       .lean();
 
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     return batch;
@@ -147,12 +147,12 @@ export const maintenanceService = {
   ) {
     const batch = await MaintenanceBatch.findOne({ _id: id, organizationId });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     if (batch.status !== "draft") {
       throw AppError.conflict(
-        "Batch can only be updated while in draft status",
+        "El lote solo se puede actualizar mientras esté en estado borrador",
       );
     }
 
@@ -177,11 +177,11 @@ export const maintenanceService = {
       organizationId,
     });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     if (batch.status !== "draft") {
-      throw AppError.conflict("Items can only be added while batch is draft");
+      throw AppError.conflict("Solo se pueden agregar ítems mientras el lote esté en borrador");
     }
 
     for (const item of items) {
@@ -192,7 +192,7 @@ export const maintenanceService = {
       });
       if (!instance) {
         throw AppError.notFound(
-          `Material instance ${item.materialInstanceId} not found in organization`,
+          `Instancia de material ${item.materialInstanceId} no encontrada en la organización`,
         );
       }
 
@@ -204,7 +204,7 @@ export const maintenanceService = {
       });
       if (existingBatch && existingBatch._id.toString() !== batchId) {
         throw AppError.conflict(
-          `Material instance ${item.materialInstanceId} is already in active maintenance batch "${existingBatch.name}"`,
+          `La instancia de material ${item.materialInstanceId} ya está en el lote de mantenimiento activo "${existingBatch.name}"`,
         );
       }
 
@@ -215,7 +215,7 @@ export const maintenanceService = {
       );
       if (alreadyInBatch) {
         throw AppError.conflict(
-          `Material instance ${item.materialInstanceId} is already in this batch`,
+          `La instancia de material ${item.materialInstanceId} ya está en este lote`,
         );
       }
 
@@ -257,12 +257,12 @@ export const maintenanceService = {
       organizationId,
     });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     if (batch.status !== "draft") {
       throw AppError.conflict(
-        "Items can only be removed while batch is draft",
+        "Solo se pueden remover ítems mientras el lote esté en borrador",
       );
     }
 
@@ -270,7 +270,7 @@ export const maintenanceService = {
       (item) => item.materialInstanceId.toString() === materialInstanceId,
     );
     if (itemIndex === -1) {
-      throw AppError.notFound("Item not found in batch");
+      throw AppError.notFound("Ítem no encontrado en el lote");
     }
 
     batch.items.splice(itemIndex, 1);
@@ -300,13 +300,13 @@ export const maintenanceService = {
       organizationId,
     });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     validateBatchTransition(batch.status, "in_progress");
 
     if (batch.items.length === 0) {
-      throw AppError.conflict("Cannot start a batch with no items");
+      throw AppError.conflict("No se puede iniciar un lote sin ítems");
     }
 
     // Transition each pending item to in_repair and sync instance status
@@ -348,18 +348,18 @@ export const maintenanceService = {
       organizationId,
     });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     if (batch.status !== "in_progress") {
-      throw AppError.conflict("Items can only be resolved in an active batch");
+      throw AppError.conflict("Solo se pueden resolver ítems en un lote activo");
     }
 
     const item = batch.items.find(
       (i) => i.materialInstanceId.toString() === materialInstanceId,
     );
     if (!item) {
-      throw AppError.notFound("Item not found in batch");
+      throw AppError.notFound("Ítem no encontrado en el lote");
     }
 
     validateItemTransition(item.itemStatus, data.resolution);
@@ -415,7 +415,7 @@ export const maintenanceService = {
       organizationId,
     });
     if (!batch) {
-      throw AppError.notFound("Maintenance batch not found");
+      throw AppError.notFound("Lote de mantenimiento no encontrado");
     }
 
     validateBatchTransition(batch.status, "cancelled");
