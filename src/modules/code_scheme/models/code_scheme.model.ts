@@ -143,13 +143,25 @@ const codeSchemeSchema = new Schema(
 
 // No duplicate scheme names per org + entity type + scope
 codeSchemeSchema.index(
-  { organizationId: 1, entityType: 1, materialTypeId: 1, categoryId: 1, name: 1 },
+  {
+    organizationId: 1,
+    entityType: 1,
+    materialTypeId: 1,
+    categoryId: 1,
+    name: 1,
+  },
   { unique: true },
 );
 
 // At most one default scheme per org + entity type + scope
 codeSchemeSchema.index(
-  { organizationId: 1, entityType: 1, materialTypeId: 1, categoryId: 1, isDefault: 1 },
+  {
+    organizationId: 1,
+    entityType: 1,
+    materialTypeId: 1,
+    categoryId: 1,
+    isDefault: 1,
+  },
   {
     unique: true,
     partialFilterExpression: { isDefault: true },

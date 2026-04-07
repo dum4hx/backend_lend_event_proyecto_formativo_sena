@@ -12,6 +12,7 @@ import {
 } from "../shared/state_machine.ts";
 import { conditionAfterToInstanceStatus } from "../shared/instance_status_mapper.ts";
 import { materialService } from "../material/material.service.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 export const inspectionService = {
   /**
@@ -133,7 +134,9 @@ export const inspectionService = {
         }).session(session);
 
         if (!loan) {
-          throw AppError.notFound("Préstamo no encontrado o no está en estado de devuelto");
+          throw AppError.notFound(
+            "Préstamo no encontrado o no está en estado de devuelto",
+          );
         }
 
         // Check if inspection already exists
@@ -141,7 +144,9 @@ export const inspectionService = {
           loanId: loan._id,
         }).session(session);
         if (existingInspection) {
-          throw AppError.conflict("Ya existe una inspección para este préstamo");
+          throw AppError.conflict(
+            "Ya existe una inspección para este préstamo",
+          );
         }
 
         // Validate all items match loan materials
@@ -157,9 +162,12 @@ export const inspectionService = {
         );
 
         if (missingMaterials.length > 0) {
-          throw AppError.badRequest("Todos los materiales del préstamo deben ser inspeccionados", {
-            missingMaterialIds: missingMaterials,
-          });
+          throw AppError.badRequest(
+            "Todos los materiales del préstamo deben ser inspeccionados",
+            {
+              missingMaterialIds: missingMaterials,
+            },
+          );
         }
 
         // Calculate total damage cost
@@ -194,10 +202,17 @@ export const inspectionService = {
           };
         });
 
+        const inspectionNumber = await codeGenerationService.generateCode({
+          organizationId: String(organizationId),
+          entityType: "inspection",
+          session,
+        });
+
         const [inspection]: any = await (Inspection as any).create(
           [
             {
               organizationId,
+              inspectionNumber,
               loanId: new Types.ObjectId(loanId),
               inspectedBy: new Types.ObjectId(userId),
               items: inspectionItems,
@@ -240,7 +255,9 @@ export const inspectionService = {
           if (dueDate) {
             invoiceDueDate = new Date(dueDate as any);
             if (isNaN(invoiceDueDate.getTime())) {
-              throw AppError.badRequest("Formato de fecha de vencimiento no válido");
+              throw AppError.badRequest(
+                "Formato de fecha de vencimiento no válido",
+              );
             }
           } else {
             // Use org-level policy for damage due days
@@ -263,7 +280,11 @@ export const inspectionService = {
             referenceType: "MaterialInstance" as const,
           }));
 
-          const invoiceNumber = `INV-${Date.now()}`;
+          const invoiceNumber = await codeGenerationService.generateCode({
+            organizationId: String(organizationId),
+            entityType: "invoice",
+            session,
+          });
           const invoiceTotal = totalDamageCost * 1; // 19% IVA
 
           const [createdInvoice]: any = await (Invoice as any).create(
@@ -329,7 +350,8 @@ export const inspectionService = {
               type: "refund",
               amount: depositAmt,
               date: new Date(),
-              reference: "Sin daños encontrados — depósito pendiente de reembolso físico",
+              reference:
+                "Sin daños encontrados — depósito pendiente de reembolso físico",
             });
             loanDeposit.status = "refund_pending";
           }

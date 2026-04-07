@@ -18,6 +18,13 @@ export const MaterialModelZodSchema = z.object({
     .min(1, "El nombre es requerido")
     .max(150, "Máximo 150 caracteres")
     .trim(),
+  code: z
+    .string()
+    .min(1, "El código es requerido")
+    .max(10, "Máximo 10 caracteres")
+    .trim()
+    .regex(/^[A-Za-z0-9]+$/, "El código solo puede contener letras y números")
+    .toUpperCase(),
   description: z
     .string()
     .min(1, "La descripción es requerida")
@@ -68,6 +75,13 @@ const materialTypeSchema = new Schema(
       required: true,
       maxlength: 150,
       trim: true,
+    },
+    code: {
+      type: String,
+      required: true,
+      maxlength: 10,
+      trim: true,
+      uppercase: true,
     },
     description: {
       type: String,
@@ -121,6 +135,7 @@ materialTypeSchema.index({ categoryId: 1 });
 
 // Ensure material model names are unique within an organization
 materialTypeSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+materialTypeSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 
 export type MaterialModelDocument = InferSchemaType<typeof materialTypeSchema>;
 export const MaterialModel = model<MaterialModelDocument>(

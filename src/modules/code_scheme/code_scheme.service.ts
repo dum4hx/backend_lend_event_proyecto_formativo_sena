@@ -66,18 +66,39 @@ async function createScheme(
     );
   }
 
-  const orgId = toObjectId(organizationId);
-
-  // If this scheme should be default, unset existing default
-  if (data.isDefault) {
-    await CodeScheme.updateMany(
-      { organizationId: orgId, entityType: data.entityType, isDefault: true },
-      { $set: { isDefault: false } },
-    );
+  // TYPE_CODE / CATEGORY_CODE tokens only allowed for material_instance
+  if (data.entityType !== "material_instance") {
+    if (
+      data.pattern.includes("{TYPE_CODE}") ||
+      data.pattern.includes("{CATEGORY_CODE}")
+    ) {
+      throw AppError.badRequest(
+        "Los tokens {TYPE_CODE} y {CATEGORY_CODE} solo están permitidos para el tipo de entidad material_instance",
+      );
+    }
   }
 
+  const orgId = toObjectId(organizationId);
+
+  // If this scheme should be default, unset existing default in same scope
+  if (data.isDefault) {
+    const defaultFilter: Record<string, unknown> = {
+      organizationId: orgId,
+      entityType: data.entityType,
+      isDefault: true,
+    };
+    if (data.entityType === "material_instance") {
+      defaultFilter.materialTypeId = data.materialTypeId ?? null;
+      defaultFilter.categoryId = data.categoryId ?? null;
+    }
+    await CodeScheme.updateMany(defaultFilter, { $set: { isDefault: false } });
+  }
+
+  const { materialTypeId, categoryId, ...rest } = data;
   const scheme = await CodeScheme.create({
-    ...data,
+    ...rest,
+    ...(materialTypeId != null ? { materialTypeId } : {}),
+    ...(categoryId != null ? { categoryId } : {}),
     organizationId: orgId,
   });
 
@@ -109,6 +130,18 @@ async function updateScheme(
       throw AppError.badRequest(
         `Patrón de código inválido: ${validation.errors.join(", ")}`,
       );
+    }
+
+    // TYPE_CODE / CATEGORY_CODE tokens only allowed for material_instance
+    if (scheme.entityType !== "material_instance") {
+      if (
+        data.pattern.includes("{TYPE_CODE}") ||
+        data.pattern.includes("{CATEGORY_CODE}")
+      ) {
+        throw AppError.badRequest(
+          "Los tokens {TYPE_CODE} y {CATEGORY_CODE} solo están permitidos para el tipo de entidad material_instance",
+        );
+      }
     }
   }
 
@@ -162,11 +195,17 @@ async function setAsDefault(
     );
   }
 
-  // Unset existing default for same entityType
-  await CodeScheme.updateMany(
-    { organizationId: orgId, entityType: scheme.entityType, isDefault: true },
-    { $set: { isDefault: false } },
-  );
+  // Unset existing default for same entityType + scope
+  const defaultFilter: Record<string, unknown> = {
+    organizationId: orgId,
+    entityType: scheme.entityType,
+    isDefault: true,
+  };
+  if (scheme.entityType === "material_instance") {
+    defaultFilter.materialTypeId = scheme.materialTypeId ?? null;
+    defaultFilter.categoryId = scheme.categoryId ?? null;
+  }
+  await CodeScheme.updateMany(defaultFilter, { $set: { isDefault: false } });
 
   scheme.isDefault = true;
   await scheme.save();
@@ -198,6 +237,31 @@ async function seedDefaultSchemes(
       entityType: "loan_request",
       name: "Predeterminado Solicitud",
       pattern: "REQ-{YYYY}-{SEQ:4}",
+    },
+    {
+      entityType: "invoice",
+      name: "Predeterminado Factura",
+      pattern: "INV-{YYYY}-{SEQ:4}",
+    },
+    {
+      entityType: "inspection",
+      name: "Predeterminado Inspección",
+      pattern: "INSP-{YYYY}-{SEQ:4}",
+    },
+    {
+      entityType: "incident",
+      name: "Predeterminado Incidente",
+      pattern: "INC-{YYYY}-{SEQ:4}",
+    },
+    {
+      entityType: "maintenance_batch",
+      name: "Predeterminado Mantenimiento",
+      pattern: "MNT-{YYYY}-{SEQ:4}",
+    },
+    {
+      entityType: "material_instance",
+      name: "Predeterminado Instancia Material",
+      pattern: "MI-{SEQ:6}",
     },
   ];
 

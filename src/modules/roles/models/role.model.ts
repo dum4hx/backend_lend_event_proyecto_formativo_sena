@@ -205,7 +205,9 @@ export const rolePermissions: Record<UserRole, string[]> = {
   ],
   manager: [
     "organization:read",
+    "users:create",
     "users:read",
+    "users:delete",
     "customers:read",
     "materials:create",
     "materials:read",
@@ -242,6 +244,9 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "operations:read",
     "maintenance:read",
     "code_schemes:read",
+    "code_schemes:create",
+    "code_schemes:update",
+    "code_schemes:delete",
   ],
   warehouse_operator: [
     "organization:read",
@@ -321,6 +326,7 @@ export const OWNER_ROLE_NAME = "owner" as const;
  */
 export const defaultOrganizationRoleDefs: Array<{
   name: DefaultOrganizationRole;
+  displayName: string;
   permissions: string[];
   isReadOnly: boolean;
   type: "SYSTEM" | "CUSTOM";
@@ -328,6 +334,7 @@ export const defaultOrganizationRoleDefs: Array<{
 }> = [
   {
     name: "owner",
+    displayName: "Propietario",
     permissions: rolePermissions.owner,
     isReadOnly: true,
     type: "SYSTEM",
@@ -336,6 +343,7 @@ export const defaultOrganizationRoleDefs: Array<{
   },
   {
     name: "manager",
+    displayName: "Gerente",
     permissions: rolePermissions.manager,
     isReadOnly: false,
     type: "CUSTOM",
@@ -344,6 +352,7 @@ export const defaultOrganizationRoleDefs: Array<{
   },
   {
     name: "warehouse_operator",
+    displayName: "Operador de Almacén",
     permissions: rolePermissions.warehouse_operator,
     isReadOnly: false,
     type: "CUSTOM",
@@ -352,6 +361,7 @@ export const defaultOrganizationRoleDefs: Array<{
   },
   {
     name: "commercial_advisor",
+    displayName: "Asesor Comercial",
     permissions: rolePermissions.commercial_advisor,
     isReadOnly: false,
     type: "CUSTOM",
@@ -413,6 +423,7 @@ const roleTypes = ["SYSTEM", "CUSTOM"] as const;
 // Zod schema for API validation
 export const RoleZodSchema = z.object({
   name: z.string().min(3).max(50).trim(),
+  displayName: z.string().min(2).max(100).trim().optional(),
   permissions: z.array(z.string()).optional(),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Formato de ID de organización no válido",
@@ -447,6 +458,14 @@ const roleSchema = new Schema(
       // NOTE: No `enum` restriction here — custom roles may use any name.
       // The `super_admin` name is blocked at the service layer via assertNotSuperAdmin.
       trim: true,
+    },
+    displayName: {
+      type: String,
+      maxlength: 100,
+      trim: true,
+      default: function (this: any) {
+        return this.name ? this.name.replace(/_/g, " ") : undefined;
+      },
     },
     permissions: {
       type: [String],

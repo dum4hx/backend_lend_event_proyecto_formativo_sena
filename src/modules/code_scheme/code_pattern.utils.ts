@@ -270,8 +270,6 @@ export function buildTokenValues(
     ...(context.categoryCode != null
       ? { categoryCode: context.categoryCode }
       : {}),
-    ...(context.typeCode != null
-      ? { typeCode: context.typeCode }
-      : {}),
+    ...(context.typeCode != null ? { typeCode: context.typeCode } : {}),
   };
 }

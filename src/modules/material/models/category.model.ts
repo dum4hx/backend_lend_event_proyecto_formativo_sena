@@ -11,6 +11,13 @@ export const CategoryZodSchema = z.object({
     .min(1, "El nombre es requerido")
     .max(100, "Máximo 100 caracteres")
     .trim(),
+  code: z
+    .string()
+    .min(1, "El código es requerido")
+    .max(10, "Máximo 10 caracteres")
+    .trim()
+    .regex(/^[A-Za-z0-9]+$/, "El código solo puede contener letras y números")
+    .toUpperCase(),
   description: z
     .string()
     .min(1, "La descripción es requerida")
@@ -50,6 +57,13 @@ const categorySchema = new Schema(
       maxlength: 100,
       trim: true,
     },
+    code: {
+      type: String,
+      required: true,
+      maxlength: 10,
+      trim: true,
+      uppercase: true,
+    },
     description: {
       type: String,
       required: true,
@@ -88,6 +102,7 @@ const categorySchema = new Schema(
 
 // Compound unique index: category name must be unique within an organization
 categorySchema.index({ organizationId: 1, name: 1 }, { unique: true });
+categorySchema.index({ organizationId: 1, code: 1 }, { unique: true });
 
 export type CategoryDocument = InferSchemaType<typeof categorySchema>;
 export const Category = model<CategoryDocument>("Category", categorySchema);

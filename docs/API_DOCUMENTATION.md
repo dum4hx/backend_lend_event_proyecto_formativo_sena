@@ -3004,11 +3004,12 @@ Creates a new category. Categories define which attributes are available to mate
 
 **Permission Required:** `materials:create`
 
-| Parameter   | Location | Type     | Required | Description                                                      |
-| ----------- | -------- | -------- | -------- | ---------------------------------------------------------------- |
-| name        | body     | string   | Yes      | Category name (max 100 chars, must be unique per organization)   |
-| description | body     | string   | Yes      | Category description (max 500 chars)                             |
-| attributes  | body     | object[] | No       | Array of attributes that belong to this category (default: `[]`) |
+| Parameter   | Location | Type     | Required | Description                                                                                               |
+| ----------- | -------- | -------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| name        | body     | string   | Yes      | Category name (max 100 chars, must be unique per organization)                                            |
+| code        | body     | string   | Yes      | Short code (1-10 alphanumeric chars, uppercase, unique per org). Used in `{CATEGORY_CODE}` pattern token. |
+| description | body     | string   | Yes      | Category description (max 500 chars)                                                                      |
+| attributes  | body     | object[] | No       | Array of attributes that belong to this category (default: `[]`)                                          |
 
 **Attributes Array Structure:**
 
@@ -3026,6 +3027,7 @@ attributes: [
 ```json
 {
   "name": "Cameras",
+  "code": "CAM",
   "description": "Professional and consumer cameras",
   "attributes": [
     {
@@ -3046,6 +3048,7 @@ attributes: [
       "_id": "64f1a2b3c4d5e6f7a8b9c0c9",
       "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
       "name": "Cameras",
+      "code": "CAM",
       "description": "Professional and consumer cameras",
       "attributes": [
         {
@@ -3064,6 +3067,7 @@ attributes: [
 
 - **400 Bad Request** – Category name already exists in this organization
 - **400 Bad Request** – Attribute ID is invalid or does not exist in organization
+- **409 Conflict** – Category code already exists in this organization
 
 ---
 
@@ -3582,6 +3586,7 @@ Creates a new material type. Validates against organization's catalog item limit
 | Parameter                | Location | Type     | Required | Description                                                                                                                                              |
 | ------------------------ | -------- | -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | name                     | body     | string   | Yes      | Material name (max 150 chars)                                                                                                                            |
+| code                     | body     | string   | Yes      | Short code (1-10 alphanumeric chars, uppercase, unique per org). Used in `{TYPE_CODE}` pattern token.                                                    |
 | description              | body     | string   | Yes      | Description (max 500 chars)                                                                                                                              |
 | categoryId               | body     | string[] | Yes      | Array of category IDs (MongoDB ObjectIds). A material type can belong to multiple categories. Attribute availability is inherited from these categories. |
 | pricePerDay              | body     | number   | Yes      | Rental price per day (must be > 0)                                                                                                                       |
@@ -3595,6 +3600,7 @@ Creates a new material type. Validates against organization's catalog item limit
 ```json
 {
   "name": "Canon EOS R5",
+  "code": "CEOSR5",
   "categoryId": ["64f1a2b3c4d5e6f7a8b9c0c9"],
   "description": "Professional mirrorless camera",
   "pricePerDay": 1500,
@@ -3623,6 +3629,7 @@ Creates a new material type. Validates against organization's catalog item limit
       "_id": "64f1a2b3c4d5e6f7a8b9c0de",
       "organizationId": "64f1a2b3c4d5e6f7a8b9c0d0",
       "name": "Canon EOS R5",
+      "code": "CEOSR5",
       "categoryId": "64f1a2b3c4d5e6f7a8b9c0c9",
       "description": "Professional mirrorless camera",
       "pricePerDay": 1500,
@@ -7669,21 +7676,44 @@ Base path: `/api/v1/code-schemes`
 
 All endpoints require `authenticate` + active organization middleware.
 
-Code schemes define patterns used to auto-generate human-readable codes for Loans and Loan Requests (e.g. `LO-2026-0001`, `REQ-2026-0042`).
+Code schemes define patterns used to auto-generate human-readable codes for multiple entities: Loans, Loan Requests, Invoices, Inspections, Incidents, Maintenance Batches, and Material Instances (e.g. `LO-2026-0001`, `INV-2026-0012`, `MI-000042`).
+
+### Supported Entity Types
+
+| Entity Type         | Default Pattern       | Auto-generated Field                        |
+| ------------------- | --------------------- | ------------------------------------------- |
+| `loan`              | `LO-{YYYY}-{SEQ:4}`   | `code`                                      |
+| `loan_request`      | `REQ-{YYYY}-{SEQ:4}`  | `code`                                      |
+| `invoice`           | `INV-{YYYY}-{SEQ:4}`  | `invoiceNumber`                             |
+| `inspection`        | `INSP-{YYYY}-{SEQ:4}` | `inspectionNumber`                          |
+| `incident`          | `INC-{YYYY}-{SEQ:4}`  | `incidentNumber`                            |
+| `maintenance_batch` | `MNT-{YYYY}-{SEQ:4}`  | `batchNumber`                               |
+| `material_instance` | `MI-{SEQ:6}`          | `serialNumber` (fallback when not provided) |
 
 ### Supported Pattern Tokens
 
-| Token             | Description                | Example Output   |
-| ----------------- | -------------------------- | ---------------- |
-| `{SEQ}`           | Unpadded sequential number | 1, 2, 42         |
-| `{SEQ:N}`         | Zero-padded to N digits    | `{SEQ:4}` → 0001 |
-| `{YYYY}`          | 4-digit year               | 2026             |
-| `{YY}`            | 2-digit year               | 26               |
-| `{MM}`            | 2-digit month (01-12)      | 04               |
-| `{DD}`            | 2-digit day (01-31)        | 06               |
-| `{LOCATION_CODE}` | Location code value        | ABC              |
+| Token             | Description                | Example Output   | Entity Restriction  |
+| ----------------- | -------------------------- | ---------------- | ------------------- |
+| `{SEQ}`           | Unpadded sequential number | 1, 2, 42         | All                 |
+| `{SEQ:N}`         | Zero-padded to N digits    | `{SEQ:4}` → 0001 | All                 |
+| `{YYYY}`          | 4-digit year               | 2026             | All                 |
+| `{YY}`            | 2-digit year               | 26               | All                 |
+| `{MM}`            | 2-digit month (01-12)      | 04               | All                 |
+| `{DD}`            | 2-digit day (01-31)        | 06               | All                 |
+| `{LOCATION_CODE}` | Location code value        | ABC              | All                 |
+| `{TYPE_CODE}`     | Material type code         | EQP              | `material_instance` |
+| `{CATEGORY_CODE}` | Material category code     | AUD              | `material_instance` |
 
 Every pattern must contain exactly one `{SEQ}` or `{SEQ:N}` token.
+
+### Material Instance Scope Resolution
+
+`material_instance` schemes support scoping by `materialTypeId` or `categoryId`. When generating a serial number, the system resolves the scheme using a priority chain:
+
+1. **Type-scoped** — scheme with matching `materialTypeId` (highest priority)
+2. **Category-scoped** — scheme with matching `categoryId` of the material type
+3. **Global** — scheme with `materialTypeId: null` and `categoryId: null` (org-wide default)
+4. **Fallback** — hardcoded pattern `MI-{SEQ:6}` if no scheme exists
 
 ### GET /code-schemes
 
@@ -7693,9 +7723,9 @@ Lists all code schemes for the organization.
 
 **Query parameters:**
 
-| Param        | Type                         | Description                    |
-| ------------ | ---------------------------- | ------------------------------ |
-| `entityType` | `"loan"` \| `"loan_request"` | Optional filter by entity type |
+| Param        | Type   | Description                                                       |
+| ------------ | ------ | ----------------------------------------------------------------- |
+| `entityType` | string | Optional filter by entity type (see supported entity types above) |
 
 **Response (200):**
 
@@ -7712,6 +7742,8 @@ Lists all code schemes for the organization.
         "pattern": "LO-{YYYY}-{SEQ:4}",
         "isActive": true,
         "isDefault": true,
+        "materialTypeId": null,
+        "categoryId": null,
         "createdAt": "...",
         "updatedAt": "..."
       }
@@ -7749,15 +7781,19 @@ Creates a new code scheme.
 
 **Request body:**
 
-| Field        | Type                         | Required | Description              |
-| ------------ | ---------------------------- | -------- | ------------------------ |
-| `entityType` | `"loan"` \| `"loan_request"` | Yes      | Target entity            |
-| `name`       | string (1-100)               | Yes      | Display name             |
-| `pattern`    | string (1-50)                | Yes      | Code pattern with tokens |
-| `isActive`   | boolean                      | No       | Default `true`           |
-| `isDefault`  | boolean                      | No       | Default `false`          |
+| Field            | Type           | Required | Description                                           |
+| ---------------- | -------------- | -------- | ----------------------------------------------------- |
+| `entityType`     | string         | Yes      | Target entity type                                    |
+| `name`           | string (1-100) | Yes      | Display name                                          |
+| `pattern`        | string (1-50)  | Yes      | Code pattern with tokens                              |
+| `isActive`       | boolean        | No       | Default `true`                                        |
+| `isDefault`      | boolean        | No       | Default `false`                                       |
+| `materialTypeId` | ObjectId       | No       | Scope to material type (only for `material_instance`) |
+| `categoryId`     | ObjectId       | No       | Scope to category (only for `material_instance`)      |
 
-**Example request:**
+> **Note:** `materialTypeId` and `categoryId` are mutually exclusive — you cannot set both. They are only valid when `entityType` is `"material_instance"`.
+
+**Example requests:**
 
 ```json
 {
@@ -7765,6 +7801,16 @@ Creates a new code scheme.
   "name": "Préstamo por Ubicación",
   "pattern": "LO-{LOCATION_CODE}-{YYYY}{MM}-{SEQ:4}",
   "isDefault": false
+}
+```
+
+```json
+{
+  "entityType": "material_instance",
+  "name": "Equipos Electrónicos",
+  "pattern": "{TYPE_CODE}-{SEQ:5}",
+  "materialTypeId": "665012ab...",
+  "isDefault": true
 }
 ```
 
@@ -7781,12 +7827,13 @@ Creates a new code scheme.
 
 **Errors:**
 
-- `400` — Invalid pattern (no `{SEQ}`, unknown token, too long).
-- `409` — Duplicate name for this entity type.
+- `400` — Invalid pattern (no `{SEQ}`, unknown token, too long, `{TYPE_CODE}`/`{CATEGORY_CODE}` on non-material_instance type).
+- `400` — `materialTypeId`/`categoryId` set on non-material_instance entity, or both set simultaneously.
+- `409` — Duplicate name for this entity type and scope.
 
 ### PUT /code-schemes/:id
 
-Updates an existing code scheme. Cannot change `entityType`.
+Updates an existing code scheme. Cannot change `entityType`, `materialTypeId`, or `categoryId`.
 
 **Permission:** `code_schemes:update`
 
@@ -7811,7 +7858,7 @@ Updates an existing code scheme. Cannot change `entityType`.
 
 **Errors:**
 
-- `400` — Invalid pattern.
+- `400` — Invalid pattern or restricted tokens for entity type.
 - `404` — Scheme not found.
 
 ### DELETE /code-schemes/:id
@@ -7836,7 +7883,7 @@ Deletes a code scheme. Cannot delete the default scheme.
 
 ### PATCH /code-schemes/:id/set-default
 
-Sets a code scheme as the default for its entity type. The previous default (if any) is automatically unset.
+Sets a code scheme as the default for its entity type and scope. For `material_instance` schemes, the default is scoped by `materialTypeId`/`categoryId` — setting a type-scoped scheme as default only affects other type-scoped schemes with the same type. The previous default (if any) in the same scope is automatically unset.
 
 **Permission:** `code_schemes:update`
 

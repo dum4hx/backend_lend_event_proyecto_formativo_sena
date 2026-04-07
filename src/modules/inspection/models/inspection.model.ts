@@ -156,6 +156,11 @@ const inspectionSchema = new Schema(
       required: true,
       index: true,
     },
+    inspectionNumber: {
+      type: String,
+      required: true,
+      immutable: true,
+    },
     loanId: {
       type: Schema.Types.ObjectId,
       ref: "Loan",
@@ -222,6 +227,10 @@ inspectionSchema.index({ organizationId: 1, loanId: 1 });
 inspectionSchema.index({ organizationId: 1, status: 1 });
 inspectionSchema.index({ organizationId: 1, createdAt: -1 });
 inspectionSchema.index({ inspectedBy: 1 });
+inspectionSchema.index(
+  { organizationId: 1, inspectionNumber: 1 },
+  { unique: true },
+);
 
 /* ---------- Export ---------- */
 

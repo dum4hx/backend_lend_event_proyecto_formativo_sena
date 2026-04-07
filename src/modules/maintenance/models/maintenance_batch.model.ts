@@ -177,6 +177,11 @@ const maintenanceBatchSchema = new Schema(
       ref: "Organization",
       required: true,
     },
+    batchNumber: {
+      type: String,
+      required: true,
+      immutable: true,
+    },
     name: {
       type: String,
       required: true,
@@ -237,6 +242,10 @@ maintenanceBatchSchema.index({
   organizationId: 1,
   "items.materialInstanceId": 1,
 });
+maintenanceBatchSchema.index(
+  { organizationId: 1, batchNumber: 1 },
+  { unique: true },
+);
 
 /* ---------- Model ---------- */
 

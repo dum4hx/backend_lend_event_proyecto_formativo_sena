@@ -124,6 +124,11 @@ const incidentSchema = new Schema(
       required: true,
       index: true,
     },
+    incidentNumber: {
+      type: String,
+      required: true,
+      immutable: true,
+    },
     loanId: {
       type: Schema.Types.ObjectId,
       ref: "Loan",
@@ -214,6 +219,10 @@ incidentSchema.index({
   sourceId: 1,
   type: 1,
 });
+incidentSchema.index(
+  { organizationId: 1, incidentNumber: 1 },
+  { unique: true },
+);
 
 /* ---------- Export ---------- */
 

@@ -11,6 +11,7 @@ import { renameProperty } from "../../utils/renameProperty.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { User } from "../user/models/user.model.ts";
 import { MATERIAL_TRANSITIONS } from "../shared/state_machine.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 type MaterialInstanceWritePayload = {
   modelId?: string;
@@ -95,7 +96,9 @@ const resolveEffectiveSerialAndBarcode = (opts: {
     if (isCreate) {
       throw AppError.badRequest("serialNumber es requerido");
     }
-    throw AppError.badRequest("serialNumber es requerido para actualizar este registro");
+    throw AppError.badRequest(
+      "serialNumber es requerido para actualizar este registro",
+    );
   }
 
   return { serialNumber, barcode };
@@ -259,6 +262,17 @@ export const materialService = {
     organizationId: Types.ObjectId | string,
     payload: Record<string, unknown>,
   ) {
+    if (payload.code) {
+      const existingCode = await Category.findOne({
+        organizationId,
+        code: payload.code,
+      });
+      if (existingCode) {
+        throw AppError.conflict(
+          "Ya existe una categoría con este código en la organización",
+        );
+      }
+    }
     const toCreate = { ...payload, organizationId } as Record<string, unknown>;
     const category = await Category.create(toCreate);
     return category;
@@ -276,6 +290,19 @@ export const materialService = {
 
     if (category.organizationId.toString() !== organizationId.toString()) {
       throw AppError.notFound("Categoría no encontrada");
+    }
+
+    if (typeof updates.code === "string" && updates.code !== category.code) {
+      const existingCode = await Category.findOne({
+        organizationId,
+        code: updates.code,
+        _id: { $ne: categoryId },
+      });
+      if (existingCode) {
+        throw AppError.conflict(
+          "Ya existe una categoría con este código en la organización",
+        );
+      }
     }
 
     Object.assign(category, updates);
@@ -351,6 +378,19 @@ export const materialService = {
     await organizationService.incrementCatalogItemCount(organizationId);
 
     try {
+      // Check duplicate code
+      if (payload.code) {
+        const existingCode = await MaterialModel.findOne({
+          organizationId,
+          code: payload.code,
+        });
+        if (existingCode) {
+          throw AppError.conflict(
+            "Ya existe un tipo de material con este código en la organización",
+          );
+        }
+      }
+
       // Resolve category IDs as strings for validation helpers
       const categoryIds: string[] = [];
       if (payload.categoryId) {
@@ -421,6 +461,20 @@ export const materialService = {
         categoryIds,
         incomingAttributes,
       );
+    }
+
+    // Check duplicate code
+    if (typeof updates.code === "string") {
+      const existingCode = await MaterialModel.findOne({
+        organizationId,
+        code: updates.code,
+        _id: { $ne: id },
+      });
+      if (existingCode) {
+        throw AppError.conflict(
+          "Ya existe un tipo de material con este código en la organización",
+        );
+      }
     }
 
     const materialType = await MaterialModel.findOneAndUpdate(
@@ -1196,8 +1250,20 @@ export const materialService = {
       );
     }
 
-    const payloadSerial = normalizeOptionalString(writePayload.serialNumber);
+    let payloadSerial = normalizeOptionalString(writePayload.serialNumber);
     const payloadBarcode = normalizeOptionalString(writePayload.barcode);
+
+    // Auto-generate serialNumber if not provided and not using barcode as serial
+    if (!payloadSerial && writePayload.useBarcodeAsSerial !== true) {
+      payloadSerial = await codeGenerationService.generateCode({
+        organizationId: String(organizationId),
+        entityType: "material_instance",
+        context: {
+          materialTypeId: String(payload.modelId),
+        },
+      });
+    }
+
     const { serialNumber, barcode } = resolveEffectiveSerialAndBarcode({
       useBarcodeAsSerial: writePayload.useBarcodeAsSerial,
       payloadSerial,
@@ -1220,7 +1286,9 @@ export const materialService = {
     } catch (err: unknown) {
       const duplicateField = parseDuplicateKeyError(err);
       if (duplicateField === "barcode") {
-        throw AppError.conflict("El código de barras ya existe en esta organización");
+        throw AppError.conflict(
+          "El código de barras ya existe en esta organización",
+        );
       }
       if (duplicateField === "serialNumber") {
         throw AppError.conflict(
@@ -1324,7 +1392,9 @@ export const materialService = {
     } catch (err: unknown) {
       const duplicateField = parseDuplicateKeyError(err);
       if (duplicateField === "barcode") {
-        throw AppError.conflict("El código de barras ya existe en esta organización");
+        throw AppError.conflict(
+          "El código de barras ya existe en esta organización",
+        );
       }
       if (duplicateField === "serialNumber") {
         throw AppError.conflict(
@@ -1381,7 +1451,9 @@ export const materialService = {
       };
     }
 
-    throw AppError.notFound("No se encontró instancia de material para el código escaneado");
+    throw AppError.notFound(
+      "No se encontró instancia de material para el código escaneado",
+    );
   },
 
   async updateInstanceStatus(

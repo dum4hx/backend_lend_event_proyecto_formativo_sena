@@ -19,6 +19,7 @@ import {
   incidentTypeOnResolveToInstanceStatus,
 } from "../shared/instance_status_mapper.ts";
 import { materialService } from "../material/material.service.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 import { logger } from "../../utils/logger.ts";
 
 /* ---------- Types ---------- */
@@ -216,6 +217,12 @@ export const incidentService = {
       );
     }
 
+    createPayload.incidentNumber = await codeGenerationService.generateCode({
+      organizationId: String(organizationId),
+      entityType: "incident",
+      ...(session ? { session } : {}),
+    });
+
     const [incident] = await (Incident as any).create([createPayload], {
       session: session ?? undefined,
     });
@@ -265,7 +272,9 @@ export const incidentService = {
     session?: ClientSession,
   ) {
     if (!materialInstanceIds.length) {
-      throw AppError.badRequest("Se requiere al menos una instancia de material");
+      throw AppError.badRequest(
+        "Se requiere al menos una instancia de material",
+      );
     }
 
     const incidentQuery = Incident.findOne({

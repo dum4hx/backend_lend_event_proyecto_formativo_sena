@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Invoice, type InvoiceDocument } from "./models/invoice.model.ts";
 import { PaymentMethod } from "../payment/models/payment_method.model.ts";
 import { AppError } from "../../errors/AppError.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 import { emailService } from "../../utils/email.ts";
 
 /**
@@ -175,9 +176,22 @@ export const invoiceService = {
     dueDate?: string | Date;
     taxRate?: number;
     createdBy: Types.ObjectId;
-    invoiceNumber: string;
+    invoiceNumber?: string;
   }) {
-    const { items, taxRate = 0, dueDate, ...rest } = params;
+    const {
+      items,
+      taxRate = 0,
+      dueDate,
+      invoiceNumber: providedNumber,
+      ...rest
+    } = params;
+
+    const invoiceNumber =
+      providedNumber ??
+      (await codeGenerationService.generateCode({
+        organizationId: params.organizationId,
+        entityType: "invoice",
+      }));
 
     // Calculate totals
     const subtotal = items.reduce(
@@ -189,6 +203,7 @@ export const invoiceService = {
 
     const invoice = new Invoice({
       ...rest,
+      invoiceNumber,
       items,
       subtotal,
       tax,
@@ -223,7 +238,9 @@ export const invoiceService = {
     });
 
     if (!invoice) {
-      throw AppError.notFound("Factura no encontrada o no está en estado de pago");
+      throw AppError.notFound(
+        "Factura no encontrada o no está en estado de pago",
+      );
     }
 
     // Validate paymentMethodId belongs to this organization and is active

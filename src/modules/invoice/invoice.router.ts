@@ -175,7 +175,6 @@ invoiceRouter.post(
         ...req.body,
         organizationId,
         createdBy: new Types.ObjectId(user.id),
-        invoiceNumber: `INV-${Date.now()}`,
       });
 
       res.status(201).json({

@@ -156,6 +156,7 @@ const invoiceSchema = new Schema(
     invoiceNumber: {
       type: String,
       required: true,
+      immutable: true,
     },
     customerId: {
       type: Schema.Types.ObjectId,

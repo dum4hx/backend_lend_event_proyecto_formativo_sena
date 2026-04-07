@@ -9,6 +9,7 @@ import {
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { materialService } from "../material/material.service.ts";
 import { AppError } from "../../errors/AppError.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 /* ---------- Batch State Machine ---------- */
 
@@ -132,6 +133,11 @@ export const maintenanceService = {
     if (data.locationId !== undefined) doc.locationId = data.locationId;
     if (data.notes !== undefined) doc.notes = data.notes;
 
+    doc.batchNumber = await codeGenerationService.generateCode({
+      organizationId: String(organizationId),
+      entityType: "maintenance_batch",
+    });
+
     const batch = await MaintenanceBatch.create(doc);
 
     return batch.toObject();
@@ -181,7 +187,9 @@ export const maintenanceService = {
     }
 
     if (batch.status !== "draft") {
-      throw AppError.conflict("Solo se pueden agregar ítems mientras el lote esté en borrador");
+      throw AppError.conflict(
+        "Solo se pueden agregar ítems mientras el lote esté en borrador",
+      );
     }
 
     for (const item of items) {
@@ -224,9 +232,7 @@ export const maintenanceService = {
         entryReason: item.entryReason,
         itemStatus: "pending",
         sourceType: item.sourceType,
-        sourceId: item.sourceId
-          ? new Types.ObjectId(item.sourceId)
-          : undefined,
+        sourceId: item.sourceId ? new Types.ObjectId(item.sourceId) : undefined,
         sourceItemIndex: item.sourceItemIndex,
         estimatedCost: item.estimatedCost,
         repairNotes: item.repairNotes,
@@ -352,7 +358,9 @@ export const maintenanceService = {
     }
 
     if (batch.status !== "in_progress") {
-      throw AppError.conflict("Solo se pueden resolver ítems en un lote activo");
+      throw AppError.conflict(
+        "Solo se pueden resolver ítems en un lote activo",
+      );
     }
 
     const item = batch.items.find(
