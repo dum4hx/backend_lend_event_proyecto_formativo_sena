@@ -373,7 +373,7 @@
     "description": "Permite ver registros de préstamos activos e históricos.",
     "category": "Loans",
     "isPlatformPermission": false,
-    "requires": []
+    "requires": ["customers:read"]
   },
   {
     "_id": "loans:update",

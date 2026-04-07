@@ -118,7 +118,9 @@ export const packageService = {
         });
 
         if (existingTypes.length !== materialTypeIds.length) {
-          throw AppError.badRequest("Uno o más tipos de material no encontrados");
+          throw AppError.badRequest(
+            "Uno o más tipos de material no encontrados",
+          );
         }
       }
     }
@@ -139,7 +141,7 @@ export const packageService = {
   async activatePackage(organizationId: Types.ObjectId | string, id: string) {
     const pkg = await Package.findOneAndUpdate(
       { _id: id, organizationId },
-      { $set: { isActive: true } },
+      { $set: { status: "active" } },
       { new: true },
     );
 
@@ -150,7 +152,7 @@ export const packageService = {
   async deactivatePackage(organizationId: Types.ObjectId | string, id: string) {
     const pkg = await Package.findOneAndUpdate(
       { _id: id, organizationId },
-      { $set: { isActive: false } },
+      { $set: { status: "inactive" } },
       { new: true },
     );
 
@@ -176,7 +178,10 @@ export const packageService = {
     if (!pkg) throw AppError.notFound("Paquete no encontrado");
 
     const materialTypeIds = pkg.items.map(
-      (item) => new Types.ObjectId(String(item.materialTypeId._id ?? item.materialTypeId)),
+      (item) =>
+        new Types.ObjectId(
+          String(item.materialTypeId._id ?? item.materialTypeId),
+        ),
     );
 
     // Fetch all candidate instances (available, reserved, or loaned)
@@ -239,7 +244,12 @@ export const packageService = {
       // Group by location
       const byLocation = new Map<
         string,
-        { locationId: string; locationName: string; count: number; instances: any[] }
+        {
+          locationId: string;
+          locationName: string;
+          count: number;
+          instances: any[];
+        }
       >();
 
       for (const inst of availableInstances) {
@@ -292,7 +302,9 @@ export const packageService = {
     });
 
     if (activeRequests > 0) {
-      throw AppError.badRequest("No se puede eliminar un paquete con solicitudes activas");
+      throw AppError.badRequest(
+        "No se puede eliminar un paquete con solicitudes activas",
+      );
     }
 
     const pkg = await Package.findOneAndDelete({ _id: id, organizationId });

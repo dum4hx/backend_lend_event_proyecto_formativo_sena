@@ -244,6 +244,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
   ],
   warehouse_operator: [
     "organization:read",
+    "customers:read",
     "materials:read",
     "materials:state:update",
     "packages:read",
