@@ -197,6 +197,10 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "maintenance:update",
     "maintenance:resolve",
     "maintenance:delete",
+    "code_schemes:read",
+    "code_schemes:create",
+    "code_schemes:update",
+    "code_schemes:delete",
   ],
   manager: [
     "organization:read",
@@ -235,6 +239,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "payment_methods:update",
     "operations:read",
     "maintenance:read",
+    "code_schemes:read",
   ],
   warehouse_operator: [
     "organization:read",
@@ -321,14 +326,15 @@ export const defaultOrganizationRoleDefs: Array<{
     isReadOnly: true,
     type: "SYSTEM",
     description:
-      "Organization owner — full access. System role, non-editable and non-deletable.",
+      "Propietario de la organización — acceso completo. Rol del sistema, no editable y no eliminable.",
   },
   {
     name: "manager",
     permissions: rolePermissions.manager,
     isReadOnly: false,
     type: "CUSTOM",
-    description: "Default manager role — can be customized by the owner.",
+    description:
+      "Rol de gerente predeterminado — puede ser personalizado por el propietario.",
   },
   {
     name: "warehouse_operator",
@@ -336,7 +342,7 @@ export const defaultOrganizationRoleDefs: Array<{
     isReadOnly: false,
     type: "CUSTOM",
     description:
-      "Default warehouse operator role — can be customized by the owner.",
+      "Rol de operador de almacén predeterminado — puede ser personalizado por el propietario.",
   },
   {
     name: "commercial_advisor",
@@ -344,7 +350,7 @@ export const defaultOrganizationRoleDefs: Array<{
     isReadOnly: false,
     type: "CUSTOM",
     description:
-      "Default commercial advisor role — can be customized by the owner.",
+      "Rol de asesor comercial predeterminado — puede ser personalizado por el propietario.",
   },
 ];
 

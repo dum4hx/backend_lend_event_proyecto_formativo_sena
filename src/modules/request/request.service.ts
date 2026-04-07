@@ -17,6 +17,7 @@ import {
   validateTransition,
   LOAN_REQUEST_TRANSITIONS,
 } from "../shared/state_machine.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 interface RequestItemInput {
   type?: string;
@@ -317,12 +318,19 @@ export const requestService = {
       throw AppError.badRequest("End date must be after start date");
     }
 
+    // Generate unique code for this request
+    const code = await codeGenerationService.generateCode({
+      organizationId,
+      entityType: "loan_request",
+    });
+
     const request = await LoanRequest.create({
       ...data,
       items: normalizedItems,
       organizationId,
       createdBy: userId,
       status: "pending",
+      code,
     });
 
     const populatedRequest = await LoanRequest.findById(request._id).populate(

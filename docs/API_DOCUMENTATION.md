@@ -572,12 +572,12 @@ Verifies the 6-digit OTP sent to the user's email during login. On success, issu
 
 **Error Responses:**
 
-| Status | Condition                                | Details |
-| ------ | ---------------------------------------- | ------- |
-| 400    | Invalid OTP | `code: "OTP_INVALID"`, `attemptsLeft: number` (remaining attempts) |
-| 400    | OTP expired after 5 minutes | `code: "OTP_EXPIRED"` |
-| 400    | Too many failed attempts (5 max) | `code: "OTP_MAX_ATTEMPTS"` |
-| 400    | No pending OTP verification found | `code: "OTP_NOT_FOUND"` |
+| Status | Condition                         | Details                                                            |
+| ------ | --------------------------------- | ------------------------------------------------------------------ |
+| 400    | Invalid OTP                       | `code: "OTP_INVALID"`, `attemptsLeft: number` (remaining attempts) |
+| 400    | OTP expired after 5 minutes       | `code: "OTP_EXPIRED"`                                              |
+| 400    | Too many failed attempts (5 max)  | `code: "OTP_MAX_ATTEMPTS"`                                         |
+| 400    | No pending OTP verification found | `code: "OTP_NOT_FOUND"`                                            |
 
 ---
 
@@ -1214,11 +1214,27 @@ Create a new custom role for the current organization.
 
 **Permission Required:** `roles:create`
 
+**Permission Dependencies Validation:**
+
+Each permission may declare a list of _required_ permissions that must also be included in the same role assignment. The system validates this dependency chain and rejects the request if any dependencies are missing.
+
+**Example:** If you assign `loans:create` to a role, the system will automatically validate that the role also includes `loans:read`, `materials:read`, and `customers:read`. If any are missing, the API returns `400 Bad Request` with a detailed error message listing which dependencies are incomplete.
+
+**Business Logic for Frontend:**
+
+When the frontend allows users to assign permissions to a role, it should:
+
+1. Fetch `GET /permissions` to retrieve all available permissions and their dependency information (the `requires` field).
+2. When building the role's permission list in the UI, display the dependency graph so admins understand the "cost" of each permission.
+3. On save, let the backend validate the complete dependency chain. If validation fails (400), display the error message to the user explaining which dependencies are missing.
+4. Optionally, the UI can pre-emptively add required dependencies when the user selects a permission (auto-include), but **do not auto-include silently**—always show the admin what dependencies are being added.
+
 **Notes:**
 
 - The name `super_admin` is reserved and will be rejected.
 - Permissions belonging to the platform `super_admin` role are restricted and cannot be assigned to organization roles.
-- Use `GET /permissions` to retrieve the full list of valid, assignable permission identifiers.
+- Use `GET /permissions` to retrieve the full list of valid, assignable permission identifiers and their dependency information.
+- All error communications are in Spanish for organization users.
 
 **Response:** `201 Created`
 
@@ -1238,6 +1254,16 @@ Create a new custom role for the current organization.
 }
 ```
 
+**Error Responses:**
+
+| Status                                                                                                               | Condition                              | Details                                                                   |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| 400                                                                                                                  | Incomplete permission dependencies     | `Dependencias de permisos incompletas:                                    |
+| - El permiso 'loans:create' requiere los siguientes permisos que no están incluidos: materials:read, customers:read` |
+| 400                                                                                                                  | Permission restricted to super_admin   | `The following permissions are restricted to the platform super-admin...` |
+| 400                                                                                                                  | Role name is 'super_admin'             | `The 'super_admin' role is platform-only...`                              |
+| 409                                                                                                                  | Name already taken in the organization | `Role with that name already exists`                                      |
+
 ---
 
 #### PATCH /roles/:id
@@ -1253,17 +1279,24 @@ Update an existing custom role. Only provided fields are updated.
 
 **Permission Required:** `roles:update`
 
+**Permission Dependencies Validation:**
+
+When updating the `permissions` array, the same dependency validation applies as in `POST /roles`. If the new permission set has incomplete dependencies, the API rejects the update with a detailed error message in Spanish listing all unsatisfied requirements.
+
 **Notes:**
 
 - System roles (`isReadOnly: true`) cannot be modified. Attempting to do so returns `403 Forbidden`.
+- If only updating `name` or `description`, permission dependencies are not re-validated (only checked when `permissions` is explicitly provided).
 
 **Error Responses:**
 
-| Status | Condition                                  | Message                                                               |
-| ------ | ------------------------------------------ | --------------------------------------------------------------------- |
-| 403    | Role is a system role (`isReadOnly: true`) | `The 'owner' role is a system role and cannot be modified or deleted` |
-| 404    | Role not found in organization             | `Role not found`                                                      |
-| 409    | Name already taken in organization         | `Role with that name already exists`                                  |
+| Status                                                                           | Condition                                  | Message                                                               |
+| -------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------- |
+| 400                                                                              | Incomplete permission dependencies         | `Dependencias de permisos incompletas:                                |
+| - El permiso '...' requiere los siguientes permisos que no están incluidos: ...` |
+| 403                                                                              | Role is a system role (`isReadOnly: true`) | `The 'owner' role is a system role and cannot be modified or deleted` |
+| 404                                                                              | Role not found in organization             | `Role not found`                                                      |
+| 409                                                                              | Name already taken in organization         | `Role with that name already exists`                                  |
 
 **Response:** `200 OK`
 
@@ -1401,13 +1434,77 @@ Returns the permission catalogue with optional filtering and grouping.
 
 **Response fields per permission object:**
 
-| Field                  | Type    | Description                                                |
-| ---------------------- | ------- | ---------------------------------------------------------- |
-| `id`                   | string  | Permission identifier in `resource:action` format          |
-| `displayName`          | string  | Human-readable label for UI display                        |
-| `description`          | string  | Short description of what granting this permission does    |
-| `category`             | string  | Grouping category (e.g. `Materials`, `Roles`, `Transfers`) |
-| `isPlatformPermission` | boolean | Whether this is a platform-only (super-admin) permission   |
+| Field                  | Type     | Description                                                                                                                                                                                                        |
+| ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                   | string   | Permission identifier in `resource:action` format                                                                                                                                                                  |
+| `displayName`          | string   | Human-readable label for UI display                                                                                                                                                                                |
+| `description`          | string   | Short description of what granting this permission does                                                                                                                                                            |
+| `category`             | string   | Grouping category (e.g. `Materials`, `Roles`, `Transfers`)                                                                                                                                                         |
+| `isPlatformPermission` | boolean  | Whether this is a platform-only (super-admin) permission                                                                                                                                                           |
+| `requires`             | string[] | **NEW** — Array of permission IDs that must also be assigned to grant this permission. Empty array if no dependencies. Example: `loans:create` has `requires: ["loans:read", "materials:read", "customers:read"]`. |
+
+**Permission Dependencies — Frontend Implementation Guide:**
+
+The `requires` field establishes a **functional dependency chain**. This ensures that permissions do not grant incomplete capabilities:
+
+- **Cross-resource dependencies:** Assigning `loans:create` requires `materials:read` and `customers:read` because loan creation needs to lookup both resources.
+- **Same-resource dependencies:** Most `create` operations require the corresponding `read` permission (e.g., `users:create` → `users:read`) so the UI can display listings after creation.
+- **Operational dependencies:** Complex operations like `requests:assign` require `materials:read` to allow inventory picking.
+
+**Frontend Implementation Recommendations:**
+
+1. **Fetch permissions with metadata:**
+
+   ```bash
+   GET /permissions
+   ```
+
+   Cache the response locally so you have the full `requires[]` data for every permission.
+
+2. **Display permission dependencies in the role editor UI:**
+   - When the user clicks on a permission, show a tooltip or expandable section listing its dependencies.
+   - Example: `loans:create` → depends on: `loans:read`, `materials:read`, `customers:read`
+
+3. **Handle the 400 validation error gracefully:**
+
+   ```javascript
+   // When POST /roles or PATCH /roles/:id returns 400:
+   // Error message example:
+   // "Dependencias de permisos incompletas:
+   // - El permiso 'loans:create' requiere los siguientes permisos que no están incluidos: materials:read, customers:read"
+
+   // Display to the admin with suggestions to add the missing permissions.
+   ```
+
+4. **Optional auto-include of dependencies:**
+   - When the admin selects a permission, you may **optionally** auto-add its dependencies (but show what's being added).
+   - This prevents the frustration of seeing a 400 validation error, but the admin must be able to undo/customize the selection.
+
+**Example: Permission with dependencies**
+
+```json
+{
+  "id": "loans:create",
+  "displayName": "Create Loans",
+  "description": "Allows initiating new material loan records.",
+  "category": "Loans",
+  "isPlatformPermission": false,
+  "requires": ["loans:read", "materials:read", "customers:read"]
+}
+```
+
+**Example: Permission with no dependencies**
+
+```json
+{
+  "id": "loans:read",
+  "displayName": "View Loans",
+  "description": "Allows viewing active and historical loan records.",
+  "category": "Loans",
+  "isPlatformPermission": false,
+  "requires": []
+}
+```
 
 ---
 
@@ -4912,12 +5009,12 @@ The server automatically populates `conditionBefore` from the material instance'
 
 **Material instance status side-effects:** After the inspection is saved, each inspected material instance is automatically transitioned to a new status based on the reported condition:
 
-| `condition` reported | MaterialInstance status set to |
-| -------------------- | ------------------------------ |
-| `excellent`, `good`, `fair` | `available` |
-| `poor` | `maintenance` |
-| `damaged` | `damaged` |
-| `lost` | `lost` |
+| `condition` reported        | MaterialInstance status set to |
+| --------------------------- | ------------------------------ |
+| `excellent`, `good`, `fair` | `available`                    |
+| `poor`                      | `maintenance`                  |
+| `damaged`                   | `damaged`                      |
+| `lost`                      | `lost`                         |
 
 The resulting status is also stored in the `transitionedToStatus` field on each inspection item sub-document for auditability.
 
@@ -5452,13 +5549,13 @@ Creates a new incident manually.
 
 **Material instance status side-effects:** Each ID in `relatedMaterialInstances` is automatically transitioned based on incident `type` when the incident is created:
 
-| `type` | MaterialInstance status set to |
-| ------ | ------------------------------ |
-| `damage` | `damaged` |
-| `lost` | `lost` |
-| `issue` | `maintenance` |
-| `replacement` | `retired` |
-| `overdue`, `extended`, `other` | _(no automatic change)_ |
+| `type`                         | MaterialInstance status set to |
+| ------------------------------ | ------------------------------ |
+| `damage`                       | `damaged`                      |
+| `lost`                         | `lost`                         |
+| `issue`                        | `maintenance`                  |
+| `replacement`                  | `retired`                      |
+| `overdue`, `extended`, `other` | _(no automatic change)_        |
 
 **Response:** `201 Created`
 
@@ -5548,11 +5645,11 @@ Resolves an incident with a resolution note.
 
 **Material instance status side-effects:** Related material instances are automatically transitioned based on the incident `type` when resolution is saved:
 
-| `type` | MaterialInstance status set to |
-| ------ | ------------------------------ |
-| `damage` | `maintenance` |
-| `issue` | `available` |
-| `lost`, `replacement`, others | _(no automatic change)_ |
+| `type`                        | MaterialInstance status set to |
+| ----------------------------- | ------------------------------ |
+| `damage`                      | `maintenance`                  |
+| `issue`                       | `available`                    |
+| `lost`, `replacement`, others | _(no automatic change)_        |
 
 **Example Request:**
 
@@ -7548,3 +7645,196 @@ Resolves a single item as `repaired` or `unrecoverable`. Syncs the material inst
 - `409` -- Batch not in `in_progress`, or item not in `in_repair` status.
 
 ---
+
+## Code Schemes
+
+Base path: `/api/v1/code-schemes`
+
+All endpoints require `authenticate` + active organization middleware.
+
+Code schemes define patterns used to auto-generate human-readable codes for Loans and Loan Requests (e.g. `LO-2026-0001`, `REQ-2026-0042`).
+
+### Supported Pattern Tokens
+
+| Token             | Description                | Example Output   |
+| ----------------- | -------------------------- | ---------------- |
+| `{SEQ}`           | Unpadded sequential number | 1, 2, 42         |
+| `{SEQ:N}`         | Zero-padded to N digits    | `{SEQ:4}` → 0001 |
+| `{YYYY}`          | 4-digit year               | 2026             |
+| `{YY}`            | 2-digit year               | 26               |
+| `{MM}`            | 2-digit month (01-12)      | 04               |
+| `{DD}`            | 2-digit day (01-31)        | 06               |
+| `{LOCATION_CODE}` | Location code value        | ABC              |
+
+Every pattern must contain exactly one `{SEQ}` or `{SEQ:N}` token.
+
+### GET /code-schemes
+
+Lists all code schemes for the organization.
+
+**Permission:** `code_schemes:read`
+
+**Query parameters:**
+
+| Param        | Type                         | Description                    |
+| ------------ | ---------------------------- | ------------------------------ |
+| `entityType` | `"loan"` \| `"loan_request"` | Optional filter by entity type |
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "schemes": [
+      {
+        "_id": "...",
+        "organizationId": "...",
+        "entityType": "loan",
+        "name": "Predeterminado Préstamo",
+        "pattern": "LO-{YYYY}-{SEQ:4}",
+        "isActive": true,
+        "isDefault": true,
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    ]
+  }
+}
+```
+
+### GET /code-schemes/:id
+
+Gets a single code scheme.
+
+**Permission:** `code_schemes:read`
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "scheme": { ... }
+  }
+}
+```
+
+**Errors:**
+
+- `404` — Scheme not found.
+
+### POST /code-schemes
+
+Creates a new code scheme.
+
+**Permission:** `code_schemes:create`
+
+**Request body:**
+
+| Field        | Type                         | Required | Description              |
+| ------------ | ---------------------------- | -------- | ------------------------ |
+| `entityType` | `"loan"` \| `"loan_request"` | Yes      | Target entity            |
+| `name`       | string (1-100)               | Yes      | Display name             |
+| `pattern`    | string (1-50)                | Yes      | Code pattern with tokens |
+| `isActive`   | boolean                      | No       | Default `true`           |
+| `isDefault`  | boolean                      | No       | Default `false`          |
+
+**Example request:**
+
+```json
+{
+  "entityType": "loan",
+  "name": "Préstamo por Ubicación",
+  "pattern": "LO-{LOCATION_CODE}-{YYYY}{MM}-{SEQ:4}",
+  "isDefault": false
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "scheme": { ... }
+  }
+}
+```
+
+**Errors:**
+
+- `400` — Invalid pattern (no `{SEQ}`, unknown token, too long).
+- `409` — Duplicate name for this entity type.
+
+### PUT /code-schemes/:id
+
+Updates an existing code scheme. Cannot change `entityType`.
+
+**Permission:** `code_schemes:update`
+
+**Request body:**
+
+| Field      | Type           | Required | Description              |
+| ---------- | -------------- | -------- | ------------------------ |
+| `name`     | string (1-100) | No       | Display name             |
+| `pattern`  | string (1-50)  | No       | Code pattern with tokens |
+| `isActive` | boolean        | No       | Active flag              |
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "scheme": { ... }
+  }
+}
+```
+
+**Errors:**
+
+- `400` — Invalid pattern.
+- `404` — Scheme not found.
+
+### DELETE /code-schemes/:id
+
+Deletes a code scheme. Cannot delete the default scheme.
+
+**Permission:** `code_schemes:delete`
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": null
+}
+```
+
+**Errors:**
+
+- `400` — Cannot delete the default scheme.
+- `404` — Scheme not found.
+
+### PATCH /code-schemes/:id/set-default
+
+Sets a code scheme as the default for its entity type. The previous default (if any) is automatically unset.
+
+**Permission:** `code_schemes:update`
+
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "scheme": { ... }
+  }
+}
+```
+
+**Errors:**
+
+- `400` — Cannot set an inactive scheme as default.
+- `404` — Scheme not found.

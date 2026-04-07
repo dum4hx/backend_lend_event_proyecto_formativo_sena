@@ -229,6 +229,12 @@ const loanSchema = new Schema(
       required: true,
       index: true,
     },
+    code: {
+      type: String,
+      required: true,
+      immutable: true,
+      trim: true,
+    },
     requestId: {
       type: Schema.Types.ObjectId,
       ref: "LoanRequest",
@@ -324,6 +330,7 @@ const loanSchema = new Schema(
 
 /* ---------- Indexes ---------- */
 
+loanSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 loanSchema.index({ organizationId: 1, customerId: 1 });
 loanSchema.index({ organizationId: 1, status: 1 });
 loanSchema.index({ organizationId: 1, endDate: 1 });

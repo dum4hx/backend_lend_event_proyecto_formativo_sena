@@ -67,6 +67,21 @@ This file tells the Copilot-style agent how to contribute code to this repositor
 
 - When adding new permission keys, update `src/modules/roles/seeders/permissions.json` and add corresponding entries to `src/modules/roles/models/role.model.ts` where rolePermissions are defined.
 
+## Internationalization (i18n) Guidelines
+
+- **Code language:** TypeScript code, variable names, function names, comments, and code structure remain in **English**.
+- **User-facing messages:** All error messages, success messages, validation messages, and user-visible strings must be in **Spanish**.
+  - Examples: Zod validation messages, `AppError` factory messages, router response messages, exception descriptions.
+- **Spanish ortography:**
+  - Use **ñ** (not "n") in words like: "ubicación", "suscripción", "descripción", "enseñanza", "diseño", "pestaña", "mañana", "niño", "años", "español".
+  - Do not replace ñ with n; this is required for correct Spanish spelling.
+  - Example: ❌ "ubicacion opened" → ✅ "ubicación abierta"
+- **Examples of correct Spanish messages:**
+  - ✅ `"Formato de ID de ubicación no válido"`
+  - ✅ `"El tipo de suscripción '${plan}' ha sido desactivado"`
+  - ✅ `"Uno o más permisos están restringidos al super-administrador"`
+  - ✅ `"La descripción del daño es requerida cuando la condición es 'damaged'"`
+
 ## Notes for the agent
 
 - Before making edits, search the codebase for patterns and existing examples (e.g., see `src/modules/material` for similar patterns).

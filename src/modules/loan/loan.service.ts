@@ -12,6 +12,7 @@ import {
   LOAN_TRANSITIONS,
   LOAN_REQUEST_TRANSITIONS,
 } from "../shared/state_machine.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 /* ---------- Internal Helpers ---------- */
 
@@ -148,6 +149,14 @@ export const loanService = {
           );
         }
 
+        // Generate unique code for this loan
+        const code = await codeGenerationService.generateCode({
+          organizationId,
+          entityType: "loan",
+          context: { locationId: loanLocationId },
+          session,
+        });
+
         // Create the loan
         const [loan]: any = await (Loan as any).create(
           [
@@ -164,6 +173,7 @@ export const loanService = {
               pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
               checkedOutBy: new Types.ObjectId(userId),
               status: "active",
+              code,
             },
           ],
           { session },

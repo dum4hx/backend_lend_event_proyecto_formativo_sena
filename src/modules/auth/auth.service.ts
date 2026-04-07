@@ -28,6 +28,7 @@ import { userService } from "../user/user.service.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
 import { paymentMethodService } from "../payment/payment_method.service.ts";
 import { transferService } from "../transfer/transfer.service.ts";
+import { codeSchemeService } from "../code_scheme/code_scheme.service.ts";
 
 import { twoFactorService } from "./two_factor.service.ts";
 
@@ -270,6 +271,7 @@ export const authService = {
         organization._id,
         session,
       );
+      await codeSchemeService.seedDefaultSchemes(organization._id, session);
 
       createdOrg = organization;
       createdUser = user;

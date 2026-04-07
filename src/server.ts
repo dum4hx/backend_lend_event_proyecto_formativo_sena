@@ -158,6 +158,9 @@ app.use(`${apiV1}/locations/:locationId/operations`, routers.operationsRouter);
 // Maintenance batch routes
 app.use(`${apiV1}/maintenance`, routers.maintenanceRouter);
 
+// Code scheme routes
+app.use(`${apiV1}/code-schemes`, routers.codeSchemeRouter);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {

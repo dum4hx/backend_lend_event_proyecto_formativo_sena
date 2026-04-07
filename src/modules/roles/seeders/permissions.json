@@ -1,590 +1,706 @@
 [
   {
     "_id": "subscription_types:create",
-    "displayName": "Create Subscription Types",
-    "description": "Allows the creation of new subscription plan levels and pricing structures.",
+    "displayName": "Crear Tipos de Suscripción",
+    "description": "Permite la creación de nuevos niveles de plan de suscripción y estructuras de precios.",
     "category": "Subscription_types",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "subscription_types:read",
-    "displayName": "View Subscription Types",
-    "description": "Allows viewing the available subscription plans and their configurations.",
+    "displayName": "Ver Tipos de Suscripción",
+    "description": "Permite ver los planes de suscripción disponibles y sus configuraciones.",
     "category": "Subscription_types",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "subscription_types:update",
-    "displayName": "Update Subscription Types",
-    "description": "Allows modifying existing subscription plan details and limits.",
+    "displayName": "Actualizar Tipos de Suscripción",
+    "description": "Permite modificar los detalles y límites del plan de suscripción existente.",
     "category": "Subscription_types",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "subscription_types:delete",
-    "displayName": "Delete Subscription Types",
-    "description": "Allows removing subscription plan definitions from the platform.",
+    "displayName": "Eliminar Tipos de Suscripción",
+    "description": "Permite eliminar las definiciones de planes de suscripción de la plataforma.",
     "category": "Subscription_types",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "platform:manage",
-    "displayName": "Manage Platform",
-    "description": "Grant full administrative access to global platform settings and configurations.",
+    "displayName": "Administrar Plataforma",
+    "description": "Otorga acceso administrativo completo a la configuración global de la plataforma.",
     "category": "Platform",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "permissions:create",
-    "displayName": "Create Permissions",
-    "description": "Allows defining new granular permissions within the system.",
+    "displayName": "Crear Permisos",
+    "description": "Permite definir nuevos permisos detallados dentro del sistema.",
     "category": "Permissions",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "permissions:read",
-    "displayName": "View Permissions",
-    "description": "Allows browsing the list of available system permissions.",
+    "displayName": "Ver Permisos",
+    "description": "Permite explorar la lista de permisos del sistema disponibles.",
     "category": "Permissions",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "permissions:update",
-    "displayName": "Update Permissions",
-    "description": "Allows editing the metadata or status of existing permissions.",
+    "displayName": "Actualizar Permisos",
+    "description": "Permite editar los metadatos o el estado de los permisos existentes.",
     "category": "Permissions",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "permissions:delete",
-    "displayName": "Delete Permissions",
-    "description": "Allows removing permission definitions from the system.",
+    "displayName": "Eliminar Permisos",
+    "description": "Permite eliminar las definiciones de permisos del sistema.",
     "category": "Permissions",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "organization:read",
-    "displayName": "View Organization",
-    "description": "Allows viewing organization profile and basic settings.",
+    "displayName": "Ver Organización",
+    "description": "Permite ver el perfil de la organización y la configuración básica.",
     "category": "Organization",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "organization:update",
-    "displayName": "Update Organization",
-    "description": "Allows editing organization details, branding, and contact info.",
+    "displayName": "Actualizar Organización",
+    "description": "Permite editar los detalles de la organización, la marca y la información de contacto.",
     "category": "Organization",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["organization:read"]
   },
   {
     "_id": "organization:delete",
-    "displayName": "Delete Organization",
-    "description": "Allows the permanent removal of an organization and its data.",
+    "displayName": "Eliminar Organización",
+    "description": "Permite la eliminación permanente de una organización y sus datos.",
     "category": "Organization",
-    "isPlatformPermission": true
+    "isPlatformPermission": true,
+    "requires": []
   },
   {
     "_id": "billing:manage",
-    "displayName": "Manage Billing",
-    "description": "Allows management of payment methods and viewing billing history.",
+    "displayName": "Administrar Facturación",
+    "description": "Permite la gestión de métodos de pago y la visualización del historial de facturación.",
     "category": "Billing",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "subscription:manage",
-    "displayName": "Manage Subscription",
-    "description": "Allows upgrading, downgrading, or canceling the organization's plan.",
+    "displayName": "Administrar Suscripción",
+    "description": "Permite actualizar, degradar o cancelar el plan de la organización.",
     "category": "Subscription",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "users:create",
-    "displayName": "Create Users",
-    "description": "Allows inviting and creating new user accounts within the organization.",
+    "displayName": "Crear Usuarios",
+    "description": "Permite invitar y crear nuevas cuentas de usuario dentro de la organización.",
     "category": "Users",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["users:read"]
   },
   {
     "_id": "users:read",
-    "displayName": "View Users",
-    "description": "Allows viewing the list and profiles of organization members.",
+    "displayName": "Ver Usuarios",
+    "description": "Permite ver la lista y los perfiles de los miembros de la organización.",
     "category": "Users",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "users:update",
-    "displayName": "Update Users",
-    "description": "Allows editing user roles, profiles, and account status.",
+    "displayName": "Actualizar Usuarios",
+    "description": "Permite editar los roles de usuario, perfiles y estado de la cuenta.",
     "category": "Users",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["users:read"]
   },
   {
     "_id": "users:delete",
-    "displayName": "Delete Users",
-    "description": "Allows removing users from the organization.",
+    "displayName": "Eliminar Usuarios",
+    "description": "Permite eliminar usuarios de la organización.",
     "category": "Users",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["users:read"]
   },
   {
     "_id": "customers:create",
-    "displayName": "Create Customers",
-    "description": "Allows registering new customers/clients in the system.",
+    "displayName": "Crear Clientes",
+    "description": "Permite registrar nuevos clientes en el sistema.",
     "category": "Customers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["customers:read"]
   },
   {
     "_id": "customers:read",
-    "displayName": "View Customers",
-    "description": "Allows viewing customer directories and history.",
+    "displayName": "Ver Clientes",
+    "description": "Permite ver directorios de clientes e historial.",
     "category": "Customers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "customers:update",
-    "displayName": "Update Customers",
-    "description": "Allows editing customer contact information and details.",
+    "displayName": "Actualizar Clientes",
+    "description": "Permite editar la información de contacto y los detalles del cliente.",
     "category": "Customers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["customers:read"]
   },
   {
     "_id": "customers:delete",
-    "displayName": "Delete Customers",
-    "description": "Allows removing customer records from the system.",
+    "displayName": "Eliminar Clientes",
+    "description": "Permite eliminar registros de clientes del sistema.",
     "category": "Customers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["customers:read"]
   },
   {
     "_id": "materials:create",
-    "displayName": "Create Materials",
-    "description": "Allows adding new materials or inventory items.",
+    "displayName": "Crear Materiales",
+    "description": "Permite agregar nuevos materiales o artículos de inventario.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
   },
   {
     "_id": "materials:read",
-    "displayName": "View Materials",
-    "description": "Allows browsing the inventory and material catalog.",
+    "displayName": "Ver Materiales",
+    "description": "Permite explorar el inventario y el catálogo de materiales.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "materials:update",
-    "displayName": "Update Materials",
-    "description": "Allows editing material specifications and details.",
+    "displayName": "Actualizar Materiales",
+    "description": "Permite editar las especificaciones y detalles del material.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
   },
   {
     "_id": "materials:delete",
-    "displayName": "Delete Materials",
-    "description": "Allows removing materials from the catalog.",
+    "displayName": "Eliminar Materiales",
+    "description": "Permite eliminar materiales del catálogo.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
   },
   {
     "_id": "materials:state:update",
-    "displayName": "Update Material State",
-    "description": "Allows changing the status (e.g., Available, In Use, Maintenance) of materials.",
+    "displayName": "Actualizar Estado del Material",
+    "description": "Permite cambiar el estado (por ejemplo, Disponible, En uso, Mantenimiento) de los materiales.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
   },
   {
     "_id": "material_attributes:read",
-    "displayName": "View Material Attributes",
-    "description": "Allows listing and viewing material attribute definitions for the organization.",
+    "displayName": "Ver Atributos de Material",
+    "description": "Permite listar y ver las definiciones de atributos de material para la organización.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "material_attributes:create",
-    "displayName": "Create Material Attributes",
-    "description": "Allows defining new attribute types (e.g. weight, size) for the organization's materials.",
+    "displayName": "Crear Atributos de Material",
+    "description": "Permite definir nuevos tipos de atributos (por ejemplo, peso, tamaño) para los materiales de la organización.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["material_attributes:read"]
   },
   {
     "_id": "material_attributes:update",
-    "displayName": "Update Material Attributes",
-    "description": "Allows editing existing material attribute definitions, including allowed values and units.",
+    "displayName": "Actualizar Atributos de Material",
+    "description": "Permite editar las definiciones de atributos de material existentes, incluyendo los valores permitidos y las unidades.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["material_attributes:read"]
   },
   {
     "_id": "material_attributes:delete",
-    "displayName": "Delete Material Attributes",
-    "description": "Allows removing material attribute definitions that are not in use.",
+    "displayName": "Eliminar Atributos de Material",
+    "description": "Permite eliminar las definiciones de atributos de material que no están en uso.",
     "category": "Materials",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["material_attributes:read"]
   },
   {
     "_id": "locations:create",
-    "displayName": "Create Locations",
-    "description": "Allows creating new physical locations within the organization.",
+    "displayName": "Crear Ubicaciones",
+    "description": "Permite crear nuevas ubicaciones físicas dentro de la organización.",
     "category": "Locations",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["locations:read"]
   },
   {
     "_id": "locations:read",
-    "displayName": "View Locations",
-    "description": "Allows viewing the list of physical locations and their details.",
+    "displayName": "Ver Ubicaciones",
+    "description": "Permite ver la lista de ubicaciones físicas y sus detalles.",
     "category": "Locations",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "locations:update",
-    "displayName": "Update Locations",
-    "description": "Allows editing location details and metadata.",
+    "displayName": "Actualizar Ubicaciones",
+    "description": "Permite editar los detalles de ubicación y metadatos.",
     "category": "Locations",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["locations:read"]
   },
   {
     "_id": "locations:delete",
-    "displayName": "Delete Locations",
-    "description": "Allows removing or deactivating location records.",
+    "displayName": "Eliminar Ubicaciones",
+    "description": "Permite eliminar o desactivar registros de ubicación.",
     "category": "Locations",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["locations:read"]
   },
   {
     "_id": "packages:create",
-    "displayName": "Create Packages",
-    "description": "Allows creating new material bundles or packages.",
+    "displayName": "Crear Paquetes",
+    "description": "Permite crear nuevos paquetes o lotes de materiales.",
     "category": "Packages",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["packages:read", "materials:read"]
   },
   {
     "_id": "packages:read",
-    "displayName": "View Packages",
-    "description": "Allows viewing existing packages and their contents.",
+    "displayName": "Ver Paquetes",
+    "description": "Permite ver paquetes existentes y su contenido.",
     "category": "Packages",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "packages:update",
-    "displayName": "Update Packages",
-    "description": "Allows modifying package compositions and details.",
+    "displayName": "Actualizar Paquetes",
+    "description": "Permite modificar las composiciones y detalles del paquete.",
     "category": "Packages",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["packages:read", "materials:read"]
   },
   {
     "_id": "packages:delete",
-    "displayName": "Delete Packages",
-    "description": "Allows removing package definitions.",
+    "displayName": "Eliminar Paquetes",
+    "description": "Permite eliminar las definiciones de paquetes.",
     "category": "Packages",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["packages:read"]
   },
   {
     "_id": "requests:create",
-    "displayName": "Create Requests",
-    "description": "Allows submitting new material or service requests.",
+    "displayName": "Crear Solicitudes",
+    "description": "Permite enviar nuevas solicitudes de materiales o servicios.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["requests:read", "materials:read", "customers:read"]
   },
   {
     "_id": "requests:read",
-    "displayName": "View Requests",
-    "description": "Allows viewing and tracking the status of requests.",
+    "displayName": "Ver Solicitudes",
+    "description": "Permite ver y rastrear el estado de las solicitudes.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "requests:update",
-    "displayName": "Update Requests",
-    "description": "Allows editing pending request details.",
+    "displayName": "Actualizar Solicitudes",
+    "description": "Permite editar los detalles de las solicitudes pendientes.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["requests:read"]
   },
   {
     "_id": "requests:approve",
-    "displayName": "Approve Requests",
-    "description": "Allows authorizing or rejecting submitted requests.",
+    "displayName": "Aprobar Solicitudes",
+    "description": "Permite autorizar o rechazar solicitudes enviadas.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["requests:read"]
   },
   {
     "_id": "requests:assign",
-    "displayName": "Assign Request Materials",
-    "description": "Allows assigning inventory instances to approved requests and marking them ready.",
+    "displayName": "Asignar Materiales de Solicitud",
+    "description": "Permite asignar instancias de inventario a solicitudes aprobadas y marcarlas como listas.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["requests:read", "materials:read"]
   },
   {
     "_id": "requests:delete",
-    "displayName": "Delete Requests",
-    "description": "Allows canceling or removing request records.",
+    "displayName": "Eliminar Solicitudes",
+    "description": "Permite cancelar o eliminar registros de solicitudes.",
     "category": "Requests",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["requests:read"]
   },
   {
     "_id": "loans:create",
-    "displayName": "Create Loans",
-    "description": "Allows initiating new material loan records.",
+    "displayName": "Crear Préstamos",
+    "description": "Permite iniciar nuevos registros de préstamo de materiales.",
     "category": "Loans",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["loans:read", "materials:read", "customers:read"]
   },
   {
     "_id": "loans:read",
-    "displayName": "View Loans",
-    "description": "Allows viewing active and historical loan records.",
+    "displayName": "Ver Préstamos",
+    "description": "Permite ver registros de préstamos activos e históricos.",
     "category": "Loans",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "loans:update",
-    "displayName": "Update Loans",
-    "description": "Allows editing loan terms and information.",
+    "displayName": "Actualizar Préstamos",
+    "description": "Permite editar los términos de préstamo e información.",
     "category": "Loans",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["loans:read"]
   },
   {
     "_id": "loans:checkout",
-    "displayName": "Checkout Loans",
-    "description": "Allows processing the physical checkout of loaned items.",
+    "displayName": "Retirar Préstamos",
+    "description": "Permite procesar la retirada física de artículos prestados.",
     "category": "Loans",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["loans:read"]
   },
   {
     "_id": "loans:return",
-    "displayName": "Return Loans",
-    "description": "Allows processing the return and check-in of loaned items.",
+    "displayName": "Devolver Préstamos",
+    "description": "Permite procesar la devolución y entrega de artículos prestados.",
     "category": "Loans",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["loans:read"]
   },
   {
     "_id": "inspections:create",
-    "displayName": "Create Inspections",
-    "description": "Allows performing and recording item inspections.",
+    "displayName": "Crear Inspecciones",
+    "description": "Permite realizar y registrar inspecciones de artículos.",
     "category": "Inspections",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["inspections:read"]
   },
   {
     "_id": "inspections:read",
-    "displayName": "View Inspections",
-    "description": "Allows viewing inspection logs and results.",
+    "displayName": "Ver Inspecciones",
+    "description": "Permite ver registros de inspección y resultados.",
     "category": "Inspections",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "inspections:update",
-    "displayName": "Update Inspections",
-    "description": "Allows editing existing inspection reports.",
+    "displayName": "Actualizar Inspecciones",
+    "description": "Permite editar los informes de inspección existentes.",
     "category": "Inspections",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["inspections:read"]
   },
   {
     "_id": "incidents:create",
-    "displayName": "Create Incidents",
-    "description": "Allows creating new incident reports for loans.",
+    "displayName": "Crear Incidentes",
+    "description": "Permite crear nuevos informes de incidentes para préstamos.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["incidents:read"]
   },
   {
     "_id": "incidents:read",
-    "displayName": "View Incidents",
-    "description": "Allows viewing incident reports and their status.",
+    "displayName": "Ver Incidentes",
+    "description": "Permite ver informes de incidentes y su estado.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "incidents:update",
-    "displayName": "Update Incidents",
-    "description": "Allows acknowledging, resolving, or dismissing incidents.",
+    "displayName": "Actualizar Incidentes",
+    "description": "Permite reconocer, resolver o descartar incidentes.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["incidents:read"]
   },
   {
     "_id": "incidents:acknowledge",
-    "displayName": "Acknowledge Incidents",
-    "description": "Allows acknowledging open incidents, confirming they are being investigated.",
+    "displayName": "Reconocer Incidentes",
+    "description": "Permite reconocer incidentes abiertos, confirmando que están siendo investigados.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["incidents:read"]
   },
   {
     "_id": "incidents:resolve",
-    "displayName": "Resolve Incidents",
-    "description": "Allows resolving incidents with a resolution note, closing the investigation.",
+    "displayName": "Resolver Incidentes",
+    "description": "Permite resolver incidentes con una nota de resolución, cerrando la investigación.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["incidents:read"]
   },
   {
     "_id": "incidents:dismiss",
-    "displayName": "Dismiss Incidents",
-    "description": "Allows dismissing incidents deemed invalid or not actionable.",
+    "displayName": "Descartar Incidentes",
+    "description": "Permite descartar incidentes considerados inválidos o no procesables.",
     "category": "Incidents",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["incidents:read"]
   },
   {
     "_id": "invoices:create",
-    "displayName": "Create Invoices",
-    "description": "Allows generating new invoices for customers.",
+    "displayName": "Crear Facturas",
+    "description": "Permite generar nuevas facturas para clientes.",
     "category": "Invoices",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["invoices:read"]
   },
   {
     "_id": "invoices:read",
-    "displayName": "View Invoices",
-    "description": "Allows viewing invoice history and payment status.",
+    "displayName": "Ver Facturas",
+    "description": "Permite ver el historial de facturas y el estado de pago.",
     "category": "Invoices",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "invoices:update",
-    "displayName": "Update Invoices",
-    "description": "Allows modifying draft or existing invoices.",
+    "displayName": "Actualizar Facturas",
+    "description": "Permite modificar facturas en borrador o existentes.",
     "category": "Invoices",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["invoices:read"]
   },
   {
     "_id": "reports:read",
-    "displayName": "View Reports",
-    "description": "Allows access to generated business and operational reports.",
+    "displayName": "Ver Reportes",
+    "description": "Permite acceso a reportes empresariales y operacionales generados.",
     "category": "Reports",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "roles:create",
-    "displayName": "Create Roles",
-    "description": "Allows defining custom roles and permission sets.",
+    "displayName": "Crear Roles",
+    "description": "Permite definir roles personalizados y conjuntos de permisos.",
     "category": "Roles",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["roles:read", "permissions:read"]
   },
   {
     "_id": "roles:read",
-    "displayName": "View Roles",
-    "description": "Allows viewing defined system and organization roles.",
+    "displayName": "Ver Roles",
+    "description": "Permite ver los roles definidos del sistema y de la organización.",
     "category": "Roles",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "roles:update",
-    "displayName": "Update Roles",
-    "description": "Allows editing role names and assigned permissions.",
+    "displayName": "Actualizar Roles",
+    "description": "Permite editar nombres de roles y permisos asignados.",
     "category": "Roles",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["roles:read", "permissions:read"]
   },
   {
     "_id": "roles:delete",
-    "displayName": "Delete Roles",
-    "description": "Allows removing custom roles from the organization.",
+    "displayName": "Eliminar Roles",
+    "description": "Permite eliminar roles personalizados de la organización.",
     "category": "Roles",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["roles:read"]
   },
   {
     "_id": "analytics:read",
-    "displayName": "View Analytics",
-    "description": "Allows access to data dashboards and performance metrics.",
+    "displayName": "Ver Análisis",
+    "description": "Permite acceso a paneles de datos y métricas de rendimiento.",
     "category": "Analytics",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "transfers:create",
-    "displayName": "Create Transfers",
-    "description": "Allows creating transfer requests and initiating physical transfers between locations.",
+    "displayName": "Crear Transferencias",
+    "description": "Permite crear solicitudes de transferencia e iniciar transferencias físicas entre ubicaciones.",
     "category": "Transfers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["transfers:read", "materials:read"]
   },
   {
     "_id": "transfers:read",
-    "displayName": "View Transfers",
-    "description": "Allows viewing transfer requests and transfer records.",
+    "displayName": "Ver Transferencias",
+    "description": "Permite ver solicitudes de transferencia y registros de transferencias.",
     "category": "Transfers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "transfers:update",
-    "displayName": "Update Transfers",
-    "description": "Allows responding to transfer requests and marking transfers as received.",
+    "displayName": "Actualizar Transferencias",
+    "description": "Permite responder a solicitudes de transferencia y marcar transferencias como recibidas.",
     "category": "Transfers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["transfers:read"]
   },
   {
     "_id": "pricing:read",
-    "displayName": "View Pricing Configurations",
-    "description": "Allows viewing pricing strategies and configurations for the organization.",
+    "displayName": "Ver Configuraciones de Precios",
+    "description": "Permite ver estrategias de precios y configuraciones para la organización.",
     "category": "Pricing",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "pricing:manage",
-    "displayName": "Manage Pricing Configurations",
-    "description": "Allows creating, updating, and deleting pricing configurations for the organization.",
+    "displayName": "Administrar Configuraciones de Precios",
+    "description": "Permite crear, actualizar y eliminar configuraciones de precios para la organización.",
     "category": "Pricing",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["pricing:read"]
   },
   {
     "_id": "payment_methods:read",
-    "displayName": "View Payment Methods",
-    "description": "Allows viewing the organization's available payment methods.",
+    "displayName": "Ver Métodos de Pago",
+    "description": "Permite ver los métodos de pago disponibles de la organización.",
     "category": "Payment Methods",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "payment_methods:create",
-    "displayName": "Create Payment Methods",
-    "description": "Allows adding new payment methods to the organization.",
+    "displayName": "Crear Métodos de Pago",
+    "description": "Permite agregar nuevos métodos de pago a la organización.",
     "category": "Payment Methods",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["payment_methods:read"]
   },
   {
     "_id": "payment_methods:update",
-    "displayName": "Update Payment Methods",
-    "description": "Allows editing existing payment methods in the organization.",
+    "displayName": "Actualizar Métodos de Pago",
+    "description": "Permite editar los métodos de pago existentes en la organización.",
     "category": "Payment Methods",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["payment_methods:read"]
   },
   {
     "_id": "payment_methods:delete",
-    "displayName": "Deactivate Payment Methods",
-    "description": "Allows deactivating payment methods in the organization.",
+    "displayName": "Desactivar Métodos de Pago",
+    "description": "Permite desactivar métodos de pago en la organización.",
     "category": "Payment Methods",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["payment_methods:read"]
   },
   {
     "_id": "operations:read",
-    "displayName": "View Operations Dashboard",
-    "description": "Allows viewing the location-scoped operational dashboard with aggregated tasks, inspections, financials, inventory issues, and transfer queues.",
+    "displayName": "Ver Panel de Operaciones",
+    "description": "Permite ver el panel de operaciones con ámbito de ubicación con tareas agregadas, inspecciones, finanzas, problemas de inventario y colas de transferencia.",
     "category": "Operations",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "transfer_rejection_reasons:manage",
-    "displayName": "Manage Transfer Rejection Reasons",
-    "description": "Allows creating, editing, and deleting the catalogue of transfer request rejection reasons.",
+    "displayName": "Administrar Razones de Rechazo de Transferencia",
+    "description": "Permite crear, editar y eliminar el catálogo de razones de rechazo de solicitudes de transferencia.",
     "category": "Transfers",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["transfers:read"]
   },
   {
     "_id": "maintenance:read",
-    "displayName": "View Maintenance Batches",
-    "description": "Allows viewing maintenance batches, their items, and status.",
+    "displayName": "Ver Lotes de Mantenimiento",
+    "description": "Permite ver lotes de mantenimiento, sus artículos y estado.",
     "category": "Maintenance",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": []
   },
   {
     "_id": "maintenance:create",
-    "displayName": "Create Maintenance Batches",
-    "description": "Allows creating new maintenance batches for damaged or lost items.",
+    "displayName": "Crear Lotes de Mantenimiento",
+    "description": "Permite crear nuevos lotes de mantenimiento para artículos dañados o perdidos.",
     "category": "Maintenance",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["maintenance:read", "materials:read"]
   },
   {
     "_id": "maintenance:update",
-    "displayName": "Update Maintenance Batches",
-    "description": "Allows editing batch details, adding/removing items, starting and cancelling batches.",
+    "displayName": "Actualizar Lotes de Mantenimiento",
+    "description": "Permite editar detalles de lotes, agregar/eliminar artículos, iniciar y cancelar lotes.",
     "category": "Maintenance",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["maintenance:read"]
   },
   {
     "_id": "maintenance:resolve",
-    "displayName": "Resolve Maintenance Items",
-    "description": "Allows resolving individual maintenance items as repaired or unrecoverable.",
+    "displayName": "Resolver Artículos de Mantenimiento",
+    "description": "Permite resolver artículos de mantenimiento individual como reparados o irrecuperables.",
     "category": "Maintenance",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["maintenance:read"]
   },
   {
     "_id": "maintenance:delete",
-    "displayName": "Delete Maintenance Batches",
-    "description": "Allows permanently removing maintenance batch records.",
+    "displayName": "Eliminar Lotes de Mantenimiento",
+    "description": "Permite eliminar permanentemente registros de lotes de mantenimiento.",
     "category": "Maintenance",
-    "isPlatformPermission": false
+    "isPlatformPermission": false,
+    "requires": ["maintenance:read"]
+  },
+  {
+    "_id": "code_schemes:read",
+    "displayName": "Ver Esquemas de Código",
+    "description": "Permite ver los esquemas de generación de códigos de la organización.",
+    "category": "Code_schemes",
+    "isPlatformPermission": false,
+    "requires": []
+  },
+  {
+    "_id": "code_schemes:create",
+    "displayName": "Crear Esquemas de Código",
+    "description": "Permite crear nuevos esquemas de generación de códigos.",
+    "category": "Code_schemes",
+    "isPlatformPermission": false,
+    "requires": ["code_schemes:read"]
+  },
+  {
+    "_id": "code_schemes:update",
+    "displayName": "Actualizar Esquemas de Código",
+    "description": "Permite modificar esquemas de generación de códigos existentes.",
+    "category": "Code_schemes",
+    "isPlatformPermission": false,
+    "requires": ["code_schemes:read"]
+  },
+  {
+    "_id": "code_schemes:delete",
+    "displayName": "Eliminar Esquemas de Código",
+    "description": "Permite eliminar esquemas de generación de códigos.",
+    "category": "Code_schemes",
+    "isPlatformPermission": false,
+    "requires": ["code_schemes:read"]
   }
 ]

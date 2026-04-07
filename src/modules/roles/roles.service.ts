@@ -1,9 +1,25 @@
 import { Types, startSession } from "mongoose";
+import { createRequire } from "node:module";
 import type { Request } from "express";
 import { getOrgId } from "../../middleware/auth.ts";
 import { Role } from "./models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { super_admin_only_permsissions } from "./models/role.model.ts";
+
+/* ---------- Permission dependency map ---------- */
+
+const require = createRequire(import.meta.url);
+const permissionsJson: Array<{
+  _id: string;
+  requires?: string[];
+}> = require("./seeders/permissions.json");
+
+/** Map from permission id → list of required permissions. */
+const PERMISSION_REQUIRES = new Map<string, string[]>(
+  permissionsJson
+    .filter((p) => p.requires && p.requires.length > 0)
+    .map((p) => [p._id, p.requires!]),
+);
 
 /* ---------- Shared Validation ---------- */
 
@@ -62,6 +78,33 @@ function assertNotReadOnly(role: {
   }
 }
 
+/**
+ * Validates that every permission in the list has all its required
+ * dependencies also present. Throws `AppError.badRequest` when
+ * one or more dependencies are missing.
+ */
+function assertPermissionDependencies(permissions: string[]): void {
+  const permSet = new Set(permissions);
+  const issues: string[] = [];
+
+  for (const perm of permissions) {
+    const deps = PERMISSION_REQUIRES.get(perm);
+    if (!deps) continue;
+    const missing = deps.filter((d) => !permSet.has(d));
+    if (missing.length > 0) {
+      issues.push(
+        `El permiso '${perm}' requiere los siguientes permisos que no están incluidos: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  if (issues.length > 0) {
+    throw AppError.badRequest(
+      `Dependencias de permisos incompletas:\n- ${issues.join("\n- ")}`,
+    );
+  }
+}
+
 /* ---------- Roles Service ---------- */
 /**
  * Business logic for roles management.
@@ -80,6 +123,9 @@ export const rolesService = {
     description?: string;
   }) {
     assertNotSuperAdmin(roleData);
+    if (roleData.permissions?.length) {
+      assertPermissionDependencies(roleData.permissions);
+    }
 
     const session = await startSession();
     return await session.withTransaction(async () => {
@@ -170,6 +216,9 @@ export const rolesService = {
       // Prevent modifying system roles (e.g. owner) and super_admin names/perms
       assertNotReadOnly(role);
       assertNotSuperAdmin(updateData);
+      if (updateData.permissions?.length) {
+        assertPermissionDependencies(updateData.permissions);
+      }
 
       if (updateData.name !== undefined) role.name = updateData.name;
       if (updateData.permissions !== undefined)

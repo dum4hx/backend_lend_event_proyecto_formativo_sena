@@ -15,6 +15,10 @@ Each section explains the purpose of a permission and the action it allows.
 - [`customers:delete`](#customersdelete)
 - [`customers:read`](#customersread)
 - [`customers:update`](#customersupdate)
+- [`code_schemes:read`](#code_schemesread)
+- [`code_schemes:create`](#code_schemescreate)
+- [`code_schemes:update`](#code_schemesupdate)
+- [`code_schemes:delete`](#code_schemesdelete)
 - [`inspections:create`](#inspectionscreate)
 - [`inspections:read`](#inspectionsread)
 - [`inspections:update`](#inspectionsupdate)
@@ -761,6 +765,53 @@ Each section explains the purpose of a permission and the action it allows.
 - **Purpose:** Allows permanently removing maintenance batch records.
 - **Allowed Action:** Remove records from this resource.
 - **Resource Target:** MaintenanceBatch
+- **Roles:** super_admin, owner
+
+### `code_schemes:read`
+
+- **Display Name:** Ver Esquemas de Código
+- **Category:** Code_schemes
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows viewing code generation schemes for the organization.
+- **Allowed Action:** Read records from this resource.
+- **Resource Target:** CodeScheme
+- **Roles:** super_admin, owner, manager
+
+### `code_schemes:create`
+
+- **Display Name:** Crear Esquemas de Código
+- **Category:** Code_schemes
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows creating new code generation schemes.
+- **Allowed Action:** Create new records in this resource.
+- **Resource Target:** CodeScheme
+- **Requires:** `code_schemes:read`
+- **Roles:** super_admin, owner
+
+### `code_schemes:update`
+
+- **Display Name:** Actualizar Esquemas de Código
+- **Category:** Code_schemes
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows modifying existing code generation schemes.
+- **Allowed Action:** Modify records in this resource.
+- **Resource Target:** CodeScheme
+- **Requires:** `code_schemes:read`
+- **Roles:** super_admin, owner
+
+### `code_schemes:delete`
+
+- **Display Name:** Eliminar Esquemas de Código
+- **Category:** Code_schemes
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows deleting code generation schemes.
+- **Allowed Action:** Remove records from this resource.
+- **Resource Target:** CodeScheme
+- **Requires:** `code_schemes:read`
 - **Roles:** super_admin, owner
 
 ### `users:create`

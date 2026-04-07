@@ -52,6 +52,12 @@ export const LocationZodSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Maximum 100 characters")
     .trim(),
+  code: z
+    .string()
+    .min(1, "El código es requerido")
+    .max(10, "El código no puede exceder 10 caracteres")
+    .toUpperCase()
+    .regex(/^[A-Z0-9]+$/, "El código solo puede contener letras y números"),
   address: AddressZodSchema,
   status: LocationStatusEnum.default("available"),
   /**
@@ -110,6 +116,14 @@ const locationSchema = new Schema(
       required: true,
       maxlength: 100,
       trim: true,
+    },
+    code: {
+      type: String,
+      required: true,
+      maxlength: 10,
+      trim: true,
+      uppercase: true,
+      match: /^[A-Z0-9]+$/,
     },
     organizationId: {
       type: Schema.Types.ObjectId,
@@ -195,6 +209,7 @@ const locationSchema = new Schema(
  * within the same organization
  */
 locationSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+locationSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 
 // ============================================================================
 // EXPORTS
