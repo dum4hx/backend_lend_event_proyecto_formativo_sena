@@ -37,7 +37,7 @@ const invoiceLineItemZodSchema = z.object({
   referenceId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid reference ID format",
+      message: "Formato de ID de referencia no válido",
     })
     .optional(),
   referenceType: z.enum(["MaterialInstance", "Loan", "Inspection"]).optional(),
@@ -47,27 +47,27 @@ const invoiceLineItemZodSchema = z.object({
 
 export const InvoiceZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   customerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Customer ID format",
+    message: "Formato de ID de cliente no válido",
   }),
   loanId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Loan ID format",
+      message: "Formato de ID de préstamo no válido",
     })
     .optional(),
   inspectionId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Inspection ID format",
+      message: "Formato de ID de inspección no válido",
     })
     .optional(),
   type: z.enum(invoiceTypeOptions),
   lineItems: z
     .array(invoiceLineItemZodSchema)
-    .min(1, "At least one line item required"),
+    .min(1, "Se requiere al menos un elemento de línea"),
   dueDate: z.coerce.date(),
   notes: z.string().max(1000).trim().optional(),
 });

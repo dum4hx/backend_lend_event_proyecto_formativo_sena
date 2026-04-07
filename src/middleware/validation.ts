@@ -23,7 +23,7 @@ export const validate = <T>(
 
       if (!result.success) {
         const errors = formatZodErrors(result.error);
-        throw AppError.badRequest("Validation failed", { errors });
+        throw AppError.badRequest("Validación fallida", { errors });
       }
 
       // Replace the target with the parsed (and transformed) data
@@ -90,7 +90,7 @@ import { Types } from "mongoose";
  */
 export const objectIdParamSchema = z.object({
   id: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid ID format",
+    message: "Formato de ID inválido",
   }),
 });
 
@@ -121,5 +121,5 @@ export const dateRangeSchema = z
       }
       return true;
     },
-    { message: "startDate must be before or equal to endDate" },
+    { message: "startDate debe ser antes o igual a endDate" },
   );

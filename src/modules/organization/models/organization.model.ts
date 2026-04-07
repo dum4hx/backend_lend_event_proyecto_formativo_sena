@@ -26,17 +26,21 @@ const organizationStatusOptions = ["active", "suspended", "cancelled"] as const;
 /* ---------- Zod Schema for API Validation ---------- */
 
 export const OrganizationZodSchema = z.object({
-  name: z.string().min(1, "Organization name is required").max(200).trim(),
-  legalName: z.string().min(1, "Legal name is required").max(200).trim(),
+  name: z
+    .string()
+    .min(1, "El nombre de la organización es requerido")
+    .max(200)
+    .trim(),
+  legalName: z.string().min(1, "El nombre legal es requerido").max(200).trim(),
   taxId: z.string().min(1).max(50).trim().optional(),
-  email: z.email("Invalid email format").lowercase().trim(),
+  email: z.email("Formato de correo electrónico no válido").lowercase().trim(),
   phone: z
     .string()
-    .regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)")
+    .regex(/^\+?[1-9]\d{1,14}$/, "Formato de telefono invalido (E.164)")
     .optional(),
   address: AddressZodSchema.optional(),
   ownerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Owner ID format",
+    message: "Formato de ID de propietario no válido",
   }),
 });
 
@@ -54,8 +58,8 @@ export const OrganizationSettingsZodSchema = z.object({
   damageDueDays: z
     .number()
     .int()
-    .min(1, "Minimum 1 day")
-    .max(365, "Maximum 365 days")
+    .min(1, "Mínimo 1 día")
+    .max(365, "Máximo 365 días")
     .optional(),
   requireFullPaymentBeforeCheckout: z.boolean().optional(),
 });

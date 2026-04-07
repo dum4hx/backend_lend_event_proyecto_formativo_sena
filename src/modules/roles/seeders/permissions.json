@@ -189,7 +189,7 @@
     "description": "Permite explorar el inventario y el catálogo de materiales.",
     "category": "Materials",
     "isPlatformPermission": false,
-    "requires": []
+    "requires": ["material_attributes:read"]
   },
   {
     "_id": "materials:update",
@@ -557,7 +557,7 @@
     "description": "Permite ver solicitudes de transferencia y registros de transferencias.",
     "category": "Transfers",
     "isPlatformPermission": false,
-    "requires": []
+    "requires": ["locations:read"]
   },
   {
     "_id": "transfers:update",

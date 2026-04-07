@@ -231,6 +231,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "analytics:read",
     "transfers:create",
     "transfers:read",
+    "locations:read",
     "transfers:update",
     "transfer_rejection_reasons:manage",
     "pricing:read",
@@ -245,12 +246,14 @@ export const rolePermissions: Record<UserRole, string[]> = {
   warehouse_operator: [
     "organization:read",
     "customers:read",
+    "material_attributes:read",
     "materials:read",
     "materials:state:update",
     "packages:read",
     "loans:read",
     "loans:checkout",
     "loans:return",
+    "locations:read",
     "inspections:create",
     "inspections:read",
     "inspections:update",
@@ -274,6 +277,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "customers:create",
     "customers:read",
     "customers:update",
+    "material_attributes:read",
     "materials:read",
     "packages:read",
     "requests:create",
@@ -359,8 +363,9 @@ export const defaultOrganizationRoleDefs: Array<{
 /* ---------- Startup: validate default role permission dependencies ---------- */
 
 const _require = createRequire(import.meta.url);
-const _permissionsJson: Array<{ _id: string; requires?: string[] }> =
-  _require("../seeders/permissions.json");
+const _permissionsJson: Array<{ _id: string; requires?: string[] }> = _require(
+  "../seeders/permissions.json",
+);
 
 const _PERMISSION_REQUIRES = new Map<string, string[]>(
   _permissionsJson
@@ -377,9 +382,7 @@ for (const roleDef of defaultOrganizationRoleDefs) {
     if (!deps) continue;
     const missing = deps.filter((d) => !permSet.has(d));
     if (missing.length > 0) {
-      issues.push(
-        `  - '${perm}' requiere: ${missing.join(", ")}`,
-      );
+      issues.push(`  - '${perm}' requiere: ${missing.join(", ")}`);
     }
   }
 
@@ -412,7 +415,7 @@ export const RoleZodSchema = z.object({
   name: z.string().min(3).max(50).trim(),
   permissions: z.array(z.string()).optional(),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   description: z.string().max(500).trim().optional(),
   // Whether the role is read-only (system roles). Client may omit this; defaults handled by DB.

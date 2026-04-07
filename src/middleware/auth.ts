@@ -39,7 +39,7 @@ export interface AuthenticatedUser {
  */
 export function getAuthUser(req: Request): AuthenticatedUser {
   if (!req.user) {
-    throw AppError.unauthorized("Authentication required");
+    throw AppError.unauthorized("Autenticación requerida");
   }
   return req.user;
 }
@@ -84,7 +84,7 @@ export const authenticate = async (
     const token = req.cookies?.[COOKIE_NAME] as string | undefined;
 
     if (!token) {
-      throw AppError.unauthorized("Authentication required");
+      throw AppError.unauthorized("Autenticación requerida");
     }
 
     // Verify the token
@@ -92,18 +92,18 @@ export const authenticate = async (
 
     // Validate payload structure — `roleId` is the JWT claim name (matches JWTPayload interface)
     if (!payload.sub || !payload.org || !payload.roleId || !payload.email) {
-      throw AppError.unauthorized("Invalid token payload structure");
+      throw AppError.unauthorized("Estructura del payload del token no válida");
     }
 
     // Validate ObjectId formats
     if (!Types.ObjectId.isValid(payload.sub)) {
-      throw AppError.unauthorized("Invalid user ID in token");
+      throw AppError.unauthorized("ID de usuario no válido en el token");
     }
     if (!Types.ObjectId.isValid(payload.org)) {
-      throw AppError.unauthorized("Invalid organization ID in token");
+      throw AppError.unauthorized("ID de organización no válido en el token");
     }
     if (!Types.ObjectId.isValid(payload.roleId)) {
-      throw AppError.unauthorized("Invalid role ID in token");
+      throw AppError.unauthorized("ID de rol no válido en el token");
     }
 
     // Attach user info to request — roleName comes for free from the token payload
@@ -146,7 +146,7 @@ export const authenticate = async (
       next(err);
       return;
     }
-    next(AppError.unauthorized("Invalid or expired token"));
+    next(AppError.unauthorized("Token no válido o expirado"));
   }
 };
 
@@ -163,7 +163,7 @@ export const requireActiveOrganization = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      throw AppError.unauthorized("Authentication required");
+      throw AppError.unauthorized("Autenticación requerida");
     }
 
     const organization = await Organization.findById(
@@ -171,19 +171,19 @@ export const requireActiveOrganization = async (
     ).select("status");
 
     if (!organization) {
-      throw AppError.notFound("Organization not found");
+      throw AppError.notFound("Organización no encontrada");
     }
 
     if (organization.status === "suspended") {
       throw AppError.unauthorized(
-        "Organization is suspended. Please contact support or update payment information.",
+        "La organización está suspendida. Por favor, contacte soporte o actualice la información de pago.",
         { code: "ORGANIZATION_SUSPENDED" },
       );
     }
 
     if (organization.status === "cancelled") {
       throw AppError.unauthorized(
-        "Organization subscription has been cancelled.",
+        "La suscripción de la organización ha sido cancelada.",
         { code: "ORGANIZATION_CANCELLED" },
       );
     }
@@ -222,13 +222,13 @@ export const requirePermission = (...permissions: string[]) => {
   ): Promise<void> => {
     try {
       if (!req.user) {
-        throw AppError.unauthorized("Authentication required");
+        throw AppError.unauthorized("Autenticación requerida");
       }
 
       const hasPermission = await hasPermissions(req.user, permissions);
       if (!hasPermission) {
         throw AppError.unauthorized(
-          "You do not have permission to perform this action",
+          "No tienes permiso para realizar esta acción",
           { code: "FORBIDDEN", requiredPermissions: permissions },
         );
       }
@@ -248,13 +248,13 @@ export const requireRole = (...roleIds: String[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
-        throw AppError.unauthorized("Authentication required");
+        throw AppError.unauthorized("Autenticación requerida");
       }
       // TODO: Remove ID based role checks in favor of permission-based checks. This is less flexible and requires an extra DB query to get the user's role ID.
       // Get role name for comparison
       if (!roleIds.includes(req.user.roleId.toString())) {
         throw AppError.unauthorized(
-          "You do not have the required role to perform this action",
+          "No tienes el rol requerido para realizar esta acción",
           { code: "FORBIDDEN", requiredRoles: roleIds },
         );
       }
@@ -286,11 +286,11 @@ export const requireSuperAdmin = (
 ): void => {
   try {
     if (!req.user) {
-      throw AppError.unauthorized("Authentication required");
+      throw AppError.unauthorized("Autenticación requerida");
     }
     if (req.user.roleName !== "super_admin") {
       throw AppError.unauthorized(
-        "You do not have the required role to perform this action",
+        "No tienes el rol requerido para realizar esta acción",
         { code: "FORBIDDEN", requiredRoles: ["super_admin"] },
       );
     }
@@ -312,7 +312,7 @@ export const validateOrgScope = (
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       if (!req.user) {
-        throw AppError.unauthorized("Authentication required");
+        throw AppError.unauthorized("Autenticación requerida");
       }
 
       const resourceOrgId = getOrgIdFromRequest(req);
@@ -324,7 +324,7 @@ export const validateOrgScope = (
       }
 
       if (resourceOrgId !== req.user.organizationId.toString()) {
-        throw AppError.notFound("Resource not found");
+        throw AppError.notFound("Recurso no encontrado");
       }
 
       next();
@@ -342,7 +342,7 @@ export const validateOrgScope = (
  */
 export const getOrgId = (req: Request): Types.ObjectId => {
   if (!req.user) {
-    throw AppError.unauthorized("Authentication required");
+    throw AppError.unauthorized("Autenticación requerida");
   }
   return req.user.organizationId;
 };
@@ -353,7 +353,7 @@ export const getOrgId = (req: Request): Types.ObjectId => {
  */
 export const getUserId = (req: Request): Types.ObjectId => {
   if (!req.user) {
-    throw AppError.unauthorized("Authentication required");
+    throw AppError.unauthorized("Autenticación requerida");
   }
   return req.user.userId;
 };

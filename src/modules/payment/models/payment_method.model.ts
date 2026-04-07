@@ -8,8 +8,8 @@ export const paymentMethodStatusOptions = ["active", "inactive"] as const;
 export const PaymentMethodZodSchema = z.object({
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(100, "Maximum 100 characters")
+    .min(1, "El nombre es requerido")
+    .max(100, "Máximo 100 caracteres")
     .trim(),
   description: z.string().max(300).trim().optional(),
   status: z.enum(paymentMethodStatusOptions).default("active"),

@@ -40,10 +40,10 @@ export type ConditionAtReturnZodType = z.infer<typeof ConditionAtReturnZod>;
 
 const loanMaterialInstanceZodSchema = z.object({
   materialInstanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Instance ID format",
+    message: "Formato de ID de instancia de material no válido",
   }),
   materialTypeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Type ID format",
+    message: "Formato de ID de tipo de material no válido",
   }),
 });
 
@@ -51,17 +51,17 @@ const loanMaterialInstanceZodSchema = z.object({
 
 export const LoanZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   requestId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Request ID format",
+    message: "Formato de ID de solicitud no válido",
   }),
   customerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Customer ID format",
+    message: "Formato de ID de cliente no válido",
   }),
   materialInstances: z
     .array(loanMaterialInstanceZodSchema)
-    .min(1, "At least one material is required"),
+    .min(1, "Se requiere al menos un material"),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   deposit: z

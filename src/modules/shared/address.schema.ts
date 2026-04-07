@@ -36,21 +36,25 @@ export type ColombianStreetType = (typeof COLOMBIAN_STREET_TYPES)[number];
  */
 export const AddressZodSchema = z.object({
   streetType: z.enum(COLOMBIAN_STREET_TYPES, {
-    error: "Invalid street type",
+    error: "Tipo de calle no válido",
   }),
-  primaryNumber: z.string().min(1, "Primary number is required").max(20).trim(),
+  primaryNumber: z
+    .string()
+    .min(1, "El número principal es requerido")
+    .max(20)
+    .trim(),
   secondaryNumber: z
     .string()
-    .min(1, "Secondary number is required")
+    .min(1, "El número secundario es requerido")
     .max(20)
     .trim(),
   complementaryNumber: z
     .string()
-    .min(1, "Complementary number is required")
+    .min(1, "El número complementario es requerido")
     .max(20)
     .trim(),
-  department: z.string().min(1, "Department is required").max(100).trim(),
-  city: z.string().min(1, "City is required").max(100).trim(),
+  department: z.string().min(1, "El departamento es requerido").max(100).trim(),
+  city: z.string().min(1, "La ciudad es requerida").max(100).trim(),
   additionalDetails: z.string().max(300).trim().optional(),
   postalCode: z.string().max(20).trim().optional(),
 });

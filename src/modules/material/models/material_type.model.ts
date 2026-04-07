@@ -4,26 +4,26 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 // Zod schema for API validation
 export const MaterialModelZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   categoryId: z
     .array(
       z.string().refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Category ID format",
+        message: "Formato de ID de categoría no válido",
       }),
     )
     .default([]),
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(150, "Maximum 150 characters")
+    .min(1, "El nombre es requerido")
+    .max(150, "Máximo 150 caracteres")
     .trim(),
   description: z
     .string()
-    .min(1, "Description is required")
-    .max(500, "Maximum 500 characters")
+    .min(1, "La descripción es requerida")
+    .max(500, "Máximo 500 caracteres")
     .trim(),
-  pricePerDay: z.number().positive("Price must be greater than 0"),
+  pricePerDay: z.number().positive("El precio debe ser mayor que 0"),
   /**
    * Attribute values assigned to this material type.
    * Each entry references a MaterialAttribute, provides the value, and specifies whether
@@ -33,12 +33,12 @@ export const MaterialModelZodSchema = z.object({
     .array(
       z.object({
         attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Attribute ID format",
+          message: "Formato de ID de atributo no válido",
         }),
         value: z
           .string()
-          .min(1, "Attribute value cannot be empty")
-          .max(500, "Maximum 500 characters"),
+          .min(1, "El valor del atributo no puede estar vacío")
+          .max(500, "Máximo 500 caracteres"),
         isRequired: z.boolean().default(false),
       }),
     )

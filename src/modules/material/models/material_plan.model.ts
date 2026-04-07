@@ -4,29 +4,29 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 // Zod schema for API validation
 export const MaterialPlanZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(150, "Maximum 150 characters")
+    .min(1, "El nombre es requerido")
+    .max(150, "Máximo 150 caracteres")
     .trim(),
   description: z
     .string()
-    .min(1, "Description is required")
-    .max(500, "Maximum 500 characters")
+    .min(1, "La descripción es requerida")
+    .max(500, "Máximo 500 caracteres")
     .trim(),
   materialTypeIds: z
     .array(
       z.string().refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Material Model ID format",
+        message: "Formato de ID de modelo de material no válido",
       }),
     )
-    .min(1, "At least one material model is required"),
+    .min(1, "Se requiere al menos un modelo de material"),
   discountRate: z
     .number()
-    .min(0, "Discount rate must be non-negative")
-    .max(1, "Discount rate must be between 0 and 1"),
+    .min(0, "La tasa de descuento debe ser no negativa")
+    .max(1, "La tasa de descuento debe estar entre 0 y 1"),
 });
 
 export type MaterialPlanInput = z.infer<typeof MaterialPlanZodSchema>;

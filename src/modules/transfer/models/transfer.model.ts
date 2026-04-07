@@ -33,33 +33,29 @@ export const TransferZodSchema = z.object({
   requestId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Request ID format",
+      message: "Formato de ID de solicitud no válido",
     })
     .optional(),
   fromLocationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid From Location ID format",
+    message: "Formato de ID de ubicación de origen no válido",
   }),
   toLocationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid To Location ID format",
+    message: "Formato de ID de ubicación de destino no válido",
   }),
   items: z
     .array(
       z.object({
         instanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Instance ID format",
+          message: "Formato de ID de instancia no válido",
         }),
         sentCondition: ItemConditionEnum.optional(),
         receivedCondition: ItemConditionEnum.optional(),
-        notes: z.string().max(200, "Maximum 200 characters").trim().optional(),
+        notes: z.string().max(200, "Máximo 200 caracteres").trim().optional(),
       }),
     )
-    .min(1, "At least one item must be transferred"),
-  senderNotes: z.string().max(500, "Maximum 500 characters").trim().optional(),
-  receiverNotes: z
-    .string()
-    .max(500, "Maximum 500 characters")
-    .trim()
-    .optional(),
+    .min(1, "Se debe transferir al menos un elemento"),
+  senderNotes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
+  receiverNotes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
   status: TransferStatusEnum.default("in_transit"),
 });
 

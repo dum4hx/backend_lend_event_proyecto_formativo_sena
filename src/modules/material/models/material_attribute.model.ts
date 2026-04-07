@@ -17,20 +17,20 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 // Zod schema for API validation (organizationId is injected server-side, not from client)
 export const MaterialAttributeZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(100, "Maximum 100 characters")
+    .min(1, "El nombre es requerido")
+    .max(100, "Máximo 100 caracteres")
     .trim(),
-  unit: z.string().max(50, "Maximum 50 characters").trim().optional(),
+  unit: z.string().max(50, "Máximo 50 caracteres").trim().optional(),
   allowedValues: z
     .array(
       z
         .string()
-        .min(1, "Allowed value cannot be empty")
-        .max(200, "Maximum 200 characters"),
+        .min(1, "El valor permitido no puede estar vacío")
+        .max(200, "Máximo 200 caracteres"),
     )
     .default([]),
 });

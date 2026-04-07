@@ -4,17 +4,17 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 // Zod schema for API validation
 export const CategoryZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(100, "Maximum 100 characters")
+    .min(1, "El nombre es requerido")
+    .max(100, "Máximo 100 caracteres")
     .trim(),
   description: z
     .string()
-    .min(1, "Description is required")
-    .max(500, "Maximum 500 characters")
+    .min(1, "La descripción es requerida")
+    .max(500, "Máximo 500 caracteres")
     .trim(),
   /**
    * Attributes that belong to this category.
@@ -25,7 +25,7 @@ export const CategoryZodSchema = z.object({
     .array(
       z.object({
         attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Attribute ID format",
+          message: "Formato de ID de atributo no válido",
         }),
         isRequired: z.boolean().default(false),
       }),

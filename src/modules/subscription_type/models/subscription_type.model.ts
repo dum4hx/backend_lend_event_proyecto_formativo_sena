@@ -21,24 +21,29 @@ export type SubscriptionTypeStatus =
 export const SubscriptionTypeZodSchema = z.object({
   plan: z
     .string()
-    .min(1, "Plan name is required")
+    .min(1, "El nombre del plan es requerido")
     .max(50)
     .trim()
     .toLowerCase()
     .refine((val) => /^[a-z0-9_]+$/.test(val), {
-      message: "Plan name must be alphanumeric with underscores only",
+      message:
+        "El nombre del plan debe ser alfanumérico con guiones bajos únicamente",
     }),
-  displayName: z.string().min(1, "Display name is required").max(100).trim(),
+  displayName: z
+    .string()
+    .min(1, "El nombre a mostrar es requerido")
+    .max(100)
+    .trim(),
   description: z.string().max(500).trim().optional(),
   billingModel: z.enum(billingModelOptions),
   baseCost: z
     .number()
-    .int("Base cost must be in cents (integer)")
-    .min(0, "Base cost cannot be negative"),
+    .int("El costo base debe estar en centavos (entero)")
+    .min(0, "El costo base no puede ser negativo"),
   pricePerSeat: z
     .number()
-    .int("Price per seat must be in cents (integer)")
-    .min(0, "Price per seat cannot be negative"),
+    .int("El precio por asiento debe estar en centavos (entero)")
+    .min(0, "El precio por asiento no puede ser negativo"),
   maxSeats: z.number().int().min(-1).default(-1), // -1 = unlimited
   maxCatalogItems: z.number().int().min(-1).default(-1), // -1 = unlimited
   /**
@@ -47,9 +52,9 @@ export const SubscriptionTypeZodSchema = z.object({
    */
   durationDays: z
     .number()
-    .int("Duration must be a whole number of days")
-    .min(1, "Duration must be at least 1 day")
-    .max(365, "Duration cannot exceed 365 days (one year)"),
+    .int("La duración debe ser un número entero de días")
+    .min(1, "La duración debe ser al menos 1 día")
+    .max(365, "La duración no puede exceder 365 días (un año)"),
   features: z.array(z.string()).optional(),
   sortOrder: z.number().int().min(0).default(0),
   stripePriceIdBase: z.string().optional(),

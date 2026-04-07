@@ -47,6 +47,7 @@ interface ListLocationsParams {
  */
 interface CreateLocationData {
   name: string;
+  code: string; // Unique alphanumeric code per organization
   organizationId: Types.ObjectId | string; // Accepts both types
   userId: string; // ID of the user creating the location
   address: {
@@ -71,6 +72,7 @@ interface CreateLocationData {
  */
 interface UpdateLocationData {
   name?: string;
+  code?: string; // Unique alphanumeric code per organization
   address?: {
     country?: string;
     state?: string;
@@ -207,13 +209,23 @@ export class LocationService {
     const { userId, ...locationData } = data;
 
     // Check for duplicate name in organization
-    const existing = await Location.findOne({
+    const existingName = await Location.findOne({
       organizationId: locationData.organizationId,
       name: locationData.name,
     });
 
-    if (existing) {
+    if (existingName) {
       throw AppError.conflict("Ya existe una ubicación con este nombre");
+    }
+
+    // Check for duplicate code in organization
+    const existingCode = await Location.findOne({
+      organizationId: locationData.organizationId,
+      code: locationData.code,
+    });
+
+    if (existingCode) {
+      throw AppError.conflict("Ya existe una ubicación con este código");
     }
 
     // Create and return new location
@@ -251,6 +263,19 @@ export class LocationService {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(id)) {
       throw AppError.badRequest("Formato de ID de ubicación no válido");
+    }
+
+    // Check for duplicate code in organization (exclude current location)
+    if (data.code) {
+      const existingCode = await Location.findOne({
+        organizationId,
+        code: data.code,
+        _id: { $ne: id },
+      });
+
+      if (existingCode) {
+        throw AppError.conflict("Ya existe una ubicación con este código");
+      }
     }
 
     // Update with organization scope

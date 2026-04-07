@@ -53,13 +53,13 @@ export const IncidentZodSchema = z
     loanId: z
       .string()
       .refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Loan ID format",
+        message: "Formato de ID de préstamo no válido",
       })
       .optional(),
     locationId: z
       .string()
       .refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Location ID format",
+        message: "Formato de ID de ubicación no válido",
       })
       .optional(),
     context: z.enum(incidentContextOptions),
@@ -68,7 +68,7 @@ export const IncidentZodSchema = z
     relatedMaterialInstances: z
       .array(
         z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Material Instance ID format",
+          message: "Formato de ID de instancia de material no válido",
         }),
       )
       .optional(),
@@ -88,7 +88,7 @@ export const IncidentZodSchema = z
       return true;
     },
     {
-      message: 'loanId is required when context is "loan"',
+      message: 'loanId es requerido cuando el contexto es "loan"',
       path: ["loanId"],
     },
   );

@@ -22,8 +22,8 @@ const userStatusOptions = [
 
 /* ---------- Zod Schema for API Validation ---------- */
 
-const namePart = z.string().max(50, "Maximum 50 characters allowed").trim();
-const requiredNamePart = namePart.min(1, "This field is required");
+const namePart = z.string().max(50, "Se permiten máximo 50 caracteres").trim();
+const requiredNamePart = namePart.min(1, "Este campo es requerido");
 
 export const UserZodSchema = z.object({
   name: z.object({
@@ -32,27 +32,29 @@ export const UserZodSchema = z.object({
     firstSurname: requiredNamePart,
     secondSurname: namePart.optional().or(z.literal("")),
   }),
-  email: z.email("Invalid email format").lowercase().trim(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)"),
+  email: z.email("Formato de correo electrónico no válido").lowercase().trim(),
+  phone: z
+    .string()
+    .regex(/^\+?[1-9]\d{1,14}$/, "Formato de telefono invalido (E.164)"),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password must not exceed 128 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one digit")
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(128, "La contraseña no debe exceder 128 caracteres")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una letra mayúscula")
+    .regex(/[a-z]/, "La contraseña debe contener al menos una letra minúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un dígito")
     .regex(
       /[^A-Za-z0-9]/,
-      "Password must contain at least one special character",
+      "La contraseña debe contener al menos un carácter especial",
     ),
   roleId: z.string(),
   locations: z.array(
     z.string().refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Location ID format",
+      message: "Formato de ID de ubicación no válido",
     }),
   ),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
 });
 
@@ -62,17 +64,17 @@ export const UserUpdateZodSchema = UserZodSchema.partial().omit({
 });
 
 export const PasswordUpdateZodSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
+  currentPassword: z.string().min(1, "La contraseña actual es requerida"),
   newPassword: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password must not exceed 128 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one digit")
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(128, "La contraseña no debe exceder 128 caracteres")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una letra mayúscula")
+    .regex(/[a-z]/, "La contraseña debe contener al menos una letra minúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un dígito")
     .regex(
       /[^A-Za-z0-9]/,
-      "Password must contain at least one special character",
+      "La contraseña debe contener al menos un carácter especial",
     ),
 });
 

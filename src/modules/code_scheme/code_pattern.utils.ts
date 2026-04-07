@@ -29,6 +29,8 @@ export type Token = TokenLiteral | TokenVariable;
 
 export interface CodeGenContext {
   locationCode?: string;
+  categoryCode?: string;
+  typeCode?: string;
   date?: Date;
 }
 
@@ -39,6 +41,8 @@ export interface TokenValues {
   month?: string;
   day?: string;
   locationCode?: string;
+  categoryCode?: string;
+  typeCode?: string;
 }
 
 /* ---------- Constants ---------- */
@@ -50,6 +54,8 @@ const KNOWN_TOKENS = new Set([
   "MM",
   "DD",
   "LOCATION_CODE",
+  "CATEGORY_CODE",
+  "TYPE_CODE",
 ]);
 
 // Matches {TOKEN} or {SEQ:N}
@@ -193,6 +199,16 @@ export function buildScopeKey(
     scopeKey += `:${context.locationCode}`;
   }
 
+  // Type code scope
+  if (varNames.has("TYPE_CODE") && context.typeCode) {
+    scopeKey += `:TYPE_${context.typeCode}`;
+  }
+
+  // Category code scope
+  if (varNames.has("CATEGORY_CODE") && context.categoryCode) {
+    scopeKey += `:CAT_${context.categoryCode}`;
+  }
+
   return scopeKey;
 }
 
@@ -222,6 +238,10 @@ export function resolvePattern(pattern: string, values: TokenValues): string {
         return values.day ?? "";
       case "LOCATION_CODE":
         return values.locationCode ?? "";
+      case "CATEGORY_CODE":
+        return values.categoryCode ?? "";
+      case "TYPE_CODE":
+        return values.typeCode ?? "";
       default:
         return fullMatch;
     }
@@ -246,6 +266,12 @@ export function buildTokenValues(
     day: String(date.getDate()).padStart(2, "0"),
     ...(context.locationCode != null
       ? { locationCode: context.locationCode }
+      : {}),
+    ...(context.categoryCode != null
+      ? { categoryCode: context.categoryCode }
+      : {}),
+    ...(context.typeCode != null
+      ? { typeCode: context.typeCode }
       : {}),
   };
 }

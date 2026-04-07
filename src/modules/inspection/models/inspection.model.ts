@@ -28,7 +28,7 @@ export type ItemCondition = (typeof conditionOptions)[number];
 
 const itemInspectionBaseZodSchema = z.object({
   materialInstanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Instance ID format",
+    message: "Formato de ID de instancia de material no válido",
   }),
   conditionBefore: z.enum(conditionOptions),
   conditionAfter: z.enum(conditionOptions),
@@ -45,7 +45,8 @@ const itemInspectionZodSchema = itemInspectionBaseZodSchema.superRefine(
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["damageDescription"],
-        message: "damageDescription is required when conditionAfter is damaged",
+        message:
+          "La descripción del daño es requerida cuando la condición es 'damaged'",
       });
     }
   },
@@ -58,7 +59,8 @@ const itemInspectionUpdateZodSchema = itemInspectionBaseZodSchema
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["damageDescription"],
-        message: "damageDescription is required when conditionAfter is damaged",
+        message:
+          "La descripción del daño es requerida cuando la condición es 'damaged'",
       });
     }
   });
@@ -67,14 +69,14 @@ const itemInspectionUpdateZodSchema = itemInspectionBaseZodSchema
 
 export const InspectionZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   loanId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Loan ID format",
+    message: "Formato de ID de préstamo no válido",
   }),
   items: z
     .array(itemInspectionZodSchema)
-    .min(1, "At least one item inspection required"),
+    .min(1, "Se requiere al menos una inspección de elemento"),
   notes: z.string().max(1000).trim().optional(),
 });
 
@@ -115,7 +117,7 @@ const itemInspectionMongooseSchema = new Schema(
       type: [String],
       validate: {
         validator: (v: string[]) => v.length <= 10,
-        message: "Maximum 10 evidence URLs allowed",
+        message: "Máximo 10 URLs de evidencia permitidas",
       },
     },
     repairRequired: {

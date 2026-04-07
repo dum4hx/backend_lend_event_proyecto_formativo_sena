@@ -40,14 +40,14 @@ export type SourceType = (typeof sourceTypeOptions)[number];
 
 const maintenanceBatchItemZodSchema = z.object({
   materialInstanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Instance ID format",
+    message: "Formato de ID de instancia de material no válido",
   }),
   entryReason: z.enum(entryReasonOptions),
   sourceType: z.enum(sourceTypeOptions),
   sourceId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Source ID format",
+      message: "Formato de ID de fuente no válido",
     })
     .optional(),
   sourceItemIndex: z.number().int().min(0).optional(),
@@ -58,7 +58,7 @@ const maintenanceBatchItemZodSchema = z.object({
 export const MaintenanceBatchItemAddZodSchema = z.object({
   items: z
     .array(maintenanceBatchItemZodSchema)
-    .min(1, "At least one item is required"),
+    .min(1, "Se requiere al menos un elemento"),
 });
 
 export type MaintenanceBatchItemInput = z.infer<
@@ -85,13 +85,13 @@ export const MaintenanceBatchCreateZodSchema = z.object({
   assignedTo: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid User ID format",
+      message: "Formato de ID de usuario no válido",
     })
     .optional(),
   locationId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Location ID format",
+      message: "Formato de ID de ubicación no válido",
     })
     .optional(),
   notes: z.string().max(1000).trim().optional(),

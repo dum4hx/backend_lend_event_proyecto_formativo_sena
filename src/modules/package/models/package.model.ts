@@ -9,21 +9,27 @@ const packageStatusOptions = ["active", "inactive", "discontinued"] as const;
 
 const packageItemZodSchema = z.object({
   materialTypeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Type ID format",
+    message: "Formato de ID de tipo de material no válido",
   }),
-  quantity: z.number().int().positive("Quantity must be at least 1").default(1),
+  quantity: z
+    .number()
+    .int()
+    .positive("La cantidad debe ser al menos 1")
+    .default(1),
 });
 
 /* ---------- Zod Schema for API Validation ---------- */
 
 export const PackageZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
-  name: z.string().min(1, "Name is required").max(150).trim(),
+  name: z.string().min(1, "El nombre es requerido").max(150).trim(),
   description: z.string().max(500).trim().optional(),
-  items: z.array(packageItemZodSchema).min(1, "At least one item is required"),
-  pricePerDay: z.number().positive("Price must be greater than 0"),
+  items: z
+    .array(packageItemZodSchema)
+    .min(1, "Se requiere al menos un elemento"),
+  pricePerDay: z.number().positive("El precio debe ser mayor que 0"),
   discountRate: z.number().min(0).max(1).default(0),
   depositAmount: z.number().min(0).default(0),
 });
@@ -79,7 +85,7 @@ const packageSchema = new Schema(
       required: true,
       validate: {
         validator: (v: unknown[]) => v.length > 0,
-        message: "Package must have at least one item",
+        message: "El paquete debe tener al menos un elemento",
       },
     },
     pricePerDay: {

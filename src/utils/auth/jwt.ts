@@ -63,7 +63,7 @@ export const loadAsymmetricKeys = async (): Promise<{
 
   if (!existsSync(publicKeyPath) || !existsSync(privateKeyPath)) {
     throw AppError.internal(
-      "JWT keys not found. Run 'npm run generate-keys' to create them.",
+      "Claves JWT no encontradas. Ejecuta 'npm run generate-keys' para crearlas.",
     );
   }
 
@@ -76,7 +76,7 @@ export const loadAsymmetricKeys = async (): Promise<{
 
     return { privateKey, publicKey };
   } catch (err: unknown) {
-    throw AppError.internal("Failed to load JWT keys", err);
+    throw AppError.internal("Error al cargar las claves JWT", err);
   }
 };
 
@@ -160,7 +160,7 @@ export const verifyToken = async (
     // Verify token type if specified
     if (expectedType && jwtPayload.type !== expectedType) {
       throw AppError.unauthorized(
-        `Invalid token type. Expected ${expectedType}.`,
+        `Tipo de token inválido. Se esperaba ${expectedType}.`,
       );
     }
 
@@ -173,14 +173,14 @@ export const verifyToken = async (
     // Handle specific JWT errors
     if (err instanceof Error) {
       if (err.message.includes("expired")) {
-        throw AppError.unauthorized("Token has expired");
+        throw AppError.unauthorized("El token ha expirado");
       }
       if (err.message.includes("signature")) {
-        throw AppError.unauthorized("Invalid token signature");
+        throw AppError.unauthorized("Firma de token inválida");
       }
     }
 
-    throw AppError.unauthorized("Invalid token");
+    throw AppError.unauthorized("Token inválido");
   }
 };
 

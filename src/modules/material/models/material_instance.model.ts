@@ -18,17 +18,17 @@ const materialStatusOptions: string[] = [
 // TODO: Consider adding more fields like purchaseDate, warrantyExpiry, etc. in the future
 export const MaterialInstanceZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Model ID format",
+    message: "Formato de ID de modelo de material no válido",
   }),
   serialNumber: z
     .string()
-    .min(1, "Serial number is required")
-    .max(100, "Maximum 100 characters")
+    .min(1, "El número de serie es requerido")
+    .max(100, "Máximo 100 caracteres")
     .trim(),
-  notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+  notes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
   status: z
     .enum([
       "available",
@@ -42,23 +42,25 @@ export const MaterialInstanceZodSchema = z.object({
     ])
     .default("available"),
   locationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Location ID format",
+    message: "Formato de ID de ubicación no válido",
   }),
   attributes: z
     .array(
       z.object({
         attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Attribute ID format",
+          message: "Formato de ID de atributo no válido",
         }),
-        value: z.string().max(100, "Maximum 100 characters").trim(),
+        value: z.string().max(100, "Máximo 100 caracteres").trim(),
       }),
     )
     .optional(),
   barcode: z
     .string()
     .trim()
-    .max(120, "Maximum 120 characters")
-    .refine((val) => val.length > 0, { message: "Barcode cannot be blank" })
+    .max(120, "Máximo 120 caracteres")
+    .refine((val) => val.length > 0, {
+      message: "El código de barras no puede estar vacío",
+    })
     .optional(),
   useBarcodeAsSerial: z.boolean().optional(),
   /**
@@ -71,29 +73,31 @@ export const MaterialInstanceZodSchema = z.object({
 const serialNumberSchema = z
   .string()
   .trim()
-  .max(100, "Maximum 100 characters")
+  .max(100, "Máximo 100 caracteres")
   .refine((val) => val.length > 0, {
-    message: "Serial number cannot be blank",
+    message: "El número de serie no puede estar vacío",
   });
 
 const barcodeSchema = z
   .string()
   .trim()
-  .max(120, "Maximum 120 characters")
-  .refine((val) => val.length > 0, { message: "Barcode cannot be blank" });
+  .max(120, "Máximo 120 caracteres")
+  .refine((val) => val.length > 0, {
+    message: "El código de barras no puede estar vacío",
+  });
 
 export const MaterialInstanceCreateZodSchema = z
   .object({
     modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Material Model ID format",
+      message: "Formato de ID de modelo de material no válido",
     }),
     locationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Location ID format",
+      message: "Formato de ID de ubicación no válido",
     }),
     serialNumber: serialNumberSchema.optional(),
     barcode: barcodeSchema.optional(),
     useBarcodeAsSerial: z.boolean().optional(),
-    notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+    notes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
     status: z
       .enum([
         "available",
@@ -110,9 +114,9 @@ export const MaterialInstanceCreateZodSchema = z
       .array(
         z.object({
           attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-            message: "Invalid Attribute ID format",
+            message: "Formato de ID de atributo no válido",
           }),
-          value: z.string().max(100, "Maximum 100 characters").trim(),
+          value: z.string().max(100, "Máximo 100 caracteres").trim(),
         }),
       )
       .optional(),
@@ -123,7 +127,7 @@ export const MaterialInstanceCreateZodSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["barcode"],
-        message: "barcode is required when useBarcodeAsSerial is true",
+        message: "barcode es requerido cuando useBarcodeAsSerial es verdadero",
       });
     }
 
@@ -131,7 +135,7 @@ export const MaterialInstanceCreateZodSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["serialNumber"],
-        message: "serialNumber is required when useBarcodeAsSerial is false",
+        message: "serialNumber es requerido cuando useBarcodeAsSerial es falso",
       });
     }
 
@@ -140,7 +144,7 @@ export const MaterialInstanceCreateZodSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["serialNumber"],
-        message: "serialNumber is required",
+        message: "serialNumber es requerido",
       });
     }
   });
@@ -150,33 +154,34 @@ export const MaterialInstanceUpdateZodSchema = z
     modelId: z
       .string()
       .refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Material Model ID format",
+        message: "Formato de ID de modelo de material no válido",
       })
       .optional(),
     locationId: z
       .string()
       .refine((val) => Types.ObjectId.isValid(val), {
-        message: "Invalid Location ID format",
+        message: "Formato de ID de ubicación no válido",
       })
       .optional(),
     serialNumber: serialNumberSchema.optional(),
     barcode: barcodeSchema.optional(),
     useBarcodeAsSerial: z.boolean().optional(),
-    notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+    notes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
     attributes: z
       .array(
         z.object({
           attributeId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-            message: "Invalid Attribute ID format",
+            message: "Formato de ID de atributo no válido",
           }),
-          value: z.string().max(100, "Maximum 100 characters").trim(),
+          value: z.string().max(100, "Máximo 100 caracteres").trim(),
         }),
       )
       .optional(),
     force: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
-    message: "At least one field is required to update the material instance",
+    message:
+      "Se requiere al menos un campo para actualizar la instancia de material",
   });
 
 export type MaterialInstanceInput = z.infer<typeof MaterialInstanceZodSchema>;

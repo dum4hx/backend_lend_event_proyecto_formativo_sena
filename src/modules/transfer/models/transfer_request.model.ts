@@ -23,26 +23,26 @@ export type TransferRequestStatus = z.infer<typeof TransferRequestStatusEnum>;
 
 export const TransferRequestZodSchema = z.object({
   fromLocationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid From Location ID format",
+    message: "Formato de ID de ubicación de origen no válido",
   }),
   toLocationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid To Location ID format",
+    message: "Formato de ID de ubicación de destino no válido",
   }),
   items: z
     .array(
       z.object({
         modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-          message: "Invalid Model ID format",
+          message: "Formato de ID de modelo no válido",
         }),
-        quantity: z.number().int().min(1, "Quantity must be at least 1"),
+        quantity: z.number().int().min(1, "La cantidad debe ser al menos 1"),
         fulfilledQuantity: z.number().int().default(0),
       }),
     )
-    .min(1, "At least one item must be requested"),
-  notes: z.string().max(500, "Maximum 500 characters").trim().optional(),
+    .min(1, "Se debe solicitar al menos un elemento"),
+  notes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
   neededBy: z
     .string()
-    .datetime({ message: "neededBy must be a valid ISO date" })
+    .datetime({ message: "neededBy debe ser una fecha ISO válida" })
     .optional(),
 });
 

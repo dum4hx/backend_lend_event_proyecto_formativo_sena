@@ -28,30 +28,33 @@ export type PricingScope = (typeof pricingScopeOptions)[number];
 export const perDayParamsZod = z.object({
   overridePricePerDay: z
     .number()
-    .positive("Override price must be positive")
+    .positive("El precio de anulación debe ser positivo")
     .optional(),
 });
 
 export const weeklyMonthlyParamsZod = z.object({
-  weeklyPrice: z.number().positive("Weekly price must be positive").optional(),
+  weeklyPrice: z
+    .number()
+    .positive("El precio semanal debe ser positivo")
+    .optional(),
   weeklyThreshold: z
     .number()
     .int()
-    .min(2, "Weekly threshold must be at least 2 days")
+    .min(2, "El umbral semanal debe ser al menos 2 días")
     .default(7),
   monthlyPrice: z
     .number()
-    .positive("Monthly price must be positive")
+    .positive("El precio mensual debe ser positivo")
     .optional(),
   monthlyThreshold: z
     .number()
     .int()
-    .min(7, "Monthly threshold must be at least 7 days")
+    .min(7, "El umbral mensual debe ser al menos 7 días")
     .default(30),
 });
 
 export const fixedParamsZod = z.object({
-  flatPrice: z.number().positive("Flat price must be positive"),
+  flatPrice: z.number().positive("El precio fijo debe ser positivo"),
 });
 
 /* ---------- Create / Update Zod Schema ---------- */
@@ -59,7 +62,7 @@ export const fixedParamsZod = z.object({
 const pricingConfigBaseSchema = z.object({
   scope: z.enum(pricingScopeOptions),
   referenceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid reference ID format",
+    message: "Formato de ID de referencia no válido",
   }),
   strategyType: PricingStrategyZod,
   perDayParams: perDayParamsZod.optional(),
@@ -73,7 +76,7 @@ export const PricingConfigCreateZodSchema = pricingConfigBaseSchema.superRefine(
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["fixedParams"],
-        message: "fixedParams.flatPrice is required for fixed strategy",
+        message: "fixedParams.flatPrice es requerido para la estrategia fija",
       });
     }
     if (data.strategyType === "weekly_monthly") {
@@ -83,7 +86,7 @@ export const PricingConfigCreateZodSchema = pricingConfigBaseSchema.superRefine(
           code: z.ZodIssueCode.custom,
           path: ["weeklyMonthlyParams"],
           message:
-            "At least one of weeklyPrice or monthlyPrice is required for weekly_monthly strategy",
+            "Al menos uno de weeklyPrice o monthlyPrice es requerido para la estrategia weekly_monthly",
         });
       }
     }
@@ -98,7 +101,7 @@ export const PricingConfigUpdateZodSchema = pricingConfigBaseSchema
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["fixedParams"],
-        message: "fixedParams.flatPrice is required for fixed strategy",
+        message: "fixedParams.flatPrice es requerido para la estrategia fija",
       });
     }
     if (data.strategyType === "weekly_monthly") {
@@ -108,7 +111,7 @@ export const PricingConfigUpdateZodSchema = pricingConfigBaseSchema
           code: z.ZodIssueCode.custom,
           path: ["weeklyMonthlyParams"],
           message:
-            "At least one of weeklyPrice or monthlyPrice is required for weekly_monthly strategy",
+            "Al menos uno de weeklyPrice o monthlyPrice es requerido para la estrategia weekly_monthly",
         });
       }
     }
@@ -126,10 +129,10 @@ export type PricingConfigUpdateInput = z.infer<
 export const PricingPreviewZodSchema = z.object({
   itemType: z.enum(["material", "package"]),
   referenceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid reference ID format",
+    message: "Formato de ID de referencia no válido",
   }),
   quantity: z.number().int().positive().default(1),
-  durationInDays: z.number().positive("Duration must be positive"),
+  durationInDays: z.number().positive("La duración debe ser positiva"),
 });
 
 export type PricingPreviewInput = z.infer<typeof PricingPreviewZodSchema>;

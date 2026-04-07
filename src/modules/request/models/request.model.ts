@@ -34,7 +34,7 @@ export type RequestStatus = (typeof requestStatusOptions)[number];
 const requestItemZodSchema = z.object({
   type: z.enum(["material", "package"]),
   referenceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid reference ID format",
+    message: "Formato de ID de referencia no válido",
   }),
   quantity: z.number().int().positive().default(1),
 });
@@ -43,12 +43,14 @@ const requestItemZodSchema = z.object({
 
 export const LoanRequestZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   customerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Customer ID format",
+    message: "Formato de ID de cliente no válido",
   }),
-  items: z.array(requestItemZodSchema).min(1, "At least one item is required"),
+  items: z
+    .array(requestItemZodSchema)
+    .min(1, "Se requiere al menos un elemento"),
   depositDueDate: z.coerce.date(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),

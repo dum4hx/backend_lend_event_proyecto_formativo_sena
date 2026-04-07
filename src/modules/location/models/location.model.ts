@@ -49,8 +49,8 @@ export type LocationStatus = z.infer<typeof LocationStatusEnum>;
 export const LocationZodSchema = z.object({
   name: z
     .string()
-    .min(1, "Name is required")
-    .max(100, "Maximum 100 characters")
+    .min(1, "El nombre es requerido")
+    .max(100, "Máximo 100 caracteres")
     .trim(),
   code: z
     .string()
@@ -70,16 +70,16 @@ export const LocationZodSchema = z.object({
         materialTypeId: z
           .string()
           .refine((val) => Types.ObjectId.isValid(val), {
-            message: "Invalid Material Type ID format",
+            message: "Formato de ID de tipo de material no válido",
           }),
-        maxQuantity: z.number().int().min(0, "Max quantity must be at least 0"),
+        maxQuantity: z.number().int().min(0, "La cantidad máxima debe ser al menos 0"),
       }),
     )
     .optional()
     .default([]),
   additionalDetails: z
     .string()
-    .max(500, "Maximum 500 characters")
+    .max(500, "Máximo 500 caracteres")
     .trim()
     .optional(),
   isActive: z.boolean().default(true),

@@ -12,9 +12,9 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 export const TransferRejectionReasonZodSchema = z.object({
   label: z
-    .string({ message: "Label is required" })
-    .min(3, "Label must be at least 3 characters")
-    .max(120, "Label must be at most 120 characters")
+    .string({ message: "La etiqueta es requerida" })
+    .min(3, "La etiqueta debe tener al menos 3 caracteres")
+    .max(120, "La etiqueta debe tener como máximo 120 caracteres")
     .trim(),
   isActive: z.boolean().default(true),
 });

@@ -54,11 +54,13 @@ const customerNameSchema = z.object({
 
 export const CustomerZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Organization ID format",
+    message: "Formato de ID de organización no válido",
   }),
   name: customerNameSchema,
-  email: z.email("Invalid email format").lowercase().trim(),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format (E.164)"),
+  email: z.email("Formato de correo electrónico no válido").lowercase().trim(),
+  phone: z
+    .string()
+    .regex(/^\+?[1-9]\d{1,14}$/, "Formato de telefono invalido (E.164)"),
   documentType: customerDocTypes.optional(),
   documentNumber: z.string().max(50).trim().optional(),
   address: AddressZodSchema.optional(),
