@@ -38,10 +38,10 @@ const listPackagesQuerySchema = paginationSchema.extend({
 const packageUpdateSchema = PackageZodSchema.partial();
 
 const packageAvailabilityQuerySchema = z.object({
-  startDate: z.coerce.date({ message: "startDate is required" }),
-  endDate: z.coerce.date({ message: "endDate is required" }),
+  startDate: z.coerce.date({ message: "La fecha de inicio es requerida" }),
+  endDate: z.coerce.date({ message: "La fecha de fin es requerida" }),
 }).refine((data) => data.endDate > data.startDate, {
-  message: "endDate must be after startDate",
+  message: "La fecha de fin debe ser posterior a la fecha de inicio",
   path: ["endDate"],
 });
 
@@ -193,7 +193,7 @@ packageRouter.post(
     try {
       const pkg = await packageService.activatePackage(getOrgId(req), req.params.id);
 
-      res.json({ status: "success", data: { package: pkg }, message: "Package activated successfully" });
+      res.json({ status: "success", data: { package: pkg }, message: "Paquete activado exitosamente" });
     } catch (err) {
       next(err);
     }
@@ -211,7 +211,7 @@ packageRouter.post(
     try {
       const pkg = await packageService.deactivatePackage(getOrgId(req), req.params.id);
 
-      res.json({ status: "success", data: { package: pkg }, message: "Package deactivated successfully" });
+      res.json({ status: "success", data: { package: pkg }, message: "Paquete desactivado exitosamente" });
     } catch (err) {
       next(err);
     }
@@ -229,7 +229,7 @@ packageRouter.delete(
     try {
       await packageService.deletePackage(getOrgId(req), req.params.id);
 
-      res.json({ status: "success", message: "Package deleted successfully" });
+      res.json({ status: "success", message: "Paquete eliminado exitosamente" });
     } catch (err) {
       next(err);
     }

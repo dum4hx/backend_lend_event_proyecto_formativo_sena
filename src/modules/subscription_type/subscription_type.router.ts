@@ -202,7 +202,7 @@ subscriptionTypeRouter.delete(
 
       res.json({
         status: "success",
-        message: `Subscription type "${plan}" has been deactivated`,
+        message: `El tipo de suscripción "${plan}" ha sido desactivado`,
       });
     } catch (err) {
       next(err);

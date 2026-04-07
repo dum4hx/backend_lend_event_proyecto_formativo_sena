@@ -62,7 +62,7 @@ const createInvoiceSchema = z.object({
 const recordPaymentSchema = z.object({
   amount: z.number().positive(),
   paymentMethodId: z.string().refine((v) => Types.ObjectId.isValid(v), {
-    message: "paymentMethodId must be a valid ObjectId",
+    message: "paymentMethodId debe ser un ObjectId válido",
   }),
   reference: z.string().max(100).optional(),
   notes: z.string().max(500).optional(),
@@ -213,8 +213,8 @@ invoiceRouter.post(
         data: { payment: result.payment },
         message:
           result.invoice.status === "paid"
-            ? "Invoice fully paid"
-            : `Payment recorded. Remaining balance: $${(result.invoice.totalAmount - result.invoice.amountPaid).toFixed(2)}`,
+            ? "Factura pagada completamente"
+            : `Pago registrado. Saldo pendiente: $${(result.invoice.totalAmount - result.invoice.amountPaid).toFixed(2)}`,
       });
     } catch (err) {
       next(err);
@@ -242,7 +242,7 @@ invoiceRouter.post(
       res.json({
         status: "success",
         data: { invoice },
-        message: "Invoice voided successfully",
+        message: "Factura anulada exitosamente",
       });
     } catch (err) {
       next(err);
@@ -264,7 +264,7 @@ invoiceRouter.post(
 
       res.json({
         status: "success",
-        message: "Invoice sent successfully",
+        message: "Factura enviada exitosamente",
       });
     } catch (err) {
       next(err);

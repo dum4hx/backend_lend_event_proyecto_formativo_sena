@@ -127,7 +127,7 @@ loanRouter.get(
       const { groupByMaterialType } = req.query as any;
 
       if (!loanId || typeof loanId !== "string") {
-        throw AppError.badRequest("Invalid loan ID");
+        throw AppError.badRequest("ID de préstamo no válido");
       }
 
       const opts =
@@ -158,7 +158,7 @@ loanRouter.post(
       const requestId = req.params.requestId;
 
       if (!requestId || typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const loan = await loanService.createLoanFromRequest({
@@ -170,7 +170,7 @@ loanRouter.post(
       res.status(201).json({
         status: "success",
         data: { loan },
-        message: "Loan created successfully - materials picked up",
+        message: "Préstamo creado exitosamente - materiales recogidos",
       });
     } catch (err) {
       next(err);
@@ -192,7 +192,7 @@ loanRouter.post(
       const loanId = req.params.id;
 
       if (!loanId || typeof loanId !== "string") {
-        throw AppError.badRequest("Invalid loan ID");
+        throw AppError.badRequest("ID de préstamo no válido");
       }
 
       const newEndDate = new Date(req.body.newEndDate);
@@ -207,7 +207,7 @@ loanRouter.post(
       res.json({
         status: "success",
         data: { loan },
-        message: "Loan extended successfully",
+        message: "Préstamo extendido exitosamente",
       });
     } catch (err) {
       next(err);
@@ -229,7 +229,7 @@ loanRouter.post(
       const loanId = req.params.id;
 
       if (!loanId || typeof loanId !== "string") {
-        throw AppError.badRequest("Invalid loan ID");
+        throw AppError.badRequest("ID de préstamo no válido");
       }
 
       const loan = await loanService.returnLoan(
@@ -241,7 +241,7 @@ loanRouter.post(
       res.json({
         status: "success",
         data: { loan },
-        message: "Loan marked as returned - pending inspection",
+        message: "Préstamo marcado como devuelto - inspección pendiente",
       });
     } catch (err) {
       next(err);
@@ -262,7 +262,7 @@ loanRouter.post(
       const loanId = req.params.id;
 
       if (!loanId || typeof loanId !== "string") {
-        throw AppError.badRequest("Invalid loan ID");
+        throw AppError.badRequest("ID de préstamo no válido");
       }
 
       const loan = await loanService.completeLoan(loanId, organizationId);
@@ -270,7 +270,7 @@ loanRouter.post(
       res.json({
         status: "success",
         data: { loan },
-        message: "Loan completed successfully",
+        message: "Préstamo completado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -293,7 +293,7 @@ loanRouter.post(
       const loanId = req.params.id;
 
       if (!loanId || typeof loanId !== "string") {
-        throw AppError.badRequest("Invalid loan ID");
+        throw AppError.badRequest("ID de préstamo no válido");
       }
 
       const loan = await loanService.refundDeposit({
@@ -305,7 +305,7 @@ loanRouter.post(
       res.json({
         status: "success",
         data: { loan },
-        message: "Deposit refunded successfully",
+        message: "Depósito reembolsado exitosamente",
       });
     } catch (err) {
       next(err);

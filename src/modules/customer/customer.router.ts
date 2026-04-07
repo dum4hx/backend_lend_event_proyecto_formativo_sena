@@ -165,7 +165,7 @@ customerRouter.post(
       res.json({
         status: "success",
         data: { customer },
-        message: "Customer activated successfully",
+        message: "Cliente activado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -191,7 +191,7 @@ customerRouter.post(
       res.json({
         status: "success",
         data: { customer },
-        message: "Customer deactivated successfully",
+        message: "Cliente desactivado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -217,7 +217,7 @@ customerRouter.post(
       res.json({
         status: "success",
         data: { customer },
-        message: "Customer blacklisted successfully",
+        message: "Cliente incluido en lista negra exitosamente",
       });
     } catch (err) {
       next(err);
@@ -241,7 +241,7 @@ customerRouter.delete(
       );
       res.json({
         status: "success",
-        message: "Customer deleted successfully",
+        message: "Cliente eliminado exitosamente",
       });
     } catch (err) {
       next(err);

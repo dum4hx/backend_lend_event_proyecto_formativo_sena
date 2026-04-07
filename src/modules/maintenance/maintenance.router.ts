@@ -44,16 +44,16 @@ const listBatchesQuerySchema = paginationSchema.extend({
 
 const batchIdParamSchema = z.object({
   id: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Batch ID format",
+    message: "Formato de ID de lote no válido",
   }),
 });
 
 const instanceIdParamSchema = z.object({
   id: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Batch ID format",
+    message: "Formato de ID de lote no válido",
   }),
   instanceId: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Material Instance ID format",
+    message: "Formato de ID de instancia de material no válido",
   }),
 });
 
@@ -71,8 +71,12 @@ maintenanceRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
-      const { page = 1, limit = 20, status, assignedTo } =
-        req.query as unknown as z.infer<typeof listBatchesQuerySchema>;
+      const {
+        page = 1,
+        limit = 20,
+        status,
+        assignedTo,
+      } = req.query as unknown as z.infer<typeof listBatchesQuerySchema>;
 
       const data = await maintenanceService.listBatches({
         organizationId,

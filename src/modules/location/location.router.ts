@@ -152,7 +152,7 @@ locationRouter.get(
       // Successful response with standard structure
       res.status(200).json({
         status: "success",
-        message: "Locations fetched successfully",
+        message: "Ubicaciones obtenidas exitosamente",
         data: result,
       });
     } catch (error) {
@@ -200,7 +200,7 @@ locationRouter.get(
       // Successful response
       res.status(200).json({
         status: "success",
-        message: "Location fetched successfully",
+        message: "Ubicación obtenida exitosamente",
         data: location,
       });
     } catch (error) {
@@ -261,7 +261,7 @@ locationRouter.post(
       // Response with 201 Created code
       res.status(201).json({
         status: "success",
-        message: "Location created successfully",
+        message: "Ubicación creada exitosamente",
         data: location,
       });
     } catch (error) {
@@ -316,7 +316,7 @@ locationRouter.patch(
 
       res.status(200).json({
         status: "success",
-        message: "Location updated successfully",
+        message: "Ubicación actualizada exitosamente",
         data: location,
       });
     } catch (error) {
@@ -357,7 +357,7 @@ locationRouter.delete(
 
       res.status(200).json({
         status: "success",
-        message: "Location deactivated successfully",
+        message: "Ubicación desactivada exitosamente",
         data: null,
       });
     } catch (error) {
@@ -397,7 +397,7 @@ locationRouter.post(
 
       res.status(200).json({
         status: "success",
-        message: "Location restored successfully",
+        message: "Ubicación restaurada exitosamente",
         data: location,
       });
     } catch (error) {

@@ -150,7 +150,7 @@ materialRouter.delete(
 
       res.json({
         status: "success",
-        message: "Category deleted successfully",
+        message: "Categoría eliminada exitosamente",
       });
     } catch (err) {
       next(err);
@@ -270,7 +270,7 @@ materialRouter.delete(
       await materialService.deleteAttribute(getOrgId(req), req.params.id);
       res.json({
         status: "success",
-        message: "Material attribute deleted successfully",
+        message: "Atributo de material eliminado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -551,7 +551,7 @@ materialRouter.delete(
 
       res.json({
         status: "success",
-        message: "Material type deleted successfully",
+        message: "Tipo de material eliminado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -753,7 +753,7 @@ materialRouter.delete(
 
       res.json({
         status: "success",
-        message: "Material instance deleted successfully",
+        message: "Instancia de material eliminada exitosamente",
       });
     } catch (err) {
       next(err);

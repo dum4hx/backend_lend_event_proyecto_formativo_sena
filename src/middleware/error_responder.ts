@@ -21,7 +21,7 @@ export const errorResponder = (
   if (err instanceof AppError) {
     appError = err;
   } else {
-    appError = AppError.internal("An unexpected error occurred", err);
+    appError = AppError.internal("Ocurrió un error inesperado", err);
   }
 
   const payload: ErrorResponsePayload = {
@@ -29,7 +29,7 @@ export const errorResponder = (
     code: appError.code,
     message:
       process.env.NODE_ENV === "production" && !appError.isOperational
-        ? "Internal Server Error"
+        ? "Error interno del servidor"
         : appError.message,
   };
 

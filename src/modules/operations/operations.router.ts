@@ -54,7 +54,7 @@ operationsRouter.use(
 function getLocationId(req: Request): Types.ObjectId {
   const locationId = req.params.locationId as string;
   if (!locationId || !Types.ObjectId.isValid(locationId)) {
-    throw AppError.badRequest("Invalid location ID format");
+    throw AppError.badRequest("Formato de ID de ubicación no válido");
   }
   return new Types.ObjectId(locationId);
 }

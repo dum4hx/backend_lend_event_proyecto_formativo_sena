@@ -45,7 +45,10 @@ export class AppError extends Error {
 
   /* ---------- Factory helpers ---------- */
 
-  static badRequest(message = "Bad Request", details?: unknown): AppError {
+  static badRequest(
+    message = "Solicitud no válida",
+    details?: unknown,
+  ): AppError {
     return new AppError({
       message,
       statusCode: 400,
@@ -54,7 +57,7 @@ export class AppError extends Error {
     });
   }
 
-  static unauthorized(message = "Unauthorized", details?: unknown): AppError {
+  static unauthorized(message = "No autorizado", details?: unknown): AppError {
     return new AppError({
       message,
       statusCode: 401,
@@ -63,7 +66,7 @@ export class AppError extends Error {
     });
   }
 
-  static forbidden(message = "Forbidden", details?: unknown): AppError {
+  static forbidden(message = "Acceso denegado", details?: unknown): AppError {
     return new AppError({
       message,
       statusCode: 403,
@@ -72,7 +75,7 @@ export class AppError extends Error {
     });
   }
 
-  static notFound(message = "Not Found", details?: unknown): AppError {
+  static notFound(message = "No encontrado", details?: unknown): AppError {
     return new AppError({
       message,
       statusCode: 404,
@@ -81,7 +84,7 @@ export class AppError extends Error {
     });
   }
 
-  static conflict(message = "Conflict", details?: unknown): AppError {
+  static conflict(message = "Conflicto", details?: unknown): AppError {
     return new AppError({
       message,
       statusCode: 409,
@@ -91,7 +94,7 @@ export class AppError extends Error {
   }
 
   static internal(
-    message = "Internal Server Error",
+    message = "Error interno del servidor",
     cause?: unknown,
   ): AppError {
     return new AppError({

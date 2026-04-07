@@ -49,76 +49,76 @@ const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password must not exceed 128 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one digit")
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(128, "La contraseña no debe exceder los 128 caracteres")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una letra mayúscula")
+    .regex(/[a-z]/, "La contraseña debe contener al menos una letra minúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un dígito")
     .regex(
       /[^A-Za-z0-9]/,
-      "Password must contain at least one special character",
+      "La contraseña debe contener al menos un carácter especial",
     ),
 });
 
 const passwordValidation = z
   .string()
-  .min(8, "Password must be at least 8 characters")
-  .max(128, "Password must not exceed 128 characters")
-  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-  .regex(/[0-9]/, "Password must contain at least one digit")
+  .min(8, "La contraseña debe tener al menos 8 caracteres")
+  .max(128, "La contraseña no debe exceder los 128 caracteres")
+  .regex(/[A-Z]/, "La contraseña debe contener al menos una letra mayúscula")
+  .regex(/[a-z]/, "La contraseña debe contener al menos una letra minúscula")
+  .regex(/[0-9]/, "La contraseña debe contener al menos un dígito")
   .regex(
     /[^A-Za-z0-9]/,
-    "Password must contain at least one special character",
+    "La contraseña debe contener al menos un carácter especial",
   );
 
 const forgotPasswordSchema = z.object({
-  email: z.email("Invalid email format"),
+  email: z.email("Formato de correo electrónico no válido"),
 });
 
 const verifyResetCodeSchema = z.object({
-  email: z.email("Invalid email format"),
+  email: z.email("Formato de correo electrónico no válido"),
   code: z
     .string()
-    .length(6, "Verification code must be 6 digits")
-    .regex(/^\d{6}$/, "Verification code must be numeric"),
+    .length(6, "El código de verificación debe tener 6 dígitos")
+    .regex(/^\d{6}$/, "El código de verificación debe ser numérico"),
 });
 
 const resetPasswordSchema = z.object({
-  email: z.email("Invalid email format"),
-  resetToken: z.string().min(1, "Reset token is required"),
+  email: z.email("Formato de correo electrónico no válido"),
+  resetToken: z.string().min(1, "El token de restablecimiento es requerido"),
   newPassword: passwordValidation,
 });
 
 const acceptInviteSchema = z.object({
-  email: z.email("Invalid email format"),
-  token: z.string().min(1, "Invite token is required"),
+  email: z.email("Formato de correo electrónico no válido"),
+  token: z.string().min(1, "El token de invitación es requerido"),
   password: passwordValidation,
 });
 
 const verifyEmailSchema = z.object({
-  email: z.email("Invalid email format"),
+  email: z.email("Formato de correo electrónico no válido"),
   code: z
     .string()
-    .length(6, "Verification code must be 6 digits")
-    .regex(/^\d{6}$/, "Verification code must be numeric"),
+    .length(6, "El código de verificación debe tener 6 dígitos")
+    .regex(/^\d{6}$/, "El código de verificación debe ser numérico"),
 });
 
 const verifyLoginOtpSchema = z.object({
-  email: z.email("Invalid email format"),
+  email: z.email("Formato de correo electrónico no válido"),
   code: z
     .string()
-    .length(6, "Verification code must be 6 digits")
-    .regex(/^\d{6}$/, "Verification code must be numeric"),
+    .length(6, "El código de verificación debe tener 6 dígitos")
+    .regex(/^\d{6}$/, "El código de verificación debe ser numérico"),
 });
 
 const verifyBackupCodeSchema = z.object({
-  email: z.email("Invalid email format"),
-  backupCode: z.string().min(1, "Backup code is required"),
+  email: z.email("Formato de correo electrónico no válido"),
+  backupCode: z.string().min(1, "El código de respaldo es requerido"),
 });
 
 const resendLoginOtpSchema = z.object({
-  email: z.email("Invalid email format"),
+  email: z.email("Formato de correo electrónico no válido"),
   password: z.string().min(1),
 });
 
@@ -141,7 +141,7 @@ authRouter.post(
       res.status(202).json({
         status: "success",
         message:
-          "Registration successful. Please check your email for a 6-digit verification code to activate your account.",
+          "Registro exitoso. Por favor revisa tu correo electrónico para obtener el código de verificación de 6 dígitos y activar tu cuenta.",
         data: {
           organization: {
             id: result.organization._id,
@@ -202,7 +202,7 @@ authRouter.post(
       const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
 
       if (!refreshToken) {
-        throw AppError.unauthorized("Refresh token required");
+        throw AppError.unauthorized("Token de actualización requerido");
       }
 
       const payload = await verifyRefreshToken(refreshToken);
@@ -218,7 +218,7 @@ authRouter.post(
 
       res.json({
         status: "success",
-        message: "Tokens refreshed",
+        message: "Tokens actualizados",
       });
     } catch (err) {
       next(err);
@@ -236,7 +236,7 @@ authRouter.post("/logout", (req: Request, res: Response) => {
 
   res.json({
     status: "success",
-    message: "Logged out successfully",
+    message: "Sesión cerrada exitosamente",
   });
 });
 
@@ -260,7 +260,7 @@ authRouter.post(
 
       res.json({
         status: "success",
-        message: "Password changed successfully",
+        message: "Contraseña cambiada exitosamente",
       });
     } catch (err) {
       next(err);
@@ -346,7 +346,7 @@ authRouter.post(
       res.json({
         status: "success",
         message:
-          "If an account with that email exists, a verification code has been sent.",
+          "Si existe una cuenta con ese correo electrónico, se ha enviado un código de verificación.",
       });
     } catch (err) {
       next(err);
@@ -374,7 +374,7 @@ authRouter.post(
           resetToken: result.resetToken,
         },
         message:
-          "Code verified successfully. Use the reset token to set a new password.",
+          "Código verificado exitosamente. Usa el token de restablecimiento para establecer una nueva contraseña.",
       });
     } catch (err) {
       next(err);
@@ -399,7 +399,7 @@ authRouter.post(
       res.json({
         status: "success",
         message:
-          "Password has been reset successfully. You can now log in with your new password.",
+          "La contraseña se ha restablecido exitosamente. Ahora puedes iniciar sesión con tu nueva contraseña.",
       });
     } catch (err) {
       next(err);
@@ -434,7 +434,7 @@ authRouter.post(
           },
         },
         message:
-          "Account activated successfully. You can now log in with your password.",
+          "Cuenta activada exitosamente. Ahora puedes iniciar sesión con tu contraseña.",
       });
     } catch (err) {
       next(err);
@@ -470,7 +470,8 @@ authRouter.post(
 
       res.status(201).json({
         status: "success",
-        message: "Email verified successfully. Your account is now active.",
+        message:
+          "Correo electrónico verificado exitosamente. Tu cuenta está ahora activa.",
         data: {
           organization: {
             id: result.organization._id,
@@ -626,7 +627,8 @@ authRouter.post(
 
       res.json({
         status: "success",
-        message: "A new verification code has been sent to your email.",
+        message:
+          "Se ha enviado un nuevo código de verificación a tu correo electrónico.",
       });
     } catch (err) {
       next(err);

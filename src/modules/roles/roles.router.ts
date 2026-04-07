@@ -51,7 +51,7 @@ const createRoleSchema = RoleZodSchema.pick({
   (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
   {
     message:
-      "One or more permissions are restricted to the platform super-admin",
+      "Uno o más permisos están restringidos al super-administrador de la plataforma",
     path: ["permissions"],
   },
 );
@@ -71,14 +71,14 @@ const updateRoleSchema = z
   })
   .refine((data) => data.name !== "super_admin", {
     message:
-      "The 'super_admin' role is platform-only and cannot be assigned to an organization",
+      "El rol 'super_admin' es exclusivo de la plataforma y no se puede asignar a una organización",
     path: ["name"],
   })
   .refine(
     (data) => !data.permissions?.some((p) => SUPER_ADMIN_PERMS_SET.has(p)),
     {
       message:
-        "One or more permissions are restricted to the platform super-admin",
+        "Uno o más permisos están restringidos al super-administrador de la plataforma",
       path: ["permissions"],
     },
   );
@@ -164,7 +164,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       await rolesService.deleteFromRequest(req);
-      res.json({ status: "success", message: "Role deleted successfully" });
+      res.json({ status: "success", message: "Rol eliminado exitosamente" });
     } catch (err) {
       next(err);
     }

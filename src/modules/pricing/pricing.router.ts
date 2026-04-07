@@ -131,7 +131,7 @@ pricingRouter.delete(
       );
       res.json({
         status: "success",
-        data: { message: "Pricing config deleted successfully" },
+        data: { message: "Configuración de precios eliminada exitosamente" },
       });
     } catch (err) {
       next(err);

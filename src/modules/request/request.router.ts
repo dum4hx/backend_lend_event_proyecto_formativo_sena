@@ -37,13 +37,13 @@ const listRequestsQuerySchema = paginationSchema.extend({
   customerId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid customerId format",
+      message: "Formato de ID de cliente no válido",
     })
     .optional(),
   packageId: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid packageId format",
+      message: "Formato de ID de paquete no válido",
     })
     .optional(),
 });
@@ -66,11 +66,11 @@ const createRequestSchema = LoanRequestZodSchema.pick({
   .extend({
     items: z
       .array(createRequestItemSchema)
-      .min(1, "At least one item is required"),
+      .min(1, "Se requiere al menos un artículo"),
     depositAmount: z.number().min(0),
   })
   .refine((data) => data.endDate > data.startDate, {
-    message: "End date must be after start date",
+    message: "La fecha de fin debe ser posterior a la fecha de inicio",
     path: ["endDate"],
   })
   .refine(
@@ -79,7 +79,8 @@ const createRequestSchema = LoanRequestZodSchema.pick({
       return data.depositDueDate <= data.startDate;
     },
     {
-      message: "Deposit due date cannot be after start date",
+      message:
+        "La fecha de vencimiento del depósito no puede ser posterior a la fecha de inicio",
       path: ["depositDueDate"],
     },
   );
@@ -91,16 +92,16 @@ const assignMaterialsSchema = z.object({
         materialTypeId: z
           .string()
           .refine((val) => Types.ObjectId.isValid(val), {
-            message: "Invalid materialTypeId format",
+            message: "Formato de ID de tipo de material no válido",
           }),
         materialInstanceId: z
           .string()
           .refine((val) => Types.ObjectId.isValid(val), {
-            message: "Invalid materialInstanceId format",
+            message: "Formato de ID de instancia de material no válido",
           }),
       }),
     )
-    .min(1, "At least one assignment is required"),
+    .min(1, "Se requiere al menos una asignación"),
 });
 
 const approveRequestSchema = z.object({
@@ -151,7 +152,7 @@ requestRouter.get(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.getRequestById(
@@ -187,7 +188,7 @@ requestRouter.get(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const result = await requestService.getAvailableMaterials(
@@ -250,7 +251,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.approveRequest(
@@ -263,7 +264,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Request approved successfully",
+        message: "Solicitud aprobada exitosamente",
       });
     } catch (err) {
       next(err);
@@ -285,7 +286,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.rejectRequest(
@@ -297,7 +298,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Request rejected",
+        message: "Solicitud rechazada",
       });
     } catch (err) {
       next(err);
@@ -321,7 +322,7 @@ requestRouter.post(
 
       const requestId = req.params.id;
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.assignMaterialsTransaction(
@@ -334,7 +335,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Materials assigned and request marked as assigned",
+        message: "Materiales asignados y solicitud marcada como asignada",
       });
     } catch (err) {
       next(err);
@@ -355,7 +356,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.markAsReady(
@@ -366,7 +367,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Request is ready for pickup",
+        message: "Solicitud lista para recolección",
       });
     } catch (err) {
       next(err);
@@ -389,7 +390,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.recordDepositPayment(
@@ -400,7 +401,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Deposit payment recorded successfully",
+        message: "Pago del depósito registrado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -423,7 +424,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.recordRentalFeePayment(
@@ -434,7 +435,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Rental fee payment recorded successfully",
+        message: "Pago de la tarifa de alquiler registrado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -455,7 +456,7 @@ requestRouter.post(
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
-        throw AppError.badRequest("Invalid request ID");
+        throw AppError.badRequest("ID de solicitud no válido");
       }
 
       const request = await requestService.cancelRequest(
@@ -466,7 +467,7 @@ requestRouter.post(
       res.json({
         status: "success",
         data: { request },
-        message: "Request cancelled successfully",
+        message: "Solicitud cancelada exitosamente",
       });
     } catch (err) {
       next(err);

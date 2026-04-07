@@ -47,7 +47,8 @@ const inspectionItemSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["damageDescription"],
-        message: "damageDescription is required when condition is damaged",
+        message:
+          "La descripción del daño es requerida cuando la condición es 'damaged'",
       });
     }
   });
@@ -64,7 +65,7 @@ const createInspectionSchema = z.object({
 
 const inspectionIdParamSchema = z.object({
   id: z.string().refine((val) => Types.ObjectId.isValid(val), {
-    message: "Invalid Inspection ID format",
+    message: "Formato de ID de inspección no válido",
   }),
 });
 
@@ -178,7 +179,7 @@ inspectionRouter.post(
       });
 
       if (!result) {
-        throw AppError.internal("Failed to create inspection");
+        throw AppError.internal("Error al crear la inspección");
       }
 
       res.status(201).json({
@@ -186,8 +187,8 @@ inspectionRouter.post(
         data: { inspection: result.inspection },
         message:
           result.totalDamageCost > 0
-            ? `Inspection created. Damage invoice generated for $${result.totalDamageCost.toFixed(2)}`
-            : "Inspection created. No damages found.",
+            ? `Inspección creada. Factura de daños generada por $${result.totalDamageCost.toFixed(2)}`
+            : "Inspección creada. No se encontraron daños.",
       });
     } catch (err) {
       next(err);

@@ -46,7 +46,7 @@ const inviteUserSchema = z.object({
   email: z.email(),
   locations: z.array(
     z.string().refine((val) => Types.ObjectId.isValid(val), {
-      message: "Invalid Location ID format",
+      message: "ID de ubicación no válido",
     }),
   ),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
@@ -136,7 +136,7 @@ userRouter.post(
           },
         },
         message:
-          "User invited successfully. An invitation email has been sent.",
+          "Usuario invitado exitosamente. Se ha enviado un correo electrónico de invitación.",
       });
     } catch (err) {
       next(err);
@@ -157,7 +157,7 @@ userRouter.post(
 
       res.json({
         status: "success",
-        message: "Invitation email has been resent.",
+        message: "El correo electrónico de invitación ha sido reenviado.",
       });
     } catch (err) {
       next(err);
@@ -235,7 +235,7 @@ userRouter.post(
 
       res.json({
         status: "success",
-        message: "User deactivated successfully",
+        message: "Usuario desactivado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -256,7 +256,7 @@ userRouter.post(
 
       res.json({
         status: "success",
-        message: "User reactivated successfully",
+        message: "Usuario reactivado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -281,7 +281,7 @@ userRouter.delete(
 
       res.json({
         status: "success",
-        message: "User deleted successfully",
+        message: "Usuario eliminado exitosamente",
       });
     } catch (err) {
       next(err);

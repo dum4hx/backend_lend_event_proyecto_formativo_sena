@@ -125,7 +125,7 @@ billingRouter.patch(
 
       res.json({
         status: "success",
-        message: "Seat quantity updated successfully",
+        message: "Cantidad de asientos actualizada exitosamente",
       });
     } catch (err) {
       next(err);
@@ -152,8 +152,8 @@ billingRouter.post(
       res.json({
         status: "success",
         message: req.body.cancelImmediately
-          ? "Subscription cancelled immediately"
-          : "Subscription will be cancelled at the end of the billing period",
+          ? "Suscripción cancelada inmediatamente"
+          : "La suscripción se cancelará al final del período de facturación",
       });
     } catch (err) {
       next(err);
@@ -200,7 +200,7 @@ billingRouter.post(
       const signature = req.headers["stripe-signature"] as string;
 
       if (!signature) {
-        throw AppError.badRequest("Missing Stripe signature");
+        throw AppError.badRequest("Firma de Stripe no encontrada");
       }
 
       // req.body should be raw buffer when configured correctly

@@ -23,7 +23,7 @@ paymentMethodRouter.use(authenticate, requireActiveOrganization);
 
 const idParamSchema = z.object({
   id: z.string().refine((v) => Types.ObjectId.isValid(v), {
-    message: "Invalid payment method ID",
+    message: "ID de método de pago no válido",
   }),
 });
 

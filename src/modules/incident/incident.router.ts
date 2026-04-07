@@ -91,7 +91,7 @@ incidentRouter.get(
       const incidentId = req.params.id;
 
       if (!incidentId || typeof incidentId !== "string") {
-        throw AppError.badRequest("Invalid incident ID");
+        throw AppError.badRequest("ID de incidente no válido");
       }
 
       const incident = await incidentService.getIncidentById(
@@ -141,7 +141,7 @@ incidentRouter.post(
       res.status(201).json({
         status: "success",
         data: { incident },
-        message: "Incident created successfully",
+        message: "Incidente creado exitosamente",
       });
     } catch (err) {
       next(err);
@@ -164,7 +164,7 @@ incidentRouter.post(
       const incidentId = req.params.id;
 
       if (!incidentId || typeof incidentId !== "string") {
-        throw AppError.badRequest("Invalid incident ID");
+        throw AppError.badRequest("ID de incidente no válido");
       }
 
       const incident = await incidentService.acknowledgeIncident(
@@ -176,7 +176,7 @@ incidentRouter.post(
       res.json({
         status: "success",
         data: { incident },
-        message: "Incident acknowledged",
+        message: "Incidente reconocido",
       });
     } catch (err) {
       next(err);
@@ -200,7 +200,7 @@ incidentRouter.post(
       const incidentId = req.params.id;
 
       if (!incidentId || typeof incidentId !== "string") {
-        throw AppError.badRequest("Invalid incident ID");
+        throw AppError.badRequest("ID de incidente no válido");
       }
 
       const incident = await incidentService.resolveIncident(
@@ -213,7 +213,7 @@ incidentRouter.post(
       res.json({
         status: "success",
         data: { incident },
-        message: "Incident resolved",
+        message: "Incidente resuelto",
       });
     } catch (err) {
       next(err);
@@ -237,7 +237,7 @@ incidentRouter.post(
       const incidentId = req.params.id;
 
       if (!incidentId || typeof incidentId !== "string") {
-        throw AppError.badRequest("Invalid incident ID");
+        throw AppError.badRequest("ID de incidente no válido");
       }
 
       const incident = await incidentService.dismissIncident(
@@ -250,7 +250,7 @@ incidentRouter.post(
       res.json({
         status: "success",
         data: { incident },
-        message: "Incident dismissed",
+        message: "Incidente descartado",
       });
     } catch (err) {
       next(err);
