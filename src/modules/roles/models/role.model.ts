@@ -310,7 +310,7 @@ export const defaultOrganizationRoles: Record<
  * String literal for the owner role name — use this constant instead of
  * the bare string `"owner"` to keep rename-refactors safe.
  */
-export const OWNER_ROLE_NAME = "owner" as const;
+export const OWNER_ROLE_NAME = "Propietario" as const;
 
 /**
  * Full per-role definitions used when seeding a newly registered organization.
@@ -325,16 +325,14 @@ export const OWNER_ROLE_NAME = "owner" as const;
  *   convenience but fully editable by the organization owner.
  */
 export const defaultOrganizationRoleDefs: Array<{
-  name: DefaultOrganizationRole;
-  displayName: string;
+  name: string;
   permissions: string[];
   isReadOnly: boolean;
   type: "SYSTEM" | "CUSTOM";
   description: string;
 }> = [
   {
-    name: "owner",
-    displayName: "Propietario",
+    name: "Propietario",
     permissions: rolePermissions.owner,
     isReadOnly: true,
     type: "SYSTEM",
@@ -342,8 +340,7 @@ export const defaultOrganizationRoleDefs: Array<{
       "Propietario de la organización — acceso completo. Rol del sistema, no editable y no eliminable.",
   },
   {
-    name: "manager",
-    displayName: "Gerente",
+    name: "Gerente",
     permissions: rolePermissions.manager,
     isReadOnly: false,
     type: "CUSTOM",
@@ -351,8 +348,7 @@ export const defaultOrganizationRoleDefs: Array<{
       "Rol de gerente predeterminado — puede ser personalizado por el propietario.",
   },
   {
-    name: "warehouse_operator",
-    displayName: "Operador de Almacén",
+    name: "Operador de almacén",
     permissions: rolePermissions.warehouse_operator,
     isReadOnly: false,
     type: "CUSTOM",
@@ -360,8 +356,7 @@ export const defaultOrganizationRoleDefs: Array<{
       "Rol de operador de almacén predeterminado — puede ser personalizado por el propietario.",
   },
   {
-    name: "commercial_advisor",
-    displayName: "Asesor Comercial",
+    name: "Asesor comercial",
     permissions: rolePermissions.commercial_advisor,
     isReadOnly: false,
     type: "CUSTOM",
@@ -423,7 +418,6 @@ const roleTypes = ["SYSTEM", "CUSTOM"] as const;
 // Zod schema for API validation
 export const RoleZodSchema = z.object({
   name: z.string().min(3).max(50).trim(),
-  displayName: z.string().min(2).max(100).trim().optional(),
   permissions: z.array(z.string()).optional(),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Formato de ID de organización no válido",
@@ -458,14 +452,6 @@ const roleSchema = new Schema(
       // NOTE: No `enum` restriction here — custom roles may use any name.
       // The `super_admin` name is blocked at the service layer via assertNotSuperAdmin.
       trim: true,
-    },
-    displayName: {
-      type: String,
-      maxlength: 100,
-      trim: true,
-      default: function (this: any) {
-        return this.name ? this.name.replace(/_/g, " ") : undefined;
-      },
     },
     permissions: {
       type: [String],

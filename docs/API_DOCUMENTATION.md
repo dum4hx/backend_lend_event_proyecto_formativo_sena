@@ -1122,12 +1122,12 @@ The roles API manages organization-scoped roles and permissions. All routes requ
 
 When an organization is registered, four default roles are seeded automatically:
 
-| Role                 | Type     | Read-only | Notes                                 |
-| -------------------- | -------- | --------- | ------------------------------------- |
-| `owner`              | `SYSTEM` | Yes       | Cannot be renamed, edited, or deleted |
-| `manager`            | `CUSTOM` | No        | Editable default role                 |
-| `warehouse_operator` | `CUSTOM` | No        | Editable default role                 |
-| `commercial_advisor` | `CUSTOM` | No        | Editable default role                 |
+| Role                  | Type     | Read-only | Notes                                 |
+| --------------------- | -------- | --------- | ------------------------------------- |
+| `Propietario`         | `SYSTEM` | Yes       | Cannot be renamed, edited, or deleted |
+| `Gerente`             | `CUSTOM` | No        | Editable default role                 |
+| `Operador de almacén` | `CUSTOM` | No        | Editable default role                 |
+| `Asesor comercial`    | `CUSTOM` | No        | Editable default role                 |
 
 Roles with `isReadOnly: true` (`type: "SYSTEM"`) are protected at the API level — any attempt to `PATCH` or `DELETE` them returns `403 Forbidden`.
 
@@ -1148,17 +1148,17 @@ List roles for the current organization. Supports pagination and sorting (see pa
     "items": [
       {
         "_id": "507f1f77bcf86cd799439012",
-        "name": "owner",
+        "name": "Propietario",
         "permissions": ["organization:read", "users:create"],
-        "description": "Organization owner — full access. System role, non-editable and non-deletable.",
+        "description": "Propietario de la organización — acceso completo. Rol del sistema, no editable y no eliminable.",
         "isReadOnly": true,
         "type": "SYSTEM"
       },
       {
         "_id": "507f1f77bcf86cd799439013",
-        "name": "manager",
+        "name": "Gerente",
         "permissions": ["materials:read", "requests:approve"],
-        "description": "Default manager role — can be customized by the owner.",
+        "description": "Rol de gerente predeterminado — puede ser personalizado por el propietario.",
         "isReadOnly": false,
         "type": "CUSTOM"
       }
@@ -1190,9 +1190,9 @@ Get details for a single role within the organization.
   "data": {
     "role": {
       "_id": "507f1f77bcf86cd799439012",
-      "name": "owner",
+      "name": "Propietario",
       "permissions": ["organization:read", "users:create"],
-      "description": "Organization owner — full access. System role, non-editable and non-deletable.",
+      "description": "Propietario de la organización — acceso completo. Rol del sistema, no editable y no eliminable.",
       "isReadOnly": true,
       "type": "SYSTEM"
     }
