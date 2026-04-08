@@ -4233,16 +4233,18 @@ Edits the `items`, `notes`, and/or `neededBy` of a transfer request. **Only the 
 
 #### PATCH /transfers/requests/:id/cancel
 
-Cancels a transfer request. **Only the user who created the request can cancel it, and only while its status is `requested`.** Sets the status to `cancelled`.
+Cancels a transfer request. **Only users assigned to the destination location (`toLocationId`) can cancel it, and only while its status is `requested`.** Sets the status to `cancelled`.
 
-> This is distinct from **rejection**, which is performed by a location-assigned user via `/respond`. Cancellation is an action by the requester themselves.
+> This is distinct from **rejection**, which is performed by a source-location-assigned user via `/respond`. Cancellation is performed by a user at the destination location.
 
 **Permission Required:** `transfers:update`
+
+**Location Requirement:** User must be assigned to the destination location (`toLocationId`) of the transfer request.
 
 **Error Responses:**
 
 - `400` — Request is not in `requested` status
-- `403` — Caller is not the request creator
+- `403` — User not assigned to the destination location
 - `404` — Transfer request not found
 
 **Response (200):**
@@ -4270,7 +4272,7 @@ Approves or rejects a transfer request. **Only users assigned to the source loca
 | rejectionReasonId | body     | string | Yes (when status=rejected) | ID of a valid, active `TransferRejectionReason`   |
 | rejectionNote     | body     | string | No                         | Free-text note explaining the rejection (max 500) |
 
-**Permission Required:** `transfers:update`
+**Permission Required:** `transfers:accept`
 
 **Location Requirement:** User must be assigned to the source location (`fromLocationId`) of the transfer request.
 
@@ -4655,7 +4657,9 @@ Validation and resolution behavior:
 
 #### POST /requests/:id/approve
 
-Approves a loan request (manager action).
+Approves a loan request (warehouse operator action).
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:approve`
 
 | Parameter | Location | Type   | Required | Description    |
 | --------- | -------- | ------ | -------- | -------------- |
@@ -4665,7 +4669,7 @@ Approves a loan request (manager action).
 
 #### POST /requests/:id/reject
 
-Rejects a loan request.
+Rejects a loan request (warehouse operator action).
 
 | Parameter | Location | Type   | Required | Description      |
 | --------- | -------- | ------ | -------- | ---------------- |
@@ -4836,6 +4840,39 @@ Instances that are `damaged`, `maintenance`, `retired`, `lost`, or won't be free
 **Common errors:**
 
 - `404 NOT_FOUND`: request does not exist in the organization
+
+---
+
+#### POST /requests/:id/cancel
+
+Cancels a loan request and releases any assigned materials back to available status.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:cancel`
+
+| Parameter | Location | Type   | Required | Description         |
+| --------- | -------- | ------ | -------- | ------------------- |
+| id        | path     | string | Yes      | The loan request ID |
+
+**Valid request states:** All states except `shipped`, `completed`, `cancelled`, and `rejected`
+
+**Success (200):**
+
+```json
+{
+  "status": "success",
+  "data": { "request": { "...requestObject", "status": "cancelled" } },
+  "message": "Solicitud cancelada exitosamente"
+}
+```
+
+**Common errors:**
+
+| Code              | Condition                                           |
+| ----------------- | --------------------------------------------------- |
+| `400 BAD_REQUEST` | Invalid request ID format                           |
+| `403 FORBIDDEN`   | User lacks `requests:cancel` permission             |
+| `404 NOT_FOUND`   | Request not found in the organization               |
+| `409 CONFLICT`    | Request cannot be cancelled from its current status |
 
 ---
 
@@ -5153,7 +5190,35 @@ Extends a loan's end date.
 
 #### POST /loans/:id/return
 
-Marks a loan as returned.
+Marks a loan as returned and initiates the inspection process.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:return`
+
+| Parameter | Location | Type   | Required | Description                         |
+| --------- | -------- | ------ | -------- | ----------------------------------- |
+| notes     | body     | string | No       | Return notes or damage observations |
+
+**Preconditions:**
+
+The loan must be in `active` or `overdue` status.
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": { "loan": { "...loanObject", "status": "returned" } },
+  "message": "Préstamo marcado como devuelto - inspección pendiente"
+}
+```
+
+**Errors:**
+
+| Code              | Condition                                      |
+| ----------------- | ---------------------------------------------- |
+| `403 FORBIDDEN`   | User lacks `loans:return` permission           |
+| `404 NOT_FOUND`   | Loan not found or not in an active/overdue state |
+| `409 CONFLICT`    | Loan cannot transition to returned from current status |
 
 ---
 

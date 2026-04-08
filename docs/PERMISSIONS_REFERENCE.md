@@ -64,6 +64,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`platform:manage`](#platformmanage)
 - [`reports:read`](#reportsread)
 - [`requests:approve`](#requestsapprove)
+- [`requests:cancel`](#requestscancel)
 - [`requests:create`](#requestscreate)
 - [`requests:delete`](#requestsdelete)
 - [`requests:read`](#requestsread)
@@ -81,6 +82,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`transfers:create`](#transferscreate)
 - [`transfers:read`](#transfersread)
 - [`transfers:update`](#transfersupdate)
+- [`transfers:accept`](#transfersaccept)
 - [`transfer_rejection_reasons:manage`](#transfer_rejection_reasonsmanage)
 - [`users:create`](#userscreate)
 - [`users:delete`](#usersdelete)
@@ -534,13 +536,25 @@ Each section explains the purpose of a permission and the action it allows.
 
 ### `requests:approve`
 
-- **Display Name:** Approve Requests
+- **Display Name:** Aprobar Solicitudes
 - **Category:** Requests
 - **Scope:** Organization
 - **Active:** Yes
 - **Purpose:** Allows authorizing or rejecting submitted requests.
-- **Allowed Action:** Approve pending workflows for this resource.
+- **Allowed Action:** Approve or reject pending loan requests.
 - **Resource Target:** Requests
+- **Roles:** `super_admin`, `owner`, `manager`, `warehouse_operator`
+
+### `requests:cancel`
+
+- **Display Name:** Cancelar Solicitudes
+- **Category:** Requests
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows cancelling loan requests and releasing any assigned materials.
+- **Allowed Action:** Transition a request to the `cancelled` status.
+- **Resource Target:** Requests
+- **Roles:** `super_admin`, `owner`, `manager`, `warehouse_operator`, `commercial_advisor`
 
 ### `requests:create`
 
@@ -708,8 +722,18 @@ Each section explains the purpose of a permission and the action it allows.
 - **Category:** Transfers
 - **Scope:** Organization
 - **Active:** Yes
-- **Purpose:** Allows responding to transfer requests and marking transfers as received.
+- **Purpose:** Allows editing and cancelling transfer requests, and marking transfers as received.
 - **Allowed Action:** Modify existing records in this resource.
+- **Resource Target:** Transfers
+
+### `transfers:accept`
+
+- **Display Name:** Accept or Reject Transfers
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows approving or rejecting transfer requests. The user must be assigned to the source location.
+- **Allowed Action:** Approve or reject transfer request records.
 - **Resource Target:** Transfers
 
 ### `transfer_rejection_reasons:manage`

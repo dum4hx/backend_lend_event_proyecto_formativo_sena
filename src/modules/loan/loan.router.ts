@@ -218,10 +218,11 @@ loanRouter.post(
 /**
  * POST /api/v1/loans/:id/return
  * Initiates the return process for a loan (sets status to returned, triggers inspection).
+ * Requires: loans:return
  */
 loanRouter.post(
   "/:id/return",
-  requirePermission("loans:update"),
+  requirePermission("loans:return"),
   validateBody(returnLoanSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

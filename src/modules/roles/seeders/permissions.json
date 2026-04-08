@@ -360,9 +360,17 @@
     "requires": ["requests:read"]
   },
   {
+    "_id": "requests:cancel",
+    "displayName": "Cancelar Solicitudes",
+    "description": "Permite cancelar solicitudes de préstamo y liberar materiales asignados.",
+    "category": "Requests",
+    "isPlatformPermission": false,
+    "requires": ["requests:read"]
+  },
+  {
     "_id": "requests:delete",
     "displayName": "Eliminar Solicitudes",
-    "description": "Permite cancelar o eliminar registros de solicitudes.",
+    "description": "Permite eliminar registros de solicitudes.",
     "category": "Requests",
     "isPlatformPermission": false,
     "requires": ["requests:read"]
@@ -570,7 +578,15 @@
   {
     "_id": "transfers:update",
     "displayName": "Actualizar Transferencias",
-    "description": "Permite responder a solicitudes de transferencia y marcar transferencias como recibidas.",
+    "description": "Permite editar, cancelar solicitudes de transferencia y marcar transferencias como recibidas.",
+    "category": "Transfers",
+    "isPlatformPermission": false,
+    "requires": ["transfers:read"]
+  },
+  {
+    "_id": "transfers:accept",
+    "displayName": "Aceptar o Rechazar Transferencias",
+    "description": "Permite aprobar o rechazar solicitudes de transferencia. El usuario debe estar asignado a la ubicación de origen.",
     "category": "Transfers",
     "isPlatformPermission": false,
     "requires": ["transfers:read"]

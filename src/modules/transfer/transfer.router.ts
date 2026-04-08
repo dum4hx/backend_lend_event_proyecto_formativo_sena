@@ -146,7 +146,10 @@ transferRouter.patch(
             modelId: z.string().refine((val) => Types.ObjectId.isValid(val), {
               message: "Formato de ID de modelo no válido",
             }),
-            quantity: z.number().int().min(1, "La cantidad debe ser al menos 1"),
+            quantity: z
+              .number()
+              .int()
+              .min(1, "La cantidad debe ser al menos 1"),
             fulfilledQuantity: z.number().int().default(0),
           }),
         )
@@ -176,11 +179,11 @@ transferRouter.patch(
 
 /**
  * PATCH /transfers/requests/:id/respond
- * Approve, reject or cancel a request
+ * Approve or reject a transfer request
  */
 transferRouter.patch(
   "/requests/:id/respond",
-  requirePermission("transfers:update"),
+  requirePermission("transfers:accept"),
   validateBody(
     z.object({
       status: z.enum(["approved", "rejected"]),

@@ -36,7 +36,7 @@ export const inspectionService = {
       Inspection.find(query)
         .skip(skip)
         .limit(limit)
-        .populate("loanId", "customerId startDate endDate")
+        .populate("loanId", "customerId startDate endDate code")
         .populate("inspectedBy", "email profile.firstName")
         .populate("items.materialInstanceId", "serialNumber modelId")
         .sort({ createdAt: -1 }),

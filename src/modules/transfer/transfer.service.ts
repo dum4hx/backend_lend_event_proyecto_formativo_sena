@@ -79,7 +79,8 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
+    if (!request)
+      throw AppError.notFound("Solicitud de transferencia no encontrada");
 
     // Validate that user is assigned to the source location
     const user = await User.findOne({ _id: userId, organizationId });
@@ -156,13 +157,15 @@ class TransferService {
       .populate("fromLocationId", "name")
       .populate("toLocationId", "name");
 
-    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
+    if (!request)
+      throw AppError.notFound("Solicitud de transferencia no encontrada");
     return request;
   }
 
   /**
    * Cancel a transfer request
-   * Only the user who created the request can cancel it, and only when status is "requested"
+   * Only users assigned to the destination location can cancel it,
+   * and only when status is "requested"
    */
   async cancelRequest(
     organizationId: string | Types.ObjectId,
@@ -173,11 +176,19 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
+    if (!request)
+      throw AppError.notFound("Solicitud de transferencia no encontrada");
 
-    if (request.requestedBy.toString() !== userId.toString()) {
+    // Validate that user is assigned to the destination location
+    const user = await User.findOne({ _id: userId, organizationId });
+    if (!user) throw AppError.notFound("Usuario no encontrado");
+
+    const userHasAccessToDestLocation = user.locations?.some(
+      (locId) => locId.toString() === request.toLocationId.toString(),
+    );
+    if (!userHasAccessToDestLocation) {
       throw AppError.forbidden(
-        "Solo el usuario que creó la solicitud puede cancelarla",
+        "Solo los usuarios asignados a la ubicación de destino pueden cancelar solicitudes de transferencia",
       );
     }
 
@@ -209,7 +220,8 @@ class TransferService {
       _id: requestId,
       organizationId,
     });
-    if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
+    if (!request)
+      throw AppError.notFound("Solicitud de transferencia no encontrada");
 
     if (request.requestedBy.toString() !== userId.toString()) {
       throw AppError.forbidden(
@@ -271,7 +283,8 @@ class TransferService {
         _id: payload.requestId,
         organizationId,
       });
-      if (!request) throw AppError.notFound("Solicitud de transferencia no encontrada");
+      if (!request)
+        throw AppError.notFound("Solicitud de transferencia no encontrada");
       if (request.status !== "approved" && request.status !== "requested") {
         throw AppError.badRequest(
           "Solo se puede iniciar una transferencia para una solicitud solicitada o aprobada",
@@ -615,7 +628,9 @@ class TransferService {
     });
     if (!reason) throw AppError.notFound("Motivo de rechazo no encontrado");
     if (reason.isDefault)
-      throw AppError.badRequest("Los motivos de rechazo predeterminados no se pueden eliminar");
+      throw AppError.badRequest(
+        "Los motivos de rechazo predeterminados no se pueden eliminar",
+      );
 
     await reason.deleteOne();
   }

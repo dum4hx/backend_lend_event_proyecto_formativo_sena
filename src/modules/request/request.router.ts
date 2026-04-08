@@ -238,7 +238,7 @@ requestRouter.post(
 
 /**
  * POST /api/v1/requests/:id/approve
- * Approves a pending request (Manager action).
+ * Approves a pending request (Warehouse Operator action).
  */
 requestRouter.post(
   "/:id/approve",
@@ -274,7 +274,7 @@ requestRouter.post(
 
 /**
  * POST /api/v1/requests/:id/reject
- * Rejects a pending request (Manager action).
+ * Rejects a pending request (Warehouse Operator action).
  */
 requestRouter.post(
   "/:id/reject",
@@ -445,11 +445,12 @@ requestRouter.post(
 
 /**
  * POST /api/v1/requests/:id/cancel
- * Cancels a request (Manager/Owner or original creator action).
+ * Cancels a request and releases assigned materials.
+ * Requires: requests:cancel
  */
 requestRouter.post(
   "/:id/cancel",
-  requirePermission("requests:update"),
+  requirePermission("requests:cancel"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
