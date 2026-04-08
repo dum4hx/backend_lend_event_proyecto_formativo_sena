@@ -4,12 +4,19 @@ import {
   type Response,
   type NextFunction,
 } from "express";
+import { z } from "zod";
 import { adminService } from "./super_admin.service.ts";
 import {
   authenticate,
   requireRole,
   requireSuperAdmin,
 } from "../../middleware/auth.ts";
+import { validateQuery } from "../../middleware/validation.ts";
+
+const booleanString = z
+  .enum(["true", "false"])
+  .optional()
+  .transform((v) => v === "true");
 
 const adminRouter = Router();
 
@@ -255,6 +262,90 @@ adminRouter.get(
           generatedAt: new Date().toISOString(),
         },
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ================================================================
+ *  EXPORT ENDPOINTS — /admin/exports/...
+ * ================================================================ */
+
+const platformKpisQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+});
+
+const subscriptionExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  plan: z.string().optional(),
+  orgStatus: z.enum(["active", "suspended", "cancelled"]).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+  includeIds: booleanString,
+});
+
+const usageExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  plan: z.string().optional(),
+  orgStatus: z.enum(["active", "suspended", "cancelled"]).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+  includeIds: booleanString,
+});
+
+/**
+ * GET /api/v1/admin/exports/platform-kpis
+ * Platform-wide KPIs: org/user growth, loans, invoices, MRR/ARR.
+ * Requires: super_admin role.
+ */
+adminRouter.get(
+  "/exports/platform-kpis",
+  validateQuery(platformKpisQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await adminService.getPlatformKpisExport(req.query as any);
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/admin/exports/subscriptions
+ * Subscription analytics: plans, churn, upgrades, payment success rate.
+ * Requires: super_admin role.
+ */
+adminRouter.get(
+  "/exports/subscriptions",
+  validateQuery(subscriptionExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await adminService.getSubscriptionsExport(req.query as any);
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/admin/exports/usage
+ * Platform usage metrics per org: loans, users, materials, invoices.
+ * Requires: super_admin role.
+ */
+adminRouter.get(
+  "/exports/usage",
+  validateQuery(usageExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await adminService.getUsageExport(req.query as any);
+      res.json({ status: "success", data });
     } catch (err) {
       next(err);
     }

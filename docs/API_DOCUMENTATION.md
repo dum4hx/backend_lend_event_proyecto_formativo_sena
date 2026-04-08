@@ -21,6 +21,7 @@
    - [Subscription Type Endpoints](#subscription-type-endpoints-super-admin)
    - [Billing Endpoints](#billing-endpoints)
    - [Admin Analytics (Super Admin)](#admin-analytics-endpoints-super-admin-only)
+   - [Admin Exports (Super Admin)](#admin-export-endpoints-super-admin-only)
    - [Customer Endpoints](#customer-endpoints)
    - [Location Endpoints](#location-endpoints)
    - [Material Endpoints](#material-endpoints)
@@ -2334,6 +2335,332 @@ Gets all analytics in a single call for dashboard rendering.
       /* health metrics */
     },
     "generatedAt": "2025-07-15T10:35:00Z"
+  }
+}
+```
+
+---
+
+### Admin Export Endpoints (Super Admin Only)
+
+All admin export endpoints require `super_admin` role. They follow the `includeIds` toggle pattern:
+
+- `includeIds=true` (default) → detailed data rows with identifiers (org IDs, org names, plan, status — **no** sensitive PII like emails, phones, or addresses).
+- `includeIds=false` → aggregated summary with enriched metrics and `periodComparison` when date range is provided.
+
+---
+
+#### GET /admin/exports/platform-kpis
+
+Platform-wide KPIs: organization/user growth, loans, invoices, MRR/ARR.
+
+**Permission Required:** `super_admin` role
+
+**Query Parameters:**
+
+| Name       | Type    | Required | Description                                                                    |
+| ---------- | ------- | -------- | ------------------------------------------------------------------------------ |
+| startDate  | string  | No       | ISO date — filter records created on or after                                  |
+| endDate    | string  | No       | ISO date — filter records created on or before                                 |
+| includeIds | boolean | No       | `true` (default) returns monthly breakdown; `false` returns aggregated summary |
+
+**Response (includeIds=true):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "monthlyBreakdown": [
+      {
+        "year": 2025,
+        "month": 1,
+        "newOrgs": 12,
+        "newUsers": 45,
+        "totalLoans": 320,
+        "totalInvoices": 280
+      }
+    ],
+    "generatedAt": "2025-07-15T12:00:00.000Z"
+  }
+}
+```
+
+**Response (includeIds=false):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "summary": {
+      "currentKpis": {
+        "totalOrgs": 150,
+        "activeOrgs": 142,
+        "totalUsers": 523,
+        "activeUsers": 498,
+        "totalLoans": 8250,
+        "totalInvoices": 7890,
+        "mrr": 12500.0,
+        "arr": 150000.0
+      },
+      "avgUsersPerOrg": 3.49,
+      "avgSeatsPerOrg": 4.2,
+      "avgCatalogItemsPerOrg": 38.5,
+      "orgsByStatus": { "active": 142, "suspended": 5, "cancelled": 3 },
+      "usersByStatus": { "active": 498, "inactive": 15, "pending": 10 },
+      "periodComparison": {
+        "previous": {
+          "orgs": 130,
+          "users": 450,
+          "loans": 7000,
+          "invoices": 6500
+        },
+        "current": {
+          "orgs": 150,
+          "users": 523,
+          "loans": 8250,
+          "invoices": 7890
+        },
+        "changes": {
+          "orgs": 15.38,
+          "users": 16.22,
+          "loans": 17.86,
+          "invoices": 21.38
+        }
+      }
+    },
+    "generatedAt": "2025-07-15T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+#### GET /admin/exports/subscriptions
+
+Subscription analytics: plan distribution, churn, upgrades/downgrades, payment success rate.
+
+**Permission Required:** `super_admin` role
+
+**Query Parameters:**
+
+| Name       | Type    | Required | Description                                                                       |
+| ---------- | ------- | -------- | --------------------------------------------------------------------------------- |
+| startDate  | string  | No       | ISO date — filter by organization creation date                                   |
+| endDate    | string  | No       | ISO date — filter by organization creation date                                   |
+| plan       | string  | No       | Filter by subscription plan (e.g., `starter`)                                     |
+| orgStatus  | string  | No       | Filter by org status: `active`, `suspended`, `cancelled`                          |
+| page       | number  | No       | Page number (default: 1) — only for includeIds=true                               |
+| limit      | number  | No       | Page size 1–200 (default: 50) — only for includeIds=true                          |
+| includeIds | boolean | No       | `true` (default) returns paginated org list; `false` returns aggregated analytics |
+
+**Response (includeIds=true):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "subscriptions": [
+      {
+        "orgId": "6650...",
+        "orgName": "Acme Corp",
+        "orgStatus": "active",
+        "plan": "professional",
+        "seatCount": 5,
+        "catalogItemCount": 120,
+        "currentPeriodStart": "2025-07-01T00:00:00.000Z",
+        "currentPeriodEnd": "2025-07-31T23:59:59.000Z",
+        "cancelAtPeriodEnd": false,
+        "pendingPlan": null,
+        "orgCreatedAt": "2024-03-15T10:00:00.000Z"
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "limit": 50,
+    "totalPages": 3,
+    "generatedAt": "2025-07-15T12:00:00.000Z"
+  }
+}
+```
+
+**Response (includeIds=false):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "summary": {
+      "totalOrgs": 150,
+      "byPlan": [
+        {
+          "plan": "free",
+          "count": 30,
+          "percentage": 20.0,
+          "estimatedMonthlyRevenue": 0
+        },
+        {
+          "plan": "starter",
+          "count": 50,
+          "percentage": 33.33,
+          "estimatedMonthlyRevenue": 1450
+        },
+        {
+          "plan": "professional",
+          "count": 60,
+          "percentage": 40.0,
+          "estimatedMonthlyRevenue": 5940
+        },
+        {
+          "plan": "enterprise",
+          "count": 10,
+          "percentage": 6.67,
+          "estimatedMonthlyRevenue": 2990
+        }
+      ],
+      "byOrgStatus": [
+        { "status": "active", "count": 142 },
+        { "status": "suspended", "count": 5 },
+        { "status": "cancelled", "count": 3 }
+      ],
+      "churn": 3,
+      "upgrades": 12,
+      "downgrades": 2,
+      "paymentAnalytics": {
+        "succeeded": 280,
+        "failed": 5,
+        "successRate": 98.25
+      },
+      "topPlanByCount": { "plan": "professional", "count": 60 },
+      "topPlanByRevenue": { "plan": "professional", "revenue": 5940 },
+      "periodComparison": {
+        "previous": { "orgs": 130, "churn": 2, "upgrades": 8, "downgrades": 1 },
+        "current": { "orgs": 150, "churn": 3, "upgrades": 12, "downgrades": 2 },
+        "changes": {
+          "orgs": 15.38,
+          "churn": 50.0,
+          "upgrades": 50.0,
+          "downgrades": 100.0
+        }
+      }
+    },
+    "generatedAt": "2025-07-15T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+#### GET /admin/exports/usage
+
+Platform usage metrics per organization: loans, users, materials, invoices, customers, locations.
+
+**Permission Required:** `super_admin` role
+
+**Query Parameters:**
+
+| Name       | Type    | Required | Description                                                                               |
+| ---------- | ------- | -------- | ----------------------------------------------------------------------------------------- |
+| startDate  | string  | No       | ISO date — filter time-based counts (loans, invoices, customers)                          |
+| endDate    | string  | No       | ISO date — filter time-based counts                                                       |
+| plan       | string  | No       | Filter orgs by subscription plan                                                          |
+| orgStatus  | string  | No       | Filter by org status: `active`, `suspended`, `cancelled`                                  |
+| page       | number  | No       | Page number (default: 1) — only for includeIds=true                                       |
+| limit      | number  | No       | Page size 1–200 (default: 50) — only for includeIds=true                                  |
+| includeIds | boolean | No       | `true` (default) returns paginated per-org rows; `false` returns platform-wide aggregates |
+
+**Response (includeIds=true):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "organizations": [
+      {
+        "orgId": "6650...",
+        "orgName": "Acme Corp",
+        "plan": "professional",
+        "orgStatus": "active",
+        "userCount": 8,
+        "activeUserCount": 7,
+        "loanCount": 250,
+        "invoiceCount": 220,
+        "customerCount": 45,
+        "locationCount": 3,
+        "materialTypeCount": 15,
+        "materialInstanceCount": 180,
+        "createdAt": "2024-03-15T10:00:00.000Z"
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "limit": 50,
+    "totalPages": 3,
+    "generatedAt": "2025-07-15T12:00:00.000Z"
+  }
+}
+```
+
+**Response (includeIds=false):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "summary": {
+      "platformTotals": {
+        "organizations": 150,
+        "users": 523,
+        "loans": 8250,
+        "invoices": 7890,
+        "customers": 3200,
+        "locations": 45,
+        "materialTypes": 890,
+        "materialInstances": 12500
+      },
+      "avgPerOrg": {
+        "users": 3.49,
+        "loans": 55.0,
+        "invoices": 52.6,
+        "customers": 21.33
+      },
+      "topByLoans": [
+        { "orgName": "Acme Corp", "plan": "professional", "count": 520 }
+      ],
+      "topByInvoices": [
+        { "orgName": "Acme Corp", "plan": "professional", "count": 480 }
+      ],
+      "topByUsers": [
+        { "orgName": "Acme Corp", "plan": "professional", "count": 15 }
+      ],
+      "usageDistribution": [
+        { "bucket": "0", "orgCount": 5 },
+        { "bucket": "1-10", "orgCount": 20 },
+        { "bucket": "11-50", "orgCount": 45 },
+        { "bucket": "51-200", "orgCount": 60 },
+        { "bucket": "201+", "orgCount": 20 }
+      ],
+      "periodComparison": {
+        "previous": {
+          "loans": 7000,
+          "invoices": 6500,
+          "users": 450,
+          "customers": 2800
+        },
+        "current": {
+          "loans": 8250,
+          "invoices": 7890,
+          "users": 523,
+          "customers": 3200
+        },
+        "changes": {
+          "loans": 17.86,
+          "invoices": 21.38,
+          "users": 16.22,
+          "customers": 14.29
+        }
+      }
+    },
+    "generatedAt": "2025-07-15T12:00:00.000Z"
   }
 }
 ```
