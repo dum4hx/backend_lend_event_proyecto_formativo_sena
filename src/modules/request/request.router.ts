@@ -349,7 +349,7 @@ requestRouter.post(
  */
 requestRouter.post(
   "/:id/ready",
-  requirePermission("requests:assign"),
+  requirePermission("requests:ready"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);

@@ -56,7 +56,7 @@ const createInvoiceSchema = z.object({
   ),
   notes: z.string().max(1000).optional(),
   dueDate: z.string().datetime().optional(),
-  taxRate: z.number().min(0).max(1).default(0.19), // Default 19% Colombian IVA
+  taxRate: z.number().min(0).max(1).default(0.0),
 });
 
 const recordPaymentSchema = z.object({

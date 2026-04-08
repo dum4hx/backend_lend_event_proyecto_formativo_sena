@@ -200,7 +200,7 @@ export const maintenanceService = {
       });
       if (!instance) {
         throw AppError.notFound(
-          `Instancia de material ${item.materialInstanceId} no encontrada en la organización`,
+          "Instancia de material no encontrada en la organización",
         );
       }
 
@@ -212,7 +212,7 @@ export const maintenanceService = {
       });
       if (existingBatch && existingBatch._id.toString() !== batchId) {
         throw AppError.conflict(
-          `La instancia de material ${item.materialInstanceId} ya está en el lote de mantenimiento activo "${existingBatch.name}"`,
+          `La instancia de material con serial "${instance.serialNumber}" ya está en el lote de mantenimiento activo "${existingBatch.name}"`,
         );
       }
 

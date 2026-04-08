@@ -352,6 +352,14 @@
     "requires": ["requests:read", "materials:read"]
   },
   {
+    "_id": "requests:ready",
+    "displayName": "Marcar Solicitud como Lista",
+    "description": "Permite marcar una solicitud como lista para recolección una vez que los materiales han sido asignados.",
+    "category": "Requests",
+    "isPlatformPermission": false,
+    "requires": ["requests:read"]
+  },
+  {
     "_id": "requests:delete",
     "displayName": "Eliminar Solicitudes",
     "description": "Permite cancelar o eliminar registros de solicitudes.",

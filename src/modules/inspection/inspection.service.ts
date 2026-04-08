@@ -205,6 +205,9 @@ export const inspectionService = {
         const inspectionNumber = await codeGenerationService.generateCode({
           organizationId: String(organizationId),
           entityType: "inspection",
+          context: {
+            ...(loan.locationId ? { locationId: loan.locationId } : {}),
+          },
           session,
         });
 
@@ -283,9 +286,12 @@ export const inspectionService = {
           const invoiceNumber = await codeGenerationService.generateCode({
             organizationId: String(organizationId),
             entityType: "invoice",
+            context: {
+              ...(loan.locationId ? { locationId: loan.locationId } : {}),
+            },
             session,
           });
-          const invoiceTotal = totalDamageCost * 1; // 19% IVA
+          const invoiceTotal = totalDamageCost * 1;
 
           const [createdInvoice]: any = await (Invoice as any).create(
             [

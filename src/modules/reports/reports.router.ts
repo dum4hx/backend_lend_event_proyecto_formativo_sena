@@ -237,4 +237,155 @@ reportsRouter.get(
   },
 );
 
+/* ================================================================
+ *  EXPORT ENDPOINTS – JSON only, includeIds toggle
+ * ================================================================ */
+
+const booleanString = z
+  .enum(["true", "false"])
+  .optional()
+  .default("true")
+  .transform((v) => v === "true");
+
+/* --- Schemas --- */
+
+const salesExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+  customerId: z.string().optional(),
+  locationId: z.string().optional(),
+  invoiceType: z.string().optional(),
+  invoiceStatus: z.string().optional(),
+  categoryId: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+const catalogDetailedExportQuerySchema = z.object({
+  includeIds: booleanString,
+  categoryId: z.string().optional(),
+  locationId: z.string().optional(),
+  search: z.string().optional(),
+  status: z.string().optional(),
+});
+
+const loanActivityExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+  customerId: z.string().optional(),
+  locationId: z.string().optional(),
+  status: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+const damageExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+  locationId: z.string().optional(),
+  batchStatus: z.string().optional(),
+  entryReason: z.enum(["damaged", "lost", "other"]).optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+/* --- Routes --- */
+
+/**
+ * GET /api/v1/reports/exports/sales
+ * Combined loan + invoice sales export with optional business metrics.
+ * When includeIds=false, IDs are omitted and an enriched summary with
+ * revenue breakdown, monthly trends, top customers, and period comparison
+ * is included.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/sales",
+  requirePermission("reports:read"),
+  validateQuery(salesExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getSalesExport(getOrgId(req), filters);
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/reports/exports/catalog
+ * Detailed catalog export with per-location/status breakdown and enriched
+ * metrics (utilization, availability, revenue, maintenance cost) when
+ * includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/catalog",
+  requirePermission("reports:read"),
+  validateQuery(catalogDetailedExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getCatalogDetailedExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/reports/exports/loan-activity
+ * Loan activity export with duration analysis, overdue/return rates,
+ * monthly trends, top materials/customers, and period comparison when
+ * includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/loan-activity",
+  requirePermission("reports:read"),
+  validateQuery(loanActivityExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getLoanActivityExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/reports/exports/damages
+ * Maintenance batch and damage export with cost analysis, repair time,
+ * most-damaged materials, and period comparison when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/damages",
+  requirePermission("reports:read"),
+  validateQuery(damageExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getDamageExport(getOrgId(req), filters);
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default reportsRouter;

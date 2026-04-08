@@ -4702,6 +4702,39 @@ This endpoint performs assignment + ready transition atomically:
 
 ---
 
+#### POST /requests/:id/ready
+
+Marks a request as ready for pickup. This is a warehouse operator action that confirms materials have been physically prepared.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:ready`
+
+| Parameter | Location | Type   | Required | Description         |
+| --------- | -------- | ------ | -------- | ------------------- |
+| id        | path     | string | Yes      | The loan request ID |
+
+**Valid request state:** `assigned`
+
+**Success (200):**
+
+```json
+{
+  "status": "success",
+  "data": { "request": { "...requestObject", "status": "ready" } },
+  "message": "Solicitud lista para recolección"
+}
+```
+
+**Common errors:**
+
+| Code              | Condition                                                    |
+| ----------------- | ------------------------------------------------------------ |
+| `400 BAD_REQUEST` | No materials assigned to the request                         |
+| `403 FORBIDDEN`   | User lacks `requests:ready` permission                       |
+| `404 NOT_FOUND`   | Request not found in the organization                        |
+| `409 CONFLICT`    | Request is not in a status that allows transition to `ready` |
+
+---
+
 #### POST /requests/:id/record-payment
 
 Records that the deposit for a request has been paid manually (cash, bank transfer, etc.).
@@ -6276,6 +6309,481 @@ Transfer report with inter-location movement history and status summary.
   }
 }
 ```
+
+---
+
+### Report Export Endpoints
+
+These endpoints return JSON exports optimized for frontend consumption (the frontend handles CSV/XLSX generation). Each endpoint accepts an `includeIds` query parameter:
+
+- **`includeIds=true`** (default): Returns raw data with MongoDB ObjectIds, suitable for cross-referencing.
+- **`includeIds=false`**: Strips all IDs and adds enriched business metrics, period-over-period comparison, and summary analytics suitable for dashboards and reports.
+
+All export endpoints require authentication, an active organization, and the `reports:read` permission.
+
+---
+
+#### GET /reports/exports/sales
+
+Combined loan revenue + invoice sales export. Returns paginated loan and invoice rows.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter     | Type    | Description                                   |
+| ------------- | ------- | --------------------------------------------- |
+| startDate     | string  | Filter from this date (ISO 8601)              |
+| endDate       | string  | Filter up to this date (ISO 8601)             |
+| includeIds    | boolean | Include ObjectIds in response (default: true) |
+| customerId    | string  | Filter by customer ObjectId                   |
+| locationId    | string  | Filter by location ObjectId                   |
+| invoiceType   | string  | Filter invoices by type                       |
+| invoiceStatus | string  | Filter invoices by status                     |
+| categoryId    | string  | Filter loans by material category             |
+| page          | integer | Page number (default: 1)                      |
+| limit         | integer | Items per page (default: 50, max: 200)        |
+
+**Response (`includeIds=true`):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loanRows": [
+      {
+        "loanId": "665a1b2c3d4e5f6a7b8c9d0e",
+        "customerId": "665a1b2c3d4e5f6a7b8c9d0f",
+        "locationId": "665a1b2c3d4e5f6a7b8c9d10",
+        "code": "LN-0042",
+        "customerName": "Maria Garcia",
+        "customerEmail": "maria@example.com",
+        "locationName": "Bodega Principal",
+        "startDate": "2025-07-01T00:00:00.000Z",
+        "endDate": "2025-07-15T00:00:00.000Z",
+        "totalAmount": 350000,
+        "depositAmount": 50000,
+        "status": "active",
+        "materialCount": 5
+      }
+    ],
+    "invoiceRows": [
+      {
+        "invoiceId": "665a1b2c3d4e5f6a7b8c9d11",
+        "customerId": "665a1b2c3d4e5f6a7b8c9d0f",
+        "invoiceNumber": "INV-0087",
+        "type": "rental",
+        "status": "paid",
+        "customerName": "Maria Garcia",
+        "totalAmount": 350000,
+        "amountPaid": 350000,
+        "amountDue": 0,
+        "dueDate": "2025-07-15T00:00:00.000Z",
+        "createdAt": "2025-07-01T00:00:00.000Z"
+      }
+    ],
+    "pagination": { "total": 45, "page": 1, "totalPages": 1 }
+  }
+}
+```
+
+**Response (`includeIds=false`):** `200 OK`
+
+When `includeIds=false`, IDs are omitted from rows and a `summary` object is added:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loanRows": [ { "code": "LN-0042", "customerName": "...", ... } ],
+    "invoiceRows": [ { "invoiceNumber": "INV-0087", ... } ],
+    "pagination": { "total": 45, "page": 1, "totalPages": 1 },
+    "summary": {
+      "totalLoanRevenue": 12500000,
+      "totalInvoiceRevenue": 8700000,
+      "combinedRevenue": 21200000,
+      "averageLoanValue": 278000,
+      "revenueByMonth": [
+        { "year": 2025, "month": 6, "loanRevenue": 5000000, "invoiceRevenue": 3200000, "total": 8200000 },
+        { "year": 2025, "month": 7, "loanRevenue": 7500000, "invoiceRevenue": 5500000, "total": 13000000 }
+      ],
+      "revenueByInvoiceType": [
+        { "type": "rental", "revenue": 6500000, "count": 42 },
+        { "type": "damage", "revenue": 1200000, "count": 8 }
+      ],
+      "topCustomersByRevenue": [
+        { "customerName": "Maria Garcia", "totalRevenue": 2500000, "loanCount": 12 }
+      ],
+      "periodComparison": {
+        "currentTotal": 21200000,
+        "previousTotal": 18000000,
+        "percentChange": 17.78
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `periodComparison` is included only when both `startDate` and `endDate` are provided. It compares the selected period against the immediately preceding period of equal duration.
+- `revenueByMonth` merges loan and invoice revenue into a single timeline.
+
+---
+
+#### GET /reports/exports/catalog
+
+Detailed material catalog export with per-location/status instance breakdown.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter  | Type    | Description                                      |
+| ---------- | ------- | ------------------------------------------------ |
+| includeIds | boolean | Include ObjectIds in response (default: true)    |
+| categoryId | string  | Filter by material category ObjectId             |
+| locationId | string  | Filter instances by location ObjectId            |
+| search     | string  | Search material types by name (case-insensitive) |
+| status     | string  | Filter instances by status                       |
+
+**Response (`includeIds=true`):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "exportedAt": "2025-07-15T10:00:00.000Z",
+    "totalMaterialTypes": 25,
+    "materialTypes": [
+      {
+        "materialTypeId": "664abc123def456789012345",
+        "categoryIds": ["664abc123def456789012350"],
+        "code": "MT-0012",
+        "name": "Silla Plegable",
+        "description": "Silla plegable metálica",
+        "pricePerDay": 5000,
+        "categoryNames": ["Mobiliario"],
+        "totalInstances": 50,
+        "instancesByStatus": {
+          "available": 35,
+          "loaned": 10,
+          "damaged": 3,
+          "maintenance": 2
+        },
+        "locationBreakdown": [
+          {
+            "locationName": "Bodega Principal",
+            "locationId": "664abc123def456789012346",
+            "count": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Response (`includeIds=false`):** `200 OK`
+
+When `includeIds=false`, IDs are omitted and each material type includes enriched metrics. A global `summary` is also added:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "exportedAt": "2025-07-15T10:00:00.000Z",
+    "totalMaterialTypes": 25,
+    "materialTypes": [
+      {
+        "code": "MT-0012",
+        "name": "Silla Plegable",
+        "description": "Silla plegable metálica",
+        "pricePerDay": 5000,
+        "categoryNames": ["Mobiliario"],
+        "totalInstances": 50,
+        "instancesByStatus": {
+          "available": 35,
+          "loaned": 10,
+          "damaged": 3,
+          "maintenance": 2
+        },
+        "locationBreakdown": [
+          { "locationName": "Bodega Principal", "count": 30 }
+        ],
+        "utilizationRate": 20.0,
+        "availabilityRate": 70.0,
+        "damageRate": 6.0,
+        "totalRevenue": 1250000,
+        "totalLoans": 45,
+        "averageLoanDurationDays": 5,
+        "maintenanceCostTotal": 75000
+      }
+    ],
+    "summary": {
+      "totalCatalogItems": 25,
+      "totalInstances": 380,
+      "globalAvailabilityRate": 68.42,
+      "globalUtilizationRate": 22.37,
+      "instancesByStatus": [
+        { "status": "available", "count": 260 },
+        { "status": "loaned", "count": 85 }
+      ],
+      "topRevenueGenerators": [
+        { "name": "Silla Plegable", "totalRevenue": 1250000, "totalLoans": 45 }
+      ]
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `utilizationRate`, `availabilityRate`, and `damageRate` are percentages (0–100) with two decimal places.
+- `maintenanceCostTotal` is derived from MaintenanceBatch items linked to the material type.
+
+---
+
+#### GET /reports/exports/loan-activity
+
+Loan activity export with duration and overdue analysis. Returns paginated loan rows.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter  | Type    | Description                                   |
+| ---------- | ------- | --------------------------------------------- |
+| startDate  | string  | Filter from this date (ISO 8601)              |
+| endDate    | string  | Filter up to this date (ISO 8601)             |
+| includeIds | boolean | Include ObjectIds in response (default: true) |
+| customerId | string  | Filter by customer ObjectId                   |
+| locationId | string  | Filter by location ObjectId                   |
+| status     | string  | Filter by loan status                         |
+| page       | integer | Page number (default: 1)                      |
+| limit      | integer | Items per page (default: 50, max: 200)        |
+
+**Response (`includeIds=true`):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "rows": [
+      {
+        "loanId": "665a1b2c3d4e5f6a7b8c9d0e",
+        "customerId": "665a1b2c3d4e5f6a7b8c9d0f",
+        "locationId": "665a1b2c3d4e5f6a7b8c9d10",
+        "code": "LN-0042",
+        "customerName": "Maria Garcia",
+        "locationName": "Bodega Principal",
+        "status": "active",
+        "startDate": "2025-07-01T00:00:00.000Z",
+        "endDate": "2025-07-15T00:00:00.000Z",
+        "returnedAt": null,
+        "durationDays": 14,
+        "overdueDays": 0,
+        "totalAmount": 350000,
+        "materialCount": 5
+      }
+    ],
+    "pagination": { "total": 45, "page": 1, "totalPages": 1 }
+  }
+}
+```
+
+**Response (`includeIds=false`):** `200 OK`
+
+When `includeIds=false`, IDs are omitted and an enriched `summary` is added:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "rows": [ { "code": "LN-0042", "customerName": "...", ... } ],
+    "pagination": { "total": 45, "page": 1, "totalPages": 1 },
+    "summary": {
+      "totalLoans": 45,
+      "totalRevenue": 12500000,
+      "averageDurationDays": 7,
+      "overdueRate": 8.89,
+      "returnRate": 75.56,
+      "loansByMonth": [
+        { "year": 2025, "month": 7, "count": 28, "totalAmount": 8000000 }
+      ],
+      "loansByStatus": [
+        { "status": "active", "count": 23, "totalAmount": 6500000 }
+      ],
+      "topMaterials": [
+        { "materialName": "Silla Plegable", "loanCount": 32 }
+      ],
+      "topCustomers": [
+        { "customerName": "Maria Garcia", "loanCount": 12, "totalAmount": 2500000 }
+      ],
+      "periodComparison": {
+        "currentCount": 45,
+        "previousCount": 38,
+        "percentChange": 18.42,
+        "currentRevenue": 12500000,
+        "previousRevenue": 10200000,
+        "revenuePercentChange": 22.55
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `overdueRate` and `returnRate` are percentages (0–100) with two decimal places.
+- `returnRate` counts loans with status `returned` or `closed`.
+- `periodComparison` is only included when both `startDate` and `endDate` are provided.
+
+---
+
+#### GET /reports/exports/damages
+
+Maintenance batch and damage cost export. Returns paginated batch rows and individual item-level detail.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter   | Type    | Description                                       |
+| ----------- | ------- | ------------------------------------------------- |
+| startDate   | string  | Filter from this date (ISO 8601)                  |
+| endDate     | string  | Filter up to this date (ISO 8601)                 |
+| includeIds  | boolean | Include ObjectIds in response (default: true)     |
+| locationId  | string  | Filter by location ObjectId                       |
+| batchStatus | string  | Filter by maintenance batch status                |
+| entryReason | string  | Filter items by entry reason (damaged/lost/other) |
+| page        | integer | Page number (default: 1)                          |
+| limit       | integer | Items per page (default: 50, max: 200)            |
+
+**Response (`includeIds=true`):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "batches": [
+      {
+        "batchId": "665a1b2c3d4e5f6a7b8c9d12",
+        "locationId": "665a1b2c3d4e5f6a7b8c9d10",
+        "batchNumber": "MB-0005",
+        "name": "Reparación julio",
+        "status": "in_progress",
+        "locationName": "Bodega Principal",
+        "assignedTo": "Carlos Lopez",
+        "totalEstimatedCost": 250000,
+        "totalActualCost": 180000,
+        "startedAt": "2025-07-10T08:00:00.000Z",
+        "completedAt": null,
+        "itemCount": 8
+      }
+    ],
+    "items": [
+      {
+        "materialInstanceId": "664abc123def456789012347",
+        "batchNumber": "MB-0005",
+        "serialNumber": "SN-00123",
+        "materialTypeName": "Silla Plegable",
+        "entryReason": "damaged",
+        "itemStatus": "in_repair",
+        "estimatedCost": 35000,
+        "actualCost": 28000,
+        "repairNotes": "Pata doblada, requiere soldadura",
+        "sourceType": "inspection",
+        "resolvedAt": null
+      }
+    ],
+    "pagination": { "total": 12, "page": 1, "totalPages": 1 }
+  }
+}
+```
+
+**Response (`includeIds=false`):** `200 OK`
+
+When `includeIds=false`, IDs are omitted and an enriched `summary` is added:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "batches": [ { "batchNumber": "MB-0005", ... } ],
+    "items": [ { "batchNumber": "MB-0005", "serialNumber": "SN-00123", ... } ],
+    "pagination": { "total": 12, "page": 1, "totalPages": 1 },
+    "summary": {
+      "totalBatches": 12,
+      "totalItems": 47,
+      "totalEstimatedCost": 1500000,
+      "totalActualCost": 1100000,
+      "costVariance": -400000,
+      "costVariancePercent": -26.67,
+      "costByEntryReason": [
+        { "reason": "damaged", "estimatedCost": 1000000, "actualCost": 750000, "itemCount": 30 },
+        { "reason": "lost", "estimatedCost": 400000, "actualCost": 300000, "itemCount": 12 }
+      ],
+      "costByMonth": [
+        { "year": 2025, "month": 7, "estimatedCost": 800000, "actualCost": 600000, "batchCount": 5 }
+      ],
+      "mostDamagedMaterials": [
+        { "materialTypeName": "Silla Plegable", "incidentCount": 15, "totalCost": 450000 }
+      ],
+      "averageRepairTimeDays": 4,
+      "resolutionBreakdown": [
+        { "status": "repaired", "count": 25 },
+        { "status": "unrecoverable", "count": 8 },
+        { "status": "in_repair", "count": 10 }
+      ],
+      "periodComparison": {
+        "currentCost": 1100000,
+        "previousCost": 950000,
+        "percentChange": 15.79,
+        "currentItemCount": 47,
+        "previousItemCount": 39,
+        "itemCountPercentChange": 20.51
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `costVariance` = `totalActualCost - totalEstimatedCost`. Negative values indicate costs came in below estimates.
+- `costVariancePercent` represents the percentage difference.
+- `periodComparison` is only included when both `startDate` and `endDate` are provided.
+- The `items` array respects the `entryReason` filter (e.g., only damaged items), even though `batches` shows full batch data.
+
+---
+
+#### Frontend Consumption Guide
+
+These export endpoints return JSON. The frontend is responsible for converting to CSV/XLSX if needed.
+
+**Recommended workflow:**
+
+1. **Fetch data** with `includeIds=false` for dashboard reports or `includeIds=true` when IDs are needed for linking.
+2. **Apply pagination** using `page` and `limit` query params. The `pagination` object in the response tells total items and pages.
+3. **Generate files** client-side using a library such as `xlsx` (SheetJS) or `papaparse`:
+   ```js
+   // Example with SheetJS
+   import * as XLSX from "xlsx";
+   const wb = XLSX.utils.book_new();
+   XLSX.utils.book_append_sheet(
+     wb,
+     XLSX.utils.json_to_sheet(data.loanRows),
+     "Loans",
+   );
+   XLSX.utils.book_append_sheet(
+     wb,
+     XLSX.utils.json_to_sheet(data.invoiceRows),
+     "Invoices",
+   );
+   XLSX.writeFile(wb, "sales-export.xlsx");
+   ```
+4. **Period comparison** is automatic when `startDate` and `endDate` are both provided — the API compares against the immediately preceding period of equal duration.
 
 ---
 

@@ -67,6 +67,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`requests:create`](#requestscreate)
 - [`requests:delete`](#requestsdelete)
 - [`requests:read`](#requestsread)
+- [`requests:ready`](#requestsready)
 - [`requests:update`](#requestsupdate)
 - [`roles:create`](#rolescreate)
 - [`roles:delete`](#rolesdelete)
@@ -569,6 +570,16 @@ Each section explains the purpose of a permission and the action it allows.
 - **Active:** Yes
 - **Purpose:** Allows viewing and tracking the status of requests.
 - **Allowed Action:** View/list records and details for this resource.
+- **Resource Target:** Requests
+
+### `requests:ready`
+
+- **Display Name:** Marcar Solicitud como Lista
+- **Category:** Requests
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows marking a request as ready for pickup once materials have been assigned.
+- **Allowed Action:** Transition a request to the `ready` status.
 - **Resource Target:** Requests
 
 ### `requests:update`
