@@ -1850,14 +1850,14 @@ Calculates the cost for a plan with a given seat count.
 
 Creates a Stripe Checkout session for subscription.
 
-| Parameter  | Location | Type    | Required | Description                                |
-| ---------- | -------- | ------- | -------- | ------------------------------------------ |
-| plan       | body     | string  | Yes      | `starter`, `professional`, or `enterprise` |
-| seatCount  | body     | integer | No       | Number of seats (default: 1)               |
-| successUrl | body     | string  | Yes      | URL to redirect on success                 |
-| cancelUrl  | body     | string  | Yes      | URL to redirect on cancel                  |
+| Parameter  | Location | Type    | Required | Description                                              |
+| ---------- | -------- | ------- | -------- | -------------------------------------------------------- |
+| plan       | body     | string  | Yes      | Plan name (e.g. `starter`, `professional`, `enterprise`) |
+| seatCount  | body     | integer | No       | Number of seats (default: 1, min: 1)                     |
+| successUrl | body     | string  | Yes      | URL to redirect on success                               |
+| cancelUrl  | body     | string  | Yes      | URL to redirect on cancel                                |
 
-**Permission Required:** Owner only
+**Permission Required:** `billing:manage`
 
 **Response:** `200 OK`
 
@@ -1870,6 +1870,14 @@ Creates a Stripe Checkout session for subscription.
 }
 ```
 
+**Error Conditions:**
+
+| Status | Condition                                        |
+| ------ | ------------------------------------------------ |
+| 400    | Plan is `free`, does not exist, or is not active |
+| 400    | Seat count invalid for the plan                  |
+| 409    | Organization already has an active subscription  |
+
 ---
 
 #### POST /billing/portal
@@ -1879,6 +1887,8 @@ Creates a Stripe Billing Portal session.
 | Parameter | Location | Type   | Required | Description                   |
 | --------- | -------- | ------ | -------- | ----------------------------- |
 | returnUrl | body     | string | Yes      | URL to return to after portal |
+
+**Permission Required:** `billing:manage`
 
 ---
 
@@ -1890,6 +1900,8 @@ Updates the subscription seat quantity.
 | --------- | -------- | ------- | -------- | -------------- |
 | seatCount | body     | integer | Yes      | New seat count |
 
+**Permission Required:** `billing:manage`
+
 ---
 
 #### POST /billing/cancel
@@ -1900,6 +1912,106 @@ Cancels the subscription.
 | ----------------- | -------- | ------- | -------- | -------------------------------------------- |
 | cancelImmediately | body     | boolean | No       | Cancel now or at period end (default: false) |
 
+**Permission Required:** `billing:manage`
+
+---
+
+#### POST /billing/change-plan
+
+Changes the subscription plan. Upgrades are applied immediately with Stripe proration. Downgrades are deferred to the end of the current billing period via Stripe Subscription Schedules.
+
+| Parameter | Location | Type    | Required | Description                                     |
+| --------- | -------- | ------- | -------- | ----------------------------------------------- |
+| plan      | body     | string  | Yes      | New plan name (e.g. `starter`, `professional`)  |
+| seatCount | body     | integer | No       | New seat count (defaults to current seat count) |
+
+**Permission Required:** `billing:manage`  
+**Requires:** Active organization with an active subscription.
+
+**Response (upgrade):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "type": "upgrade",
+    "effectiveDate": "immediate",
+    "previousPlan": "starter",
+    "newPlan": "professional"
+  }
+}
+```
+
+**Response (downgrade):** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "type": "downgrade",
+    "effectiveDate": "2026-05-08T00:00:00.000Z",
+    "previousPlan": "professional",
+    "newPlan": "starter"
+  }
+}
+```
+
+**Error Conditions:**
+
+| Status | Condition                                     |
+| ------ | --------------------------------------------- |
+| 400    | No active subscription                        |
+| 400    | Same plan requested (`Ya estás en este plan`) |
+| 400    | Plan does not exist or is not active          |
+| 400    | Invalid seat count for the target plan        |
+
+---
+
+#### GET /billing/pending-changes
+
+Gets pending plan change information (scheduled downgrades).
+
+**Permission Required:** `billing:manage`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "pendingChange": {
+      "pendingPlan": "starter",
+      "effectiveDate": "2026-05-08T00:00:00.000Z"
+    }
+  }
+}
+```
+
+Returns `null` for `pendingChange` if no pending plan change exists.
+
+---
+
+#### DELETE /billing/pending-changes
+
+Cancels a pending plan change (deferred downgrade). Releases the Stripe Subscription Schedule, keeping the current subscription as-is.
+
+**Permission Required:** `billing:manage`
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Cambio de plan pendiente cancelado exitosamente"
+}
+```
+
+**Error Conditions:**
+
+| Status | Condition                        |
+| ------ | -------------------------------- |
+| 400    | No pending plan change to cancel |
+
 ---
 
 #### GET /billing/history
@@ -1909,6 +2021,8 @@ Gets billing history for the organization.
 | Parameter | Location | Type    | Required | Description             |
 | --------- | -------- | ------- | -------- | ----------------------- |
 | limit     | query    | integer | No       | Max items (default: 50) |
+
+**Permission Required:** `billing:manage`
 
 ---
 
@@ -4296,7 +4410,7 @@ Initiates a physical transfer (shipment) at the **instance level**. Marks the it
 | items          | body     | array  | Yes      | List of `{ instanceId, sentCondition?, receivedCondition?, notes? }` (min 1 item). `sentCondition` and `receivedCondition` are enum: `OK`, `DAMAGED`, `MISSING_PARTS`, `DIRTY`, `REPAIR_REQUIRED`, `LOST` |
 | senderNotes    | body     | string | No       | Notes from the sender                                                                                                                                                                                     |
 
-**Permission Required:** `transfers:create`
+**Permission Required:** `transfers:send`
 
 ---
 
@@ -4309,7 +4423,7 @@ Marks a transfer as received at the destination location. Updates the location o
 | receiverNotes | body     | string | No       | Notes from the receiver                                                                                                                                                           |
 | items         | body     | array  | No       | List of `{ instanceId, receivedCondition }` to record per-item received condition. `receivedCondition` enum: `OK`, `DAMAGED`, `MISSING_PARTS`, `DIRTY`, `REPAIR_REQUIRED`, `LOST` |
 
-**Permission Required:** `transfers:update`
+**Permission Required:** `transfers:receive`
 
 ---
 
@@ -5214,11 +5328,11 @@ The loan must be in `active` or `overdue` status.
 
 **Errors:**
 
-| Code              | Condition                                      |
-| ----------------- | ---------------------------------------------- |
-| `403 FORBIDDEN`   | User lacks `loans:return` permission           |
-| `404 NOT_FOUND`   | Loan not found or not in an active/overdue state |
-| `409 CONFLICT`    | Loan cannot transition to returned from current status |
+| Code            | Condition                                              |
+| --------------- | ------------------------------------------------------ |
+| `403 FORBIDDEN` | User lacks `loans:return` permission                   |
+| `404 NOT_FOUND` | Loan not found or not in an active/overdue state       |
+| `409 CONFLICT`  | Loan cannot transition to returned from current status |
 
 ---
 
@@ -6143,6 +6257,22 @@ Returns customer status breakdown and the top 10 customers ranked by total loan 
 
 ### Reports Endpoints
 
+> **⚠️ Legacy — uso desaconsejado.** Estos endpoints se mantienen por compatibilidad retroactiva, pero se recomienda migrar a los **Report Export Endpoints** (sección siguiente). Los nuevos endpoints ofrecen el parámetro `includeIds` para controlar la presencia de IDs, métricas de negocio enriquecidas (tendencias, comparaciones de periodo, tasas de utilización, rutas top, etc.) y filtros más completos.
+>
+> **Tabla de migración:**
+>
+> | Endpoint legacy          | Reemplazo recomendado                | Notas                                                                                                            |
+> | ------------------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+> | `GET /reports/loans`     | `GET /reports/exports/loan-activity` | Métricas de duración, sobrepasos, tendencias mensuales y comparación de periodo                                  |
+> | `GET /reports/inventory` | `GET /reports/exports/inventory`     | Desglose por tipo/ubicación con tasas de utilización/disponibilidad/daño                                         |
+> | `GET /reports/financial` | `GET /reports/exports/sales`         | Combina préstamos + facturas con revenue breakdown y top clientes                                                |
+> | `GET /reports/damages`   | —                                    | Sin reemplazo directo; usa datos de inspección. `/exports/damages` usa datos de mantenimiento (fuente diferente) |
+> | `GET /reports/transfers` | `GET /reports/exports/transfers`     | Análisis de rutas, tiempos de tránsito, condición de ítems y comparación de periodo                              |
+> | `GET /reports/catalog`   | `GET /reports/exports/catalog`       | Catálogo detallado con disponibilidad por ubicación, ingreso estimado y costo de mantenimiento                   |
+> | —                        | `GET /reports/exports/locations`     | Nuevo: catálogo de ubicaciones con capacidades de material, tasas de ocupación y resumen por estado              |
+> | —                        | `GET /reports/exports/customers`     | Nuevo: listado de clientes con ingresos reales desde préstamos, top por revenue y por número de préstamos        |
+> | —                        | `GET /reports/exports/requests`      | Nuevo: solicitudes de préstamo con embudo de conversión, revenue analytics y comparación de periodo              |
+
 All reports endpoints require authentication, an active organization, and the `reports:read` permission. Reports are designed for operational analysis and support pagination, date-range filtering, and status filtering.
 
 **Common Query Parameters** (all optional):
@@ -6820,6 +6950,658 @@ When `includeIds=false`, IDs are omitted and an enriched `summary` is added:
 - `costVariancePercent` represents the percentage difference.
 - `periodComparison` is only included when both `startDate` and `endDate` are provided.
 - The `items` array respects the `entryReason` filter (e.g., only damaged items), even though `batches` shows full batch data.
+
+---
+
+#### GET /reports/exports/inventory
+
+Inventory export grouped by material type and location. When `includeIds=false`, includes utilization, availability, damage, and maintenance rates, estimated daily catalog value, and top materials/locations by stock.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter  | Type   | Description                                                            |
+| ---------- | ------ | ---------------------------------------------------------------------- |
+| includeIds | string | `"true"` (default) includes IDs; `"false"` omits them and adds summary |
+| locationId | string | Filter by location ObjectId                                            |
+| categoryId | string | Filter by category ObjectId                                            |
+| status     | string | Filter by instance status (e.g., `available`, `loaned`, `damaged`)     |
+| search     | string | Search material type name (case-insensitive regex)                     |
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/inventory?includeIds=false&status=available
+Authorization: Bearer <token>
+x-organization-id: <org-id>
+```
+
+**Success Response (200) — `includeIds=true`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "totalInstances": 150,
+    "byMaterialType": [
+      {
+        "materialTypeId": "665...",
+        "materialTypeName": "Proyector Epson",
+        "code": "MAT-001",
+        "pricePerDay": 15000,
+        "categoryNames": ["Electrónica"],
+        "totalInstances": 30,
+        "instancesByStatus": { "available": 20, "loaned": 8, "damaged": 2 }
+      }
+    ],
+    "byLocation": [
+      {
+        "locationId": "664...",
+        "locationName": "Sede Principal",
+        "totalInstances": 80,
+        "instancesByStatus": { "available": 50, "loaned": 25, "maintenance": 5 }
+      }
+    ]
+  }
+}
+```
+
+**Success Response (200) — `includeIds=false` (additional `summary`):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "totalInstances": 150,
+    "byMaterialType": ["..."],
+    "byLocation": ["..."],
+    "summary": {
+      "totalInstances": 150,
+      "totalMaterialTypes": 12,
+      "totalLocations": 5,
+      "globalInstancesByStatus": [
+        { "status": "available", "count": 80 },
+        { "status": "loaned", "count": 50 },
+        { "status": "damaged", "count": 10 },
+        { "status": "maintenance", "count": 10 }
+      ],
+      "availabilityRate": 53.33,
+      "utilizationRate": 33.33,
+      "damageRate": 6.67,
+      "maintenanceRate": 6.67,
+      "estimatedDailyValue": 2250000,
+      "topMaterialTypesByStock": [{ "name": "Proyector Epson", "total": 30 }],
+      "topLocationsByStock": [{ "name": "Sede Principal", "total": 80 }]
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| 400    | Query parameter validation failure |
+| 401    | Not authenticated                  |
+| 403    | Missing `reports:read` permission  |
+
+---
+
+#### GET /reports/exports/transfers
+
+Transfer export with condition tracking, paginated rows, and enriched metrics (transit time, completion/issue rates, route analysis, condition breakdown, period comparison) when `includeIds=false`.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter      | Type    | Description                                                                       |
+| -------------- | ------- | --------------------------------------------------------------------------------- |
+| startDate      | string  | Filter from this date (ISO 8601)                                                  |
+| endDate        | string  | Filter up to this date (ISO 8601)                                                 |
+| includeIds     | string  | `"true"` (default) includes IDs; `"false"` omits them and adds summary            |
+| status         | string  | Filter by transfer status (`picking`, `in_transit`, `received`, `issue_reported`) |
+| fromLocationId | string  | Filter by origin location ObjectId                                                |
+| toLocationId   | string  | Filter by destination location ObjectId                                           |
+| page           | integer | Page number (default: 1)                                                          |
+| limit          | integer | Items per page (default: 50, max: 200)                                            |
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/transfers?includeIds=false&startDate=2025-01-01&endDate=2025-06-30
+Authorization: Bearer <token>
+x-organization-id: <org-id>
+```
+
+**Success Response (200) — `includeIds=true`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "rows": [
+      {
+        "transferId": "665...",
+        "fromLocationId": "664a...",
+        "toLocationId": "664b...",
+        "status": "received",
+        "fromLocation": "Sede Principal",
+        "toLocation": "Sucursal Norte",
+        "itemCount": 5,
+        "pickedBy": "Juan Pérez",
+        "receivedBy": "María López",
+        "sentAt": "2025-03-10T08:00:00.000Z",
+        "receivedAt": "2025-03-12T14:30:00.000Z",
+        "transitDays": 3,
+        "senderNotes": null,
+        "receiverNotes": "Todo en orden",
+        "createdAt": "2025-03-10T07:50:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 42,
+      "page": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+**Success Response (200) — `includeIds=false` (additional `summary`):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "rows": ["..."],
+    "pagination": { "total": 42, "page": 1, "totalPages": 1 },
+    "summary": {
+      "totalTransfers": 42,
+      "totalItemsMoved": 185,
+      "averageTransitDays": 2,
+      "completionRate": 85.71,
+      "issueRate": 4.76,
+      "transfersByStatus": [
+        { "status": "received", "count": 36, "totalItems": 160 },
+        { "status": "in_transit", "count": 4, "totalItems": 15 }
+      ],
+      "transfersByMonth": [
+        { "year": 2025, "month": 1, "count": 8, "totalItems": 30 },
+        { "year": 2025, "month": 2, "count": 10, "totalItems": 45 }
+      ],
+      "receivedConditionBreakdown": [
+        { "condition": "good", "count": 140 },
+        { "condition": "damaged", "count": 12 }
+      ],
+      "topRoutes": [
+        {
+          "fromLocation": "Sede Principal",
+          "toLocation": "Sucursal Norte",
+          "transferCount": 15,
+          "totalItems": 60
+        }
+      ],
+      "periodComparison": {
+        "currentTransfers": 42,
+        "previousTransfers": 35,
+        "percentChange": 20.0,
+        "currentItems": 185,
+        "previousItems": 150,
+        "itemsPercentChange": 23.33
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `transitDays` is calculated only when both `sentAt` and `receivedAt` exist.
+- `periodComparison` is included only when both `startDate` and `endDate` are provided.
+- `topRoutes` returns the 10 most-used origin→destination pairs.
+- `receivedConditionBreakdown` reflects the condition of items at reception.
+
+**Error Responses:**
+
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| 400    | Query parameter validation failure |
+| 401    | Not authenticated                  |
+| 403    | Missing `reports:read` permission  |
+
+---
+
+#### GET /reports/exports/billing-history
+
+Billing history export with subscription lifecycle events, payment tracking, and cost analytics. When `includeIds=false`, includes event breakdown by type/month, payment summary per currency, payment success rate, plan change history, and period comparison.
+
+**Permissions:** `reports:read` **AND** `billing:manage`
+
+**Query Parameters:**
+
+| Parameter  | Type    | Description                                                                                 |
+| ---------- | ------- | ------------------------------------------------------------------------------------------- |
+| startDate  | string  | Filter from this date (ISO 8601)                                                            |
+| endDate    | string  | Filter up to this date (ISO 8601)                                                           |
+| includeIds | string  | `"true"` (default) includes IDs; `"false"` omits them and adds summary                      |
+| eventType  | string  | Filter by event type (e.g., `payment_succeeded`, `plan_upgraded`, `subscription_cancelled`) |
+| page       | integer | Page number (default: 1)                                                                    |
+| limit      | integer | Items per page (default: 50, max: 200)                                                      |
+
+**Valid `eventType` values:** `subscription_created`, `subscription_updated`, `subscription_cancelled`, `payment_succeeded`, `payment_failed`, `invoice_paid`, `invoice_payment_failed`, `seat_added`, `seat_removed`, `plan_upgraded`, `plan_downgraded`.
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/billing-history?includeIds=false&startDate=2025-01-01&endDate=2025-12-31
+Authorization: Bearer <token>
+x-organization-id: <org-id>
+```
+
+**Success Response (200) — `includeIds=true`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "currentSubscription": {
+      "plan": "professional",
+      "seatCount": 10,
+      "currentPeriodStart": "2025-06-01T00:00:00.000Z",
+      "currentPeriodEnd": "2025-07-01T00:00:00.000Z",
+      "cancelAtPeriodEnd": false,
+      "pendingPlan": null,
+      "pendingPlanEffectiveDate": null
+    },
+    "rows": [
+      {
+        "eventId": "665...",
+        "stripeEventId": "evt_...",
+        "stripeSubscriptionId": "sub_...",
+        "stripeInvoiceId": "in_...",
+        "stripePaymentIntentId": null,
+        "eventType": "payment_succeeded",
+        "amount": 50000,
+        "currency": "usd",
+        "previousPlan": null,
+        "newPlan": null,
+        "seatChange": null,
+        "processed": true,
+        "error": null,
+        "createdAt": "2025-06-01T00:05:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 24,
+      "page": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+**Success Response (200) — `includeIds=false` (additional `summary`):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "currentSubscription": { "..." },
+    "rows": [ "..." ],
+    "pagination": { "total": 24, "page": 1, "totalPages": 1 },
+    "summary": {
+      "totalEvents": 24,
+      "eventsByType": [
+        { "eventType": "payment_succeeded", "count": 12 },
+        { "eventType": "subscription_updated", "count": 6 },
+        { "eventType": "plan_upgraded", "count": 2 }
+      ],
+      "eventsByMonth": [
+        { "year": 2025, "month": 1, "count": 2, "totalAmount": 100000 },
+        { "year": 2025, "month": 2, "count": 3, "totalAmount": 150000 }
+      ],
+      "paymentSummary": [
+        {
+          "currency": "usd",
+          "totalPaid": 600000,
+          "paymentCount": 12,
+          "averagePayment": 50000
+        }
+      ],
+      "paymentSuccessRate": 92.31,
+      "failedPaymentCount": 1,
+      "planChangeHistory": [
+        {
+          "eventType": "plan_upgraded",
+          "previousPlan": "starter",
+          "newPlan": "professional",
+          "seatChange": 10,
+          "createdAt": "2025-03-15T10:00:00.000Z"
+        }
+      ],
+      "periodComparison": {
+        "currentEvents": 24,
+        "previousEvents": 18,
+        "eventsPercentChange": 33.33,
+        "currentAmountPaid": 600000,
+        "previousAmountPaid": 450000,
+        "amountPercentChange": 33.33
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `amount` values are in the smallest currency unit (e.g., cents for USD).
+- `periodComparison` is included only when both `startDate` and `endDate` are provided.
+- `currentSubscription` always reflects the organization's live subscription state, regardless of filters.
+- `paymentSuccessRate` considers both `payment_succeeded`/`invoice_paid` (success) and `payment_failed`/`invoice_payment_failed` (failure).
+
+**Error Responses:**
+
+| Status | Condition                                             |
+| ------ | ----------------------------------------------------- |
+| 400    | Query parameter validation failure                    |
+| 401    | Not authenticated                                     |
+| 403    | Missing `reports:read` or `billing:manage` permission |
+
+---
+
+#### GET /reports/exports/locations
+
+Location catalog export with material capacity detail and summary. When `includeIds=false`, adds occupancy analytics, status breakdown, and top locations by occupancy.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter  | Type    | Default | Description                                           |
+| ---------- | ------- | ------- | ----------------------------------------------------- |
+| includeIds | boolean | `true`  | Include ObjectIds in the output                       |
+| locationId | string  | —       | Filter by specific location ID                        |
+| status     | string  | —       | Filter by status (`available`, `full_capacity`, etc.) |
+| isActive   | boolean | —       | Filter by active/inactive state                       |
+| search     | string  | —       | Partial match on location name (case-insensitive)     |
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/locations?includeIds=false&status=available
+```
+
+**Success Response (includeIds=false):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "totalLocations": 5,
+    "locations": [
+      {
+        "name": "Bodega Central",
+        "code": "BC01",
+        "status": "available",
+        "isActive": true,
+        "address": {
+          "street": "Calle 10 #5-30",
+          "city": "Bogotá",
+          "state": "Cundinamarca",
+          "country": "CO"
+        },
+        "additionalDetails": null,
+        "materialCapacitiesDetail": [
+          {
+            "typeName": "Silla plegable",
+            "maxQuantity": 200,
+            "currentQuantity": 150
+          },
+          {
+            "typeName": "Mesa redonda",
+            "maxQuantity": 50,
+            "currentQuantity": 30
+          }
+        ],
+        "materialCapacitiesSummary": {
+          "totalCapacity": 250,
+          "totalOccupied": 180,
+          "occupancyRate": 72
+        },
+        "createdAt": "2025-01-10T08:00:00.000Z",
+        "updatedAt": "2025-06-01T12:00:00.000Z"
+      }
+    ],
+    "summary": {
+      "totalLocations": 5,
+      "byStatus": [
+        { "status": "available", "count": 3 },
+        { "status": "full_capacity", "count": 1 },
+        { "status": "maintenance", "count": 1 }
+      ],
+      "byActive": { "active": 4, "inactive": 1 },
+      "avgOccupancyRate": 65.5,
+      "totalCapacity": 1200,
+      "totalOccupied": 786,
+      "topByOccupancy": [
+        { "name": "Bodega Norte", "code": "BN01", "occupancyRate": 95.2 }
+      ]
+    }
+  }
+}
+```
+
+**Notes:**
+
+- No pagination — returns all matching locations (catalog-style).
+- `materialCapacitiesDetail` includes resolved material type names via lookup.
+- `materialCapacitiesSummary` provides a per-location rollup of capacity.
+- `summary` is only included when `includeIds=false`.
+
+**Error Responses:**
+
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| 400    | Query parameter validation failure |
+| 401    | Not authenticated                  |
+| 403    | Missing `reports:read` permission  |
+
+---
+
+#### GET /reports/exports/customers
+
+Customer export with real revenue calculated from Loans. When `includeIds=false`, includes global revenue stats, top customers by revenue and loan count, and period comparison on `createdAt`.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter    | Type    | Default | Description                                            |
+| ------------ | ------- | ------- | ------------------------------------------------------ |
+| includeIds   | boolean | `true`  | Include ObjectIds in the output                        |
+| status       | string  | —       | Filter by status (`active`, `inactive`, `blacklisted`) |
+| search       | string  | —       | Search by firstName, firstSurname, email, or document  |
+| documentType | string  | —       | Filter by document type (`cc`, `ce`, `passport`, etc.) |
+| startDate    | date    | —       | Filter customers created from this date                |
+| endDate      | date    | —       | Filter customers created up to this date               |
+| page         | number  | `1`     | Page number                                            |
+| limit        | number  | `50`    | Items per page (max 200)                               |
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/customers?includeIds=false&status=active&startDate=2025-01-01&endDate=2025-06-30
+```
+
+**Success Response (includeIds=false):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "total": 120,
+    "page": 1,
+    "limit": 50,
+    "customers": [
+      {
+        "fullName": "María García López",
+        "email": "maria@example.com",
+        "phone": "+573001234567",
+        "documentType": "cc",
+        "documentNumber": "1234567890",
+        "status": "active",
+        "totalLoans": 8,
+        "activeLoans": 2,
+        "totalRevenue": 1500000,
+        "avgLoanAmount": 187500,
+        "lastLoanAt": "2025-06-15T10:00:00.000Z",
+        "createdAt": "2025-01-05T09:00:00.000Z"
+      }
+    ],
+    "summary": {
+      "totalCustomers": 120,
+      "byStatus": [
+        { "status": "active", "count": 100 },
+        { "status": "inactive", "count": 15 },
+        { "status": "blacklisted", "count": 5 }
+      ],
+      "totalRevenue": 45000000,
+      "totalLoans": 350,
+      "topByRevenue": [{ "fullName": "María García", "totalRevenue": 5000000 }],
+      "topByLoanCount": [{ "fullName": "Carlos Pérez", "loanCount": 25 }],
+      "periodComparison": {
+        "currentNewCustomers": 30,
+        "previousNewCustomers": 22,
+        "percentChange": 36.36
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- Revenue is calculated by aggregating `totalAmount` from the Loan model per customer.
+- `topByRevenue` and `topByLoanCount` are global (not affected by pagination).
+- `periodComparison` compares new customers in the selected date range vs. the previous equal-length period. Only included when both `startDate` and `endDate` are provided.
+- `summary` is only included when `includeIds=false`.
+
+**Error Responses:**
+
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| 400    | Query parameter validation failure |
+| 401    | Not authenticated                  |
+| 403    | Missing `reports:read` permission  |
+
+---
+
+#### GET /reports/exports/requests
+
+Loan request export with full conversion funnel analytics, monthly breakdown, and period comparison when `includeIds=false`. Supports dual date filters: `createdAtStart/End` on the request creation date and `loanStartFrom/To` on the requested loan start date.
+
+**Permission:** `reports:read`
+
+**Query Parameters:**
+
+| Parameter      | Type    | Default | Description                                                         |
+| -------------- | ------- | ------- | ------------------------------------------------------------------- |
+| includeIds     | boolean | `true`  | Include ObjectIds in the output                                     |
+| createdAtStart | date    | —       | Filter requests created from this date                              |
+| createdAtEnd   | date    | —       | Filter requests created up to this date                             |
+| loanStartFrom  | date    | —       | Filter by requested loan start date (from)                          |
+| loanStartTo    | date    | —       | Filter by requested loan start date (to)                            |
+| status         | string  | —       | Filter by request status (`pending`, `approved`, `completed`, etc.) |
+| customerId     | string  | —       | Filter by customer ID                                               |
+| page           | number  | `1`     | Page number                                                         |
+| limit          | number  | `50`    | Items per page (max 200)                                            |
+
+**Example Request:**
+
+```
+GET /api/v1/reports/exports/requests?includeIds=false&createdAtStart=2025-01-01&createdAtEnd=2025-06-30
+```
+
+**Success Response (includeIds=false):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "total": 250,
+    "page": 1,
+    "limit": 50,
+    "requests": [
+      {
+        "code": "REQ-2025-0042",
+        "status": "completed",
+        "itemCount": 3,
+        "totalAmount": 450000,
+        "subtotal": 500000,
+        "discountAmount": 50000,
+        "depositAmount": 100000,
+        "totalDays": 7,
+        "startDate": "2025-03-10T00:00:00.000Z",
+        "endDate": "2025-03-17T00:00:00.000Z",
+        "approvedAt": "2025-03-08T14:30:00.000Z",
+        "rejectionReason": null,
+        "createdAt": "2025-03-07T10:00:00.000Z"
+      }
+    ],
+    "summary": {
+      "totalRequests": 250,
+      "byStatus": [
+        { "status": "completed", "count": 120 },
+        { "status": "approved", "count": 40 },
+        { "status": "pending", "count": 30 },
+        { "status": "rejected", "count": 25 },
+        { "status": "cancelled", "count": 15 },
+        { "status": "expired", "count": 20 }
+      ],
+      "byMonth": [
+        { "year": 2025, "month": 1, "count": 35, "totalAmount": 8500000 },
+        { "year": 2025, "month": 2, "count": 42, "totalAmount": 10200000 }
+      ],
+      "funnel": {
+        "approvalRate": 76.4,
+        "completionRate": 48,
+        "rejectionRate": 10,
+        "cancellationRate": 6,
+        "avgApprovalTimeHours": 18.5
+      },
+      "avgRequestValue": 380000,
+      "avgDuration": 5,
+      "totalRevenue": 95000000,
+      "periodComparison": {
+        "currentRequests": 250,
+        "previousRequests": 200,
+        "requestsPercentChange": 25,
+        "currentRevenue": 95000000,
+        "previousRevenue": 78000000,
+        "revenuePercentChange": 21.79
+      }
+    }
+  }
+}
+```
+
+**Notes:**
+
+- `itemCount` is the number of items in the request (no item detail array is included).
+- The **funnel** counts "approved" as all requests that reached any post-approval status (approved, deposit_pending, assigned, ready, shipped, completed).
+- `avgApprovalTimeHours` is `null` when no requests have `approvedAt`.
+- `periodComparison` uses `createdAtStart/End` to define the comparison window. Only included when both are provided.
+- `summary` is only included when `includeIds=false`.
+
+**Error Responses:**
+
+| Status | Condition                          |
+| ------ | ---------------------------------- |
+| 400    | Query parameter validation failure |
+| 401    | Not authenticated                  |
+| 403    | Missing `reports:read` permission  |
 
 ---
 

@@ -83,6 +83,8 @@ Each section explains the purpose of a permission and the action it allows.
 - [`transfers:read`](#transfersread)
 - [`transfers:update`](#transfersupdate)
 - [`transfers:accept`](#transfersaccept)
+- [`transfers:send`](#transferssend)
+- [`transfers:receive`](#transfersreceive)
 - [`transfer_rejection_reasons:manage`](#transfer_rejection_reasonsmanage)
 - [`users:create`](#userscreate)
 - [`users:delete`](#usersdelete)
@@ -698,11 +700,11 @@ Each section explains the purpose of a permission and the action it allows.
 
 ### `transfers:create`
 
-- **Display Name:** Create Transfers
+- **Display Name:** Crear Transferencias
 - **Category:** Transfers
 - **Scope:** Organization
 - **Active:** Yes
-- **Purpose:** Allows creating transfer requests and initiating physical transfers between locations.
+- **Purpose:** Allows creating transfer requests between locations.
 - **Allowed Action:** Create new records in this resource.
 - **Resource Target:** Transfers
 
@@ -718,22 +720,42 @@ Each section explains the purpose of a permission and the action it allows.
 
 ### `transfers:update`
 
-- **Display Name:** Update Transfers
+- **Display Name:** Actualizar Transferencias
 - **Category:** Transfers
 - **Scope:** Organization
 - **Active:** Yes
-- **Purpose:** Allows editing and cancelling transfer requests, and marking transfers as received.
+- **Purpose:** Allows editing and cancelling transfer requests.
 - **Allowed Action:** Modify existing records in this resource.
 - **Resource Target:** Transfers
 
 ### `transfers:accept`
 
-- **Display Name:** Accept or Reject Transfers
+- **Display Name:** Aceptar o Rechazar Transferencias
 - **Category:** Transfers
 - **Scope:** Organization
 - **Active:** Yes
 - **Purpose:** Allows approving or rejecting transfer requests. The user must be assigned to the source location.
 - **Allowed Action:** Approve or reject transfer request records.
+- **Resource Target:** Transfers
+
+### `transfers:send`
+
+- **Display Name:** Enviar Transferencias
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows initiating the physical shipment of materials between locations.
+- **Allowed Action:** Initiate physical transfer shipments.
+- **Resource Target:** Transfers
+
+### `transfers:receive`
+
+- **Display Name:** Recibir Transferencias
+- **Category:** Transfers
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows marking a transfer as received at the destination location.
+- **Allowed Action:** Mark transfer shipments as received.
 - **Resource Target:** Transfers
 
 ### `transfer_rejection_reasons:manage`

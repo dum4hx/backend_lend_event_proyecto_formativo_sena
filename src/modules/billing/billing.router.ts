@@ -25,8 +25,12 @@ const billingRouter = Router();
 /* ---------- Validation Schemas ---------- */
 
 const createCheckoutSchema = z.object({
-  plan: z.string(),
-  seatCount: z.number().int().positive().default(1),
+  plan: z.string().min(1, "El plan es requerido").max(50).trim().toLowerCase(),
+  seatCount: z
+    .number()
+    .int()
+    .min(1, "El número de asientos debe ser al menos 1")
+    .default(1),
   successUrl: z.url(),
   cancelUrl: z.url(),
 });
@@ -41,6 +45,15 @@ const cancelSubscriptionSchema = z.object({
 
 const createPortalSchema = z.object({
   returnUrl: z.url(),
+});
+
+const changePlanSchema = z.object({
+  plan: z.string().min(1, "El plan es requerido").max(50).trim().toLowerCase(),
+  seatCount: z
+    .number()
+    .int()
+    .min(1, "El número de asientos debe ser al menos 1")
+    .optional(),
 });
 
 /* ---------- Authenticated Routes ---------- */
@@ -85,6 +98,7 @@ billingRouter.post(
   "/portal",
   authenticate,
   requirePermission("billing:manage"),
+  paymentRateLimiter,
   validateBody(createPortalSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -180,6 +194,88 @@ billingRouter.get(
       res.json({
         status: "success",
         data: { history },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/billing/change-plan
+ * Changes the subscription plan (upgrade or downgrade).
+ * Upgrades are applied immediately with Stripe proration.
+ * Downgrades are deferred to the end of the billing period.
+ * Requires billing:manage permission.
+ */
+billingRouter.post(
+  "/change-plan",
+  authenticate,
+  requireActiveOrganization,
+  requirePermission("billing:manage"),
+  paymentRateLimiter,
+  validateBody(changePlanSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { plan, seatCount } = req.body;
+
+      const result = await billingService.changePlan(
+        getOrgId(req),
+        plan as SubscriptionPlan,
+        seatCount,
+      );
+
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/billing/pending-changes
+ * Gets pending plan change information.
+ * Requires billing:manage permission.
+ */
+billingRouter.get(
+  "/pending-changes",
+  authenticate,
+  requirePermission("billing:manage"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pendingChange = await billingService.getPendingPlanChange(
+        getOrgId(req),
+      );
+
+      res.json({
+        status: "success",
+        data: { pendingChange },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /api/v1/billing/pending-changes
+ * Cancels a pending plan change (deferred downgrade).
+ * Requires billing:manage permission.
+ */
+billingRouter.delete(
+  "/pending-changes",
+  authenticate,
+  requirePermission("billing:manage"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await billingService.cancelPendingPlanChange(getOrgId(req));
+
+      res.json({
+        status: "success",
+        message: "Cambio de plan pendiente cancelado exitosamente",
       });
     } catch (err) {
       next(err);

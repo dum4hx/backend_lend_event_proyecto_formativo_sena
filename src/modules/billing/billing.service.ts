@@ -66,7 +66,9 @@ const getOrCreateStripePriceIds = async (
 
     stripePriceIdBase = basePrice.id;
     needsUpdate = true;
-    logger.info(`Stripe base price created for plan "${plan}": ${basePrice.id}`);
+    logger.info(
+      `Stripe base price created for plan "${plan}": ${basePrice.id}`,
+    );
   }
 
   // Create seat price in Stripe if missing
@@ -88,7 +90,9 @@ const getOrCreateStripePriceIds = async (
 
     stripePriceIdSeat = seatPrice.id;
     needsUpdate = true;
-    logger.info(`Stripe seat price created for plan "${plan}": ${seatPrice.id}`);
+    logger.info(
+      `Stripe seat price created for plan "${plan}": ${seatPrice.id}`,
+    );
   }
 
   // Persist newly created IDs back to the subscription type
@@ -152,17 +156,37 @@ export const billingService = {
     const stripeClient = ensureStripe();
 
     if (plan === "free") {
-      throw AppError.badRequest("No se puede crear un checkout para el plan gratuito");
+      throw AppError.badRequest(
+        "No se puede crear un checkout para el plan gratuito",
+      );
     }
+
+    // Validate plan exists and is active
+    const planValid = await subscriptionTypeService.planExists(plan);
+    if (!planValid) {
+      throw AppError.badRequest(`El plan '${plan}' no existe o no está activo`);
+    }
+
+    // Validate seat count against plan limits
+    await subscriptionTypeService.validateSeatCount(plan, seatCount);
 
     const priceIds = await getOrCreateStripePriceIds(plan);
     if (!priceIds) {
-      throw AppError.internal(`No se pudieron resolver los precios de Stripe para el plan: ${plan}`);
+      throw AppError.internal(
+        `No se pudieron resolver los precios de Stripe para el plan: ${plan}`,
+      );
     }
 
     const org = await Organization.findById(organizationId);
     if (!org) {
       throw AppError.notFound("Organización no encontrada");
+    }
+
+    // Guard against double subscription
+    if (org.subscription?.stripeSubscriptionId) {
+      throw AppError.conflict(
+        "La organización ya tiene una suscripción activa. Use el portal de facturación para administrar su suscripción o el endpoint de cambio de plan.",
+      );
     }
 
     // Create or get Stripe customer
@@ -260,7 +284,9 @@ export const billingService = {
 
     const priceIds = await getOrCreateStripePriceIds(plan);
     if (!priceIds?.seat) {
-      throw AppError.internal("Precio por puesto no configurado para este plan");
+      throw AppError.internal(
+        "Precio por puesto no configurado para este plan",
+      );
     }
 
     // Get subscription and update seat quantity
@@ -274,7 +300,9 @@ export const billingService = {
     );
 
     if (!seatItem) {
-      throw AppError.internal("Elemento de suscripción de puestos no encontrado");
+      throw AppError.internal(
+        "Elemento de suscripción de puestos no encontrado",
+      );
     }
 
     await stripeClient.subscriptionItems.update(seatItem.id, {
@@ -310,6 +338,9 @@ export const billingService = {
       await stripeClient.subscriptions.cancel(
         org.subscription.stripeSubscriptionId,
       );
+
+      // Clear all subscription data and set status to cancelled
+      await organizationService.clearSubscriptionData(organizationId);
     } else {
       await stripeClient.subscriptions.update(
         org.subscription.stripeSubscriptionId,
@@ -317,14 +348,10 @@ export const billingService = {
           cancel_at_period_end: true,
         },
       );
-    }
 
-    await organizationService.updateSubscription(organizationId, {
-      cancelAtPeriodEnd: !cancelImmediately,
-    });
-
-    if (cancelImmediately) {
-      await organizationService.cancel(organizationId);
+      await organizationService.updateSubscription(organizationId, {
+        cancelAtPeriodEnd: true,
+      });
     }
 
     logger.info("Subscription cancellation requested", {
@@ -346,7 +373,9 @@ export const billingService = {
 
     const org = await Organization.findById(organizationId);
     if (!org?.subscription?.stripeCustomerId) {
-      throw AppError.badRequest("La organización no tiene un cliente de Stripe");
+      throw AppError.badRequest(
+        "La organización no tiene un cliente de Stripe",
+      );
     }
 
     const paymentIntent = await stripeClient.paymentIntents.create({
@@ -427,6 +456,13 @@ export const billingService = {
         case "invoice.payment_failed":
           await this.handleInvoicePaymentFailed(
             event.data.object as Stripe.Invoice,
+          );
+          break;
+
+        case "subscription_schedule.canceled":
+        case "subscription_schedule.released":
+          await this.handleSubscriptionScheduleCanceled(
+            event.data.object as Stripe.SubscriptionSchedule,
           );
           break;
 
@@ -511,7 +547,9 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      throw AppError.badRequest("Falta organizationId en los metadatos de la suscripción");
+      throw AppError.badRequest(
+        "Falta organizationId en los metadatos de la suscripción",
+      );
     }
 
     // Get billing cycle dates from the subscription items
@@ -528,6 +566,37 @@ export const billingService = {
       }),
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
     });
+
+    // Check if a pending plan change (downgrade) has taken effect
+    const org =
+      await Organization.findById(organizationId).select("subscription");
+    if (
+      org?.subscription?.pendingPlan &&
+      org.subscription.pendingPlanEffectiveDate &&
+      org.subscription.pendingPlanEffectiveDate <= new Date()
+    ) {
+      const newPlan = org.subscription.pendingPlan as SubscriptionPlan;
+      await organizationService.updateSubscription(organizationId, {
+        plan: newPlan,
+        pendingPlan: null,
+        pendingPlanEffectiveDate: null,
+        stripeScheduleId: null,
+      });
+
+      await BillingEvent.create({
+        organizationId,
+        eventType: "plan_downgraded",
+        stripeSubscriptionId: subscription.id,
+        previousPlan: org.subscription.plan,
+        newPlan,
+      });
+
+      logger.info("Pending plan downgrade applied", {
+        organizationId,
+        previousPlan: org.subscription.plan,
+        newPlan,
+      });
+    }
 
     // Reactivate if subscription becomes active again
     if (subscription.status === "active") {
@@ -549,13 +618,13 @@ export const billingService = {
   ): Promise<void> {
     const organizationId = subscription.metadata?.organizationId;
     if (!organizationId) {
-      throw AppError.badRequest("Falta organizationId en los metadatos de la suscripción");
+      throw AppError.badRequest(
+        "Falta organizationId en los metadatos de la suscripción",
+      );
     }
 
-    // Downgrade to free plan - only set defined values
-    await organizationService.updateSubscription(organizationId, {
-      plan: "free",
-    });
+    // Clear all Stripe subscription data and set org to cancelled/free
+    await organizationService.clearSubscriptionData(organizationId);
 
     await BillingEvent.create({
       organizationId,
@@ -577,7 +646,9 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      throw AppError.notFound("Organización no encontrada para el cliente de Stripe");
+      throw AppError.notFound(
+        "Organización no encontrada para el cliente de Stripe",
+      );
     }
 
     await BillingEvent.create({
@@ -609,7 +680,9 @@ export const billingService = {
       invoice.customer as string,
     );
     if (!org) {
-      throw AppError.notFound("Organización no encontrada para el cliente de Stripe");
+      throw AppError.notFound(
+        "Organización no encontrada para el cliente de Stripe",
+      );
     }
 
     await BillingEvent.create({
@@ -640,5 +713,350 @@ export const billingService = {
     return BillingEvent.find({ organizationId })
       .sort({ createdAt: -1 })
       .limit(limit);
+  },
+
+  /**
+   * Handles subscription_schedule.canceled / released events.
+   * Clears pending plan change data when a schedule is canceled or released externally.
+   */
+  async handleSubscriptionScheduleCanceled(
+    schedule: Stripe.SubscriptionSchedule,
+  ): Promise<void> {
+    const subscriptionId =
+      typeof schedule.subscription === "string"
+        ? schedule.subscription
+        : schedule.subscription?.id;
+
+    if (!subscriptionId) {
+      logger.warn("Schedule canceled/released without subscription reference", {
+        scheduleId: schedule.id,
+      });
+      return;
+    }
+
+    const org = await Organization.findOne({
+      "subscription.stripeScheduleId": schedule.id,
+    });
+    if (!org) {
+      logger.info("No org found for canceled/released schedule", {
+        scheduleId: schedule.id,
+      });
+      return;
+    }
+
+    await organizationService.updateSubscription(org._id, {
+      pendingPlan: null,
+      pendingPlanEffectiveDate: null,
+      stripeScheduleId: null,
+    });
+
+    logger.info("Pending plan change cleared (schedule canceled/released)", {
+      organizationId: org._id.toString(),
+      scheduleId: schedule.id,
+    });
+  },
+
+  /**
+   * Changes the subscription plan for an organization.
+   * Upgrades are applied immediately with Stripe proration.
+   * Downgrades are deferred to the end of the billing period via Subscription Schedules.
+   */
+  async changePlan(
+    organizationId: Types.ObjectId | string,
+    newPlan: SubscriptionPlan,
+    seatCount?: number,
+  ): Promise<{
+    type: "upgrade" | "downgrade";
+    effectiveDate: Date | "immediate";
+    previousPlan: string;
+    newPlan: string;
+    prorationAmount?: number;
+  }> {
+    const stripeClient = ensureStripe();
+
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      throw AppError.notFound("Organización no encontrada");
+    }
+
+    if (!org.subscription?.stripeSubscriptionId) {
+      throw AppError.badRequest(
+        "La organización no tiene una suscripción activa",
+      );
+    }
+
+    const currentPlan = (org.subscription.plan ?? "free") as SubscriptionPlan;
+
+    if (currentPlan === newPlan) {
+      // Same plan but potentially different seat count
+      if (seatCount && seatCount !== org.subscription.seatCount) {
+        await this.updateSeatQuantity(organizationId, seatCount);
+        return {
+          type: "upgrade",
+          effectiveDate: "immediate",
+          previousPlan: currentPlan,
+          newPlan,
+        };
+      }
+      throw AppError.badRequest("Ya estás en este plan");
+    }
+
+    // Validate new plan
+    const newPlanValid = await subscriptionTypeService.planExists(newPlan);
+    if (!newPlanValid) {
+      throw AppError.badRequest(
+        `El plan '${newPlan}' no existe o no está activo`,
+      );
+    }
+
+    const effectiveSeatCount = seatCount ?? org.subscription.seatCount ?? 1;
+    await subscriptionTypeService.validateSeatCount(
+      newPlan,
+      effectiveSeatCount,
+    );
+
+    // Calculate costs to determine direction
+    const currentCost = await subscriptionTypeService.calculateCost(
+      currentPlan,
+      org.subscription.seatCount ?? 1,
+    );
+    const newCost = await subscriptionTypeService.calculateCost(
+      newPlan,
+      effectiveSeatCount,
+    );
+
+    const isUpgrade = newCost.totalCost > currentCost.totalCost;
+
+    const newPriceIds = await getOrCreateStripePriceIds(newPlan);
+    if (!newPriceIds) {
+      throw AppError.internal(
+        `No se pudieron resolver los precios de Stripe para el plan: ${newPlan}`,
+      );
+    }
+
+    if (isUpgrade) {
+      // Immediate upgrade with Stripe proration
+      const subscription = await stripeClient.subscriptions.retrieve(
+        org.subscription.stripeSubscriptionId,
+      );
+
+      // Replace all items with new plan prices
+      const existingItems = subscription.items.data;
+      const items: Stripe.SubscriptionUpdateParams.Item[] = [
+        // Remove existing items
+        ...existingItems.map((item) => ({
+          id: item.id,
+          deleted: true as const,
+        })),
+        // Add new plan items
+        { price: newPriceIds.base, quantity: 1 },
+        { price: newPriceIds.seat, quantity: effectiveSeatCount },
+      ];
+
+      await stripeClient.subscriptions.update(
+        org.subscription.stripeSubscriptionId,
+        {
+          items,
+          proration_behavior: "always_invoice",
+          metadata: {
+            organizationId: organizationId.toString(),
+            plan: newPlan,
+          },
+        },
+      );
+
+      // Update org immediately
+      await organizationService.updateSubscription(organizationId, {
+        plan: newPlan,
+        pendingPlan: null,
+        pendingPlanEffectiveDate: null,
+        stripeScheduleId: null,
+      });
+      await organizationService.updateSeatCount(
+        organizationId,
+        effectiveSeatCount,
+      );
+
+      await BillingEvent.create({
+        organizationId,
+        eventType: "plan_upgraded",
+        stripeSubscriptionId: org.subscription.stripeSubscriptionId,
+        previousPlan: currentPlan,
+        newPlan,
+        seatChange: effectiveSeatCount,
+      });
+
+      logger.info("Plan upgraded", {
+        organizationId: organizationId.toString(),
+        previousPlan: currentPlan,
+        newPlan,
+      });
+
+      return {
+        type: "upgrade",
+        effectiveDate: "immediate",
+        previousPlan: currentPlan,
+        newPlan,
+      };
+    } else {
+      // Deferred downgrade via Subscription Schedule
+      if (org.subscription.stripeScheduleId) {
+        // Cancel existing schedule first
+        try {
+          await stripeClient.subscriptionSchedules.release(
+            org.subscription.stripeScheduleId,
+          );
+        } catch (err) {
+          logger.warn("Failed to release existing schedule", {
+            scheduleId: org.subscription.stripeScheduleId,
+            error: err,
+          });
+        }
+      }
+
+      // Create schedule from existing subscription
+      const schedule = await stripeClient.subscriptionSchedules.create({
+        from_subscription: org.subscription.stripeSubscriptionId,
+      });
+
+      // Get current subscription for phase details
+      const subscription = await stripeClient.subscriptions.retrieve(
+        org.subscription.stripeSubscriptionId,
+      );
+
+      const currentPhaseEnd = subscription.items.data[0]?.current_period_end;
+      const currentPhaseStart =
+        subscription.items.data[0]?.current_period_start;
+      if (!currentPhaseEnd || !currentPhaseStart) {
+        throw AppError.internal(
+          "No se pudo determinar el período actual de la suscripción",
+        );
+      }
+
+      // Update schedule with two phases: current (keep as-is) + new (downgraded plan)
+      await stripeClient.subscriptionSchedules.update(schedule.id, {
+        phases: [
+          {
+            items: subscription.items.data.map((item) => ({
+              price: item.price.id,
+              quantity: item.quantity ?? 1,
+            })),
+            start_date: currentPhaseStart,
+            end_date: currentPhaseEnd,
+          },
+          {
+            items: [
+              { price: newPriceIds.base, quantity: 1 },
+              { price: newPriceIds.seat, quantity: effectiveSeatCount },
+            ],
+            metadata: {
+              organizationId: organizationId.toString(),
+              plan: newPlan,
+            },
+          },
+        ],
+      });
+
+      const effectiveDate = new Date(currentPhaseEnd * 1000);
+
+      // Store pending change in org
+      await organizationService.updateSubscription(organizationId, {
+        pendingPlan: newPlan,
+        pendingPlanEffectiveDate: effectiveDate,
+        stripeScheduleId: schedule.id,
+      });
+
+      await BillingEvent.create({
+        organizationId,
+        eventType: "plan_downgraded",
+        stripeSubscriptionId: org.subscription.stripeSubscriptionId,
+        previousPlan: currentPlan,
+        newPlan,
+        metadata: {
+          effectiveDate: effectiveDate.toISOString(),
+          scheduleId: schedule.id,
+          deferred: true,
+        },
+      });
+
+      logger.info("Plan downgrade scheduled", {
+        organizationId: organizationId.toString(),
+        previousPlan: currentPlan,
+        newPlan,
+        effectiveDate,
+        scheduleId: schedule.id,
+      });
+
+      return {
+        type: "downgrade",
+        effectiveDate,
+        previousPlan: currentPlan,
+        newPlan,
+      };
+    }
+  },
+
+  /**
+   * Cancels a pending plan change (deferred downgrade).
+   * Releases the Stripe Subscription Schedule, keeping the current subscription as-is.
+   */
+  async cancelPendingPlanChange(
+    organizationId: Types.ObjectId | string,
+  ): Promise<void> {
+    const stripeClient = ensureStripe();
+
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      throw AppError.notFound("Organización no encontrada");
+    }
+
+    if (!org.subscription?.stripeScheduleId) {
+      throw AppError.badRequest(
+        "No hay un cambio de plan pendiente para cancelar",
+      );
+    }
+
+    // Release the schedule — keeps current subscription as-is
+    await stripeClient.subscriptionSchedules.release(
+      org.subscription.stripeScheduleId,
+    );
+
+    // Clear pending fields
+    await organizationService.updateSubscription(organizationId, {
+      pendingPlan: null,
+      pendingPlanEffectiveDate: null,
+      stripeScheduleId: null,
+    });
+
+    logger.info("Pending plan change canceled", {
+      organizationId: organizationId.toString(),
+      previousPendingPlan: org.subscription.pendingPlan,
+    });
+  },
+
+  /**
+   * Gets pending plan change information for an organization.
+   */
+  async getPendingPlanChange(organizationId: Types.ObjectId | string): Promise<{
+    pendingPlan: string;
+    effectiveDate: Date;
+  } | null> {
+    const org =
+      await Organization.findById(organizationId).select("subscription");
+    if (!org) {
+      throw AppError.notFound("Organización no encontrada");
+    }
+
+    if (
+      !org.subscription?.pendingPlan ||
+      !org.subscription?.pendingPlanEffectiveDate
+    ) {
+      return null;
+    }
+
+    return {
+      pendingPlan: org.subscription.pendingPlan,
+      effectiveDate: org.subscription.pendingPlanEffectiveDate,
+    };
   },
 };

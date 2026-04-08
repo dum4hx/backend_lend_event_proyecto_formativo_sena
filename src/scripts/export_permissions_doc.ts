@@ -23,6 +23,8 @@ const ACTION_EXPLANATIONS: Record<string, string> = {
   return: "Process returns and close checkouts for this resource.",
   manage: "Perform administrative/management operations for this resource.",
   state_update: "Change lifecycle/status state for this resource.",
+  send: "Initiate physical transfer shipments.",
+  receive: "Mark transfer shipments as received.",
 };
 
 function titleize(value: string): string {

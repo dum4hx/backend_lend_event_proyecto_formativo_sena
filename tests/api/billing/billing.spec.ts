@@ -37,6 +37,67 @@ test.describe("Billing Module", () => {
     expect(res.status()).toBe(400);
   });
 
+  test("POST /billing/checkout - should reject empty plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/checkout", {
+      data: {
+        plan: "",
+        seatCount: 1,
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  test("POST /billing/checkout - should reject non-existent plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/checkout", {
+      data: {
+        plan: "nonexistent_plan_xyz",
+        seatCount: 1,
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      },
+    });
+    // Should be 400 (plan not found) or 500 (Stripe not configured)
+    expect([400, 500]).toContain(res.status());
+    if (res.status() === 400) {
+      const body = await res.json();
+      expect(body.message).toContain("no existe");
+    }
+  });
+
+  test("POST /billing/checkout - should reject free plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/checkout", {
+      data: {
+        plan: "free",
+        seatCount: 1,
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  test("POST /billing/checkout - should reject invalid seat count", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/checkout", {
+      data: {
+        plan: "starter",
+        seatCount: 0,
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      },
+    });
+    expect(res.status()).toBe(400);
+  });
+
   /* ===================== PORTAL ===================== */
 
   test("POST /billing/portal - should reject missing returnUrl", async ({
@@ -133,6 +194,90 @@ test.describe("Billing Module", () => {
 
     const res = await ctx.get("billing/history");
     expect(res.status()).toBe(401);
+    await ctx.dispose();
+  });
+
+  /* ===================== CHANGE PLAN ===================== */
+
+  test("POST /billing/change-plan - should reject missing plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/change-plan", {
+      data: {},
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  test("POST /billing/change-plan - should reject empty plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/change-plan", {
+      data: { plan: "" },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  test("POST /billing/change-plan - should reject non-existent plan", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/change-plan", {
+      data: { plan: "nonexistent_plan_xyz" },
+    });
+    // 400 (no active subscription or plan not found) or 500 (Stripe not configured)
+    expect([400, 500]).toContain(res.status());
+  });
+
+  test("POST /billing/change-plan - should reject invalid seat count", async ({
+    request,
+  }) => {
+    const res = await request.post("billing/change-plan", {
+      data: { plan: "starter", seatCount: 0 },
+    });
+    expect(res.status()).toBe(400);
+  });
+
+  /* ===================== PENDING CHANGES ===================== */
+
+  test("GET /billing/pending-changes - should return pending changes", async ({
+    request,
+  }) => {
+    const res = await request.get("billing/pending-changes");
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("success");
+    expect(body.data).toHaveProperty("pendingChange");
+  });
+
+  test("DELETE /billing/pending-changes - should handle no pending change", async ({
+    request,
+  }) => {
+    const res = await request.delete("billing/pending-changes");
+    // 400 (no pending change) or 500 (Stripe not configured)
+    expect([400, 500]).toContain(res.status());
+  });
+
+  /* ===================== NEW ENDPOINTS AUTH ===================== */
+
+  test("New billing endpoints should require authentication", async ({
+    baseURL,
+  }) => {
+    const { request: anonRequest } = await import("@playwright/test");
+    const ctx = await anonRequest.newContext({
+      baseURL,
+      ignoreHTTPSErrors: true,
+    });
+
+    const changePlanRes = await ctx.post("billing/change-plan", {
+      data: { plan: "starter" },
+    });
+    expect(changePlanRes.status()).toBe(401);
+
+    const pendingRes = await ctx.get("billing/pending-changes");
+    expect(pendingRes.status()).toBe(401);
+
+    const deleteRes = await ctx.delete("billing/pending-changes");
+    expect(deleteRes.status()).toBe(401);
+
     await ctx.dispose();
   });
 });

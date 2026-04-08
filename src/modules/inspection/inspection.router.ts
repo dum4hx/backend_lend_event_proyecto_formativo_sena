@@ -111,7 +111,7 @@ inspectionRouter.get(
  */
 inspectionRouter.get(
   "/pending-loans",
-  requirePermission("inspections:create"),
+  requirePermission("inspections:read"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);

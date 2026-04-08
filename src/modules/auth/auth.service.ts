@@ -135,9 +135,12 @@ export const authService = {
             { code: "PENDING_EMAIL_VERIFICATION" },
           );
         }
-        throw AppError.conflict("Ya existe un usuario con este correo electrónico", {
-          code: "USER_EMAIL_ALREADY_EXISTS",
-        });
+        throw AppError.conflict(
+          "Ya existe un usuario con este correo electrónico",
+          {
+            code: "USER_EMAIL_ALREADY_EXISTS",
+          },
+        );
       }
 
       // Check if taxId is provided and already exists for another organization
@@ -904,16 +907,15 @@ export const authService = {
       !organization.subscription?.currentPeriodEnd ||
       organization.subscription.currentPeriodEnd < new Date()
     ) {
-      // If billing cycle hasn't been synced yet, avoid mutating org status.
+      // If billing cycle hasn't been synced yet, avoid blocking access.
       if (!organization.subscription?.currentPeriodEnd) {
         return response;
       }
 
-      await Organization.updateOne(
-        { _id: profile.user.organizationId },
-        { status: "suspended" },
-      );
-      response.status = "suspended";
+      // Read-only: do NOT mutate org status here.
+      // The detectExpiredSubscriptions scheduled job handles suspension
+      // with a grace period for Stripe webhook delivery.
+      response.status = "expired";
       return response;
     }
 

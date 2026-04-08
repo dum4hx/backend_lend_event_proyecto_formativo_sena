@@ -562,10 +562,10 @@
   {
     "_id": "transfers:create",
     "displayName": "Crear Transferencias",
-    "description": "Permite crear solicitudes de transferencia e iniciar transferencias físicas entre ubicaciones.",
+    "description": "Permite crear solicitudes de transferencia entre ubicaciones.",
     "category": "Transfers",
     "isPlatformPermission": false,
-    "requires": ["transfers:read", "materials:read"]
+    "requires": ["transfers:read"]
   },
   {
     "_id": "transfers:read",
@@ -578,7 +578,7 @@
   {
     "_id": "transfers:update",
     "displayName": "Actualizar Transferencias",
-    "description": "Permite editar, cancelar solicitudes de transferencia y marcar transferencias como recibidas.",
+    "description": "Permite editar y cancelar solicitudes de transferencia.",
     "category": "Transfers",
     "isPlatformPermission": false,
     "requires": ["transfers:read"]
@@ -587,6 +587,22 @@
     "_id": "transfers:accept",
     "displayName": "Aceptar o Rechazar Transferencias",
     "description": "Permite aprobar o rechazar solicitudes de transferencia. El usuario debe estar asignado a la ubicación de origen.",
+    "category": "Transfers",
+    "isPlatformPermission": false,
+    "requires": ["transfers:read"]
+  },
+  {
+    "_id": "transfers:send",
+    "displayName": "Enviar Transferencias",
+    "description": "Permite iniciar el envío físico de materiales entre ubicaciones.",
+    "category": "Transfers",
+    "isPlatformPermission": false,
+    "requires": ["transfers:read", "materials:read"]
+  },
+  {
+    "_id": "transfers:receive",
+    "displayName": "Recibir Transferencias",
+    "description": "Permite marcar una transferencia como recibida en la ubicación destino.",
     "category": "Transfers",
     "isPlatformPermission": false,
     "requires": ["transfers:read"]
@@ -611,7 +627,7 @@
     "_id": "payment_methods:read",
     "displayName": "Ver Métodos de Pago",
     "description": "Permite ver los métodos de pago disponibles de la organización.",
-    "category": "Payment Methods",
+    "category": "Payment_methods",
     "isPlatformPermission": false,
     "requires": []
   },
@@ -619,7 +635,7 @@
     "_id": "payment_methods:create",
     "displayName": "Crear Métodos de Pago",
     "description": "Permite agregar nuevos métodos de pago a la organización.",
-    "category": "Payment Methods",
+    "category": "Payment_methods",
     "isPlatformPermission": false,
     "requires": ["payment_methods:read"]
   },
@@ -627,7 +643,7 @@
     "_id": "payment_methods:update",
     "displayName": "Actualizar Métodos de Pago",
     "description": "Permite editar los métodos de pago existentes en la organización.",
-    "category": "Payment Methods",
+    "category": "Payment_methods",
     "isPlatformPermission": false,
     "requires": ["payment_methods:read"]
   },
@@ -635,7 +651,7 @@
     "_id": "payment_methods:delete",
     "displayName": "Desactivar Métodos de Pago",
     "description": "Permite desactivar métodos de pago en la organización.",
-    "category": "Payment Methods",
+    "category": "Payment_methods",
     "isPlatformPermission": false,
     "requires": ["payment_methods:read"]
   },

@@ -296,6 +296,9 @@ export const organizationService = {
       currentPeriodStart?: Date;
       currentPeriodEnd?: Date;
       cancelAtPeriodEnd?: boolean;
+      pendingPlan?: string | null;
+      pendingPlanEffectiveDate?: Date | null;
+      stripeScheduleId?: string | null;
     },
     session?: ClientSession,
   ): Promise<void> {
@@ -326,6 +329,34 @@ export const organizationService = {
     await Organization.updateOne(
       { _id: organizationId },
       { $set: updateFields },
+      updateOptions,
+    );
+  },
+
+  /**
+   * Clears all Stripe-specific subscription data and sets the organization to cancelled/free.
+   * Used when a subscription is fully deleted or immediately cancelled.
+   */
+  async clearSubscriptionData(
+    organizationId: Types.ObjectId | string,
+    session?: ClientSession,
+  ): Promise<void> {
+    const updateOptions = session ? { session } : undefined;
+    await Organization.updateOne(
+      { _id: organizationId },
+      {
+        $set: {
+          status: "cancelled",
+          "subscription.plan": "free",
+          "subscription.stripeSubscriptionId": null,
+          "subscription.currentPeriodStart": null,
+          "subscription.currentPeriodEnd": null,
+          "subscription.cancelAtPeriodEnd": false,
+          "subscription.pendingPlan": null,
+          "subscription.pendingPlanEffectiveDate": null,
+          "subscription.stripeScheduleId": null,
+        },
+      },
       updateOptions,
     );
   },

@@ -9,6 +9,10 @@ import { Transfer } from "../transfer/models/transfer.model.ts";
 import { MaintenanceBatch } from "../maintenance/models/maintenance_batch.model.ts";
 import { Category } from "../material/models/category.model.ts";
 import { materialService } from "../material/material.service.ts";
+import { BillingEvent } from "../billing/models/billing_event.model.ts";
+import { Organization } from "../organization/models/organization.model.ts";
+import { Location } from "../location/models/location.model.ts";
+import { LoanRequest } from "../request/models/request.model.ts";
 
 interface ReportFilters {
   startDate?: Date | undefined;
@@ -60,6 +64,65 @@ interface DamageExportFilters {
   locationId?: string;
   entryReason?: string;
   batchStatus?: string;
+  page?: number;
+  limit?: number;
+  includeIds?: boolean;
+}
+
+interface InventoryExportFilters {
+  locationId?: string;
+  categoryId?: string;
+  status?: string;
+  search?: string;
+  includeIds?: boolean;
+}
+
+interface TransferExportFilters {
+  startDate?: Date;
+  endDate?: Date;
+  status?: string;
+  fromLocationId?: string;
+  toLocationId?: string;
+  page?: number;
+  limit?: number;
+  includeIds?: boolean;
+}
+
+interface BillingHistoryExportFilters {
+  startDate?: Date;
+  endDate?: Date;
+  eventType?: string;
+  page?: number;
+  limit?: number;
+  includeIds?: boolean;
+}
+
+interface LocationExportFilters {
+  locationId?: string;
+  status?: string;
+  isActive?: boolean;
+  search?: string;
+  includeIds?: boolean;
+}
+
+interface CustomerExportFilters {
+  status?: string;
+  search?: string;
+  documentType?: string;
+  startDate?: Date;
+  endDate?: Date;
+  page?: number;
+  limit?: number;
+  includeIds?: boolean;
+}
+
+interface RequestExportFilters {
+  createdAtStart?: Date;
+  createdAtEnd?: Date;
+  loanStartFrom?: Date;
+  loanStartTo?: Date;
+  status?: string;
+  customerId?: string;
   page?: number;
   limit?: number;
   includeIds?: boolean;
@@ -568,8 +631,7 @@ export const reportsService = {
       if (filters.endDate) df.$lte = filters.endDate;
       invoiceQuery.createdAt = df;
     }
-    if (customerId)
-      invoiceQuery.customerId = new Types.ObjectId(customerId);
+    if (customerId) invoiceQuery.customerId = new Types.ObjectId(customerId);
     if (invoiceType) invoiceQuery.type = invoiceType;
     if (invoiceStatus) invoiceQuery.status = invoiceStatus;
 
@@ -820,7 +882,8 @@ export const reportsService = {
         totalLoanRevenue,
         totalInvoiceRevenue,
         combinedRevenue: totalLoanRevenue + totalInvoiceRevenue,
-        averageLoanValue: loanCount > 0 ? Math.round(totalLoanRevenue / loanCount) : 0,
+        averageLoanValue:
+          loanCount > 0 ? Math.round(totalLoanRevenue / loanCount) : 0,
         revenueByMonth,
         revenueByInvoiceType: revenueByInvoiceType.map((r: any) => ({
           type: r._id,
@@ -843,8 +906,13 @@ export const reportsService = {
     organizationId: Types.ObjectId | string,
     filters: CatalogDetailedExportFilters,
   ) {
-    const { includeIds = true, categoryId, locationId, search, status } =
-      filters;
+    const {
+      includeIds = true,
+      categoryId,
+      locationId,
+      search,
+      status,
+    } = filters;
 
     /* --- Material type query --- */
     const mtQuery: Record<string, any> = { organizationId };
@@ -857,8 +925,7 @@ export const reportsService = {
 
     /* --- Instance aggregation per material type --- */
     const instanceMatch: Record<string, any> = { organizationId };
-    if (locationId)
-      instanceMatch.locationId = new Types.ObjectId(locationId);
+    if (locationId) instanceMatch.locationId = new Types.ObjectId(locationId);
     if (status) instanceMatch.status = status;
 
     const instanceAgg = await MaterialInstance.aggregate([
@@ -930,15 +997,16 @@ export const reportsService = {
       locationMap.set(
         entry._id.toString(),
         entry.locations.map((l: any) =>
-          includeIds
-            ? l
-            : { locationName: l.locationName, count: l.count },
+          includeIds ? l : { locationName: l.locationName, count: l.count },
         ),
       );
     }
 
     // Fetch enriched metrics only when includeIds=false
-    let revenueMap = new Map<string, { totalRevenue: number; totalLoans: number; avgDurationDays: number }>();
+    let revenueMap = new Map<
+      string,
+      { totalRevenue: number; totalLoans: number; avgDurationDays: number }
+    >();
     let maintenanceCostMap = new Map<string, number>();
 
     if (!includeIds) {
@@ -993,7 +1061,9 @@ export const reportsService = {
         {
           $group: {
             _id: "$inst.modelId",
-            totalCost: { $sum: { $ifNull: ["$items.actualCost", "$items.estimatedCost"] } },
+            totalCost: {
+              $sum: { $ifNull: ["$items.actualCost", "$items.estimatedCost"] },
+            },
           },
         },
       ]);
@@ -1016,7 +1086,10 @@ export const reportsService = {
 
       const base: Record<string, any> = {
         ...(includeIds
-          ? { materialTypeId: mt._id, categoryIds: mt.categoryId?.map?.((c: any) => c._id) ?? [] }
+          ? {
+              materialTypeId: mt._id,
+              categoryIds: mt.categoryId?.map?.((c: any) => c._id) ?? [],
+            }
           : {}),
         code: mt.code,
         name: mt.name,
@@ -1030,9 +1103,12 @@ export const reportsService = {
 
       if (!includeIds) {
         const revData = revenueMap.get(mtId);
-        base.utilizationRate = total > 0 ? Math.round((loaned / total) * 10000) / 100 : 0;
-        base.availabilityRate = total > 0 ? Math.round((available / total) * 10000) / 100 : 0;
-        base.damageRate = total > 0 ? Math.round((damaged / total) * 10000) / 100 : 0;
+        base.utilizationRate =
+          total > 0 ? Math.round((loaned / total) * 10000) / 100 : 0;
+        base.availabilityRate =
+          total > 0 ? Math.round((available / total) * 10000) / 100 : 0;
+        base.damageRate =
+          total > 0 ? Math.round((damaged / total) * 10000) / 100 : 0;
         base.totalRevenue = revData?.totalRevenue ?? 0;
         base.totalLoans = revData?.totalLoans ?? 0;
         base.averageLoanDurationDays = revData?.avgDurationDays ?? 0;
@@ -1066,7 +1142,8 @@ export const reportsService = {
       const globalStatusMap: Record<string, number> = {};
       for (const e of instanceAgg) {
         for (const s of e.statuses) {
-          globalStatusMap[s.status] = (globalStatusMap[s.status] ?? 0) + s.count;
+          globalStatusMap[s.status] =
+            (globalStatusMap[s.status] ?? 0) + s.count;
         }
       }
 
@@ -1179,123 +1256,118 @@ export const reportsService = {
     };
 
     if (!includeIds) {
-      const [
-        summaryAgg,
-        byMonth,
-        byStatus,
-        topMaterials,
-        topCustomers,
-      ] = await Promise.all([
-        Loan.aggregate([
-          { $match: query },
-          {
-            $group: {
-              _id: null,
-              totalLoans: { $sum: 1 },
-              totalRevenue: { $sum: "$totalAmount" },
-              avgDuration: {
-                $avg: {
-                  $divide: [
-                    { $subtract: ["$endDate", "$startDate"] },
-                    86_400_000,
-                  ],
+      const [summaryAgg, byMonth, byStatus, topMaterials, topCustomers] =
+        await Promise.all([
+          Loan.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: null,
+                totalLoans: { $sum: 1 },
+                totalRevenue: { $sum: "$totalAmount" },
+                avgDuration: {
+                  $avg: {
+                    $divide: [
+                      { $subtract: ["$endDate", "$startDate"] },
+                      86_400_000,
+                    ],
+                  },
+                },
+                overdueCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "overdue"] }, 1, 0] },
+                },
+                returnedCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "returned"] }, 1, 0] },
+                },
+                closedCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "closed"] }, 1, 0] },
                 },
               },
-              overdueCount: {
-                $sum: { $cond: [{ $eq: ["$status", "overdue"] }, 1, 0] },
+            },
+          ]),
+          Loan.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$createdAt" },
+                  month: { $month: "$createdAt" },
+                },
+                count: { $sum: 1 },
+                totalAmount: { $sum: "$totalAmount" },
               },
-              returnedCount: {
-                $sum: { $cond: [{ $eq: ["$status", "returned"] }, 1, 0] },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+          ]),
+          Loan.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: "$status",
+                count: { $sum: 1 },
+                totalAmount: { $sum: "$totalAmount" },
               },
-              closedCount: {
-                $sum: { $cond: [{ $eq: ["$status", "closed"] }, 1, 0] },
+            },
+            { $sort: { count: -1 } },
+          ]),
+          Loan.aggregate([
+            { $match: query },
+            { $unwind: "$materialInstances" },
+            {
+              $group: {
+                _id: "$materialInstances.materialTypeId",
+                loanCount: { $sum: 1 },
               },
             },
-          },
-        ]),
-        Loan.aggregate([
-          { $match: query },
-          {
-            $group: {
-              _id: {
-                year: { $year: "$createdAt" },
-                month: { $month: "$createdAt" },
+            { $sort: { loanCount: -1 } },
+            { $limit: 10 },
+            {
+              $lookup: {
+                from: "materialtypes",
+                localField: "_id",
+                foreignField: "_id",
+                as: "mt",
               },
-              count: { $sum: 1 },
-              totalAmount: { $sum: "$totalAmount" },
             },
-          },
-          { $sort: { "_id.year": 1, "_id.month": 1 } },
-        ]),
-        Loan.aggregate([
-          { $match: query },
-          {
-            $group: {
-              _id: "$status",
-              count: { $sum: 1 },
-              totalAmount: { $sum: "$totalAmount" },
-            },
-          },
-          { $sort: { count: -1 } },
-        ]),
-        Loan.aggregate([
-          { $match: query },
-          { $unwind: "$materialInstances" },
-          {
-            $group: {
-              _id: "$materialInstances.materialTypeId",
-              loanCount: { $sum: 1 },
-            },
-          },
-          { $sort: { loanCount: -1 } },
-          { $limit: 10 },
-          {
-            $lookup: {
-              from: "materialtypes",
-              localField: "_id",
-              foreignField: "_id",
-              as: "mt",
-            },
-          },
-          { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
-          { $project: { _id: 0, materialName: "$mt.name", loanCount: 1 } },
-        ]),
-        Loan.aggregate([
-          { $match: query },
-          {
-            $group: {
-              _id: "$customerId",
-              loanCount: { $sum: 1 },
-              totalAmount: { $sum: "$totalAmount" },
-            },
-          },
-          { $sort: { loanCount: -1 } },
-          { $limit: 10 },
-          {
-            $lookup: {
-              from: "customers",
-              localField: "_id",
-              foreignField: "_id",
-              as: "cust",
-            },
-          },
-          { $unwind: { path: "$cust", preserveNullAndEmptyArrays: true } },
-          {
-            $project: {
-              _id: 0,
-              customerName: {
-                $concat: [
-                  { $ifNull: ["$cust.name.firstName", ""] },
-                  " ",
-                  { $ifNull: ["$cust.name.firstSurname", ""] },
-                ],
+            { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
+            { $project: { _id: 0, materialName: "$mt.name", loanCount: 1 } },
+          ]),
+          Loan.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: "$customerId",
+                loanCount: { $sum: 1 },
+                totalAmount: { $sum: "$totalAmount" },
               },
-              loanCount: 1,
-              totalAmount: 1,
             },
-          },
-        ]),
-      ]);
+            { $sort: { loanCount: -1 } },
+            { $limit: 10 },
+            {
+              $lookup: {
+                from: "customers",
+                localField: "_id",
+                foreignField: "_id",
+                as: "cust",
+              },
+            },
+            { $unwind: { path: "$cust", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                _id: 0,
+                customerName: {
+                  $concat: [
+                    { $ifNull: ["$cust.name.firstName", ""] },
+                    " ",
+                    { $ifNull: ["$cust.name.firstSurname", ""] },
+                  ],
+                },
+                loanCount: 1,
+                totalAmount: 1,
+              },
+            },
+          ]),
+        ]);
 
       const s = summaryAgg[0] ?? {
         totalLoans: 0,
@@ -1427,9 +1499,7 @@ export const reportsService = {
     }
 
     const batchRows = batches.map((b: any) => ({
-      ...(includeIds
-        ? { batchId: b._id, locationId: b.locationId?._id }
-        : {}),
+      ...(includeIds ? { batchId: b._id, locationId: b.locationId?._id } : {}),
       batchNumber: b.batchNumber,
       name: b.name,
       status: b.status,
@@ -1457,7 +1527,7 @@ export const reportsService = {
           batchNumber: (b as any).batchNumber,
           serialNumber: inst?.serialNumber ?? null,
           materialTypeName: inst?.modelId
-            ? typeNames.get(inst.modelId.toString()) ?? null
+            ? (typeNames.get(inst.modelId.toString()) ?? null)
             : null,
           entryReason: item.entryReason,
           itemStatus: item.itemStatus,
@@ -1482,117 +1552,125 @@ export const reportsService = {
 
     if (!includeIds) {
       // Full aggregation over ALL matching batches (not just current page)
-      const [costAgg, costByReason, costByMonth, mostDamaged, repairTime, resolutionAgg] =
-        await Promise.all([
-          MaintenanceBatch.aggregate([
-            { $match: query },
-            {
-              $group: {
-                _id: null,
-                totalBatches: { $sum: 1 },
-                totalItems: { $sum: { $size: "$items" } },
-                totalEstimatedCost: { $sum: "$totalEstimatedCost" },
-                totalActualCost: { $sum: "$totalActualCost" },
-              },
+      const [
+        costAgg,
+        costByReason,
+        costByMonth,
+        mostDamaged,
+        repairTime,
+        resolutionAgg,
+      ] = await Promise.all([
+        MaintenanceBatch.aggregate([
+          { $match: query },
+          {
+            $group: {
+              _id: null,
+              totalBatches: { $sum: 1 },
+              totalItems: { $sum: { $size: "$items" } },
+              totalEstimatedCost: { $sum: "$totalEstimatedCost" },
+              totalActualCost: { $sum: "$totalActualCost" },
             },
-          ]),
-          MaintenanceBatch.aggregate([
-            { $match: query },
-            { $unwind: "$items" },
-            {
-              $group: {
-                _id: "$items.entryReason",
-                estimatedCost: { $sum: { $ifNull: ["$items.estimatedCost", 0] } },
-                actualCost: { $sum: { $ifNull: ["$items.actualCost", 0] } },
-                itemCount: { $sum: 1 },
-              },
+          },
+        ]),
+        MaintenanceBatch.aggregate([
+          { $match: query },
+          { $unwind: "$items" },
+          {
+            $group: {
+              _id: "$items.entryReason",
+              estimatedCost: { $sum: { $ifNull: ["$items.estimatedCost", 0] } },
+              actualCost: { $sum: { $ifNull: ["$items.actualCost", 0] } },
+              itemCount: { $sum: 1 },
             },
-            { $sort: { actualCost: -1 } },
-          ]),
-          MaintenanceBatch.aggregate([
-            { $match: query },
-            {
-              $group: {
-                _id: {
-                  year: { $year: "$createdAt" },
-                  month: { $month: "$createdAt" },
-                },
-                estimatedCost: { $sum: "$totalEstimatedCost" },
-                actualCost: { $sum: "$totalActualCost" },
-                batchCount: { $sum: 1 },
+          },
+          { $sort: { actualCost: -1 } },
+        ]),
+        MaintenanceBatch.aggregate([
+          { $match: query },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
               },
+              estimatedCost: { $sum: "$totalEstimatedCost" },
+              actualCost: { $sum: "$totalActualCost" },
+              batchCount: { $sum: 1 },
             },
-            { $sort: { "_id.year": 1, "_id.month": 1 } },
-          ]),
-          MaintenanceBatch.aggregate([
-            { $match: query },
-            { $unwind: "$items" },
-            {
-              $lookup: {
-                from: "materialinstances",
-                localField: "items.materialInstanceId",
-                foreignField: "_id",
-                as: "inst",
-              },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1 } },
+        ]),
+        MaintenanceBatch.aggregate([
+          { $match: query },
+          { $unwind: "$items" },
+          {
+            $lookup: {
+              from: "materialinstances",
+              localField: "items.materialInstanceId",
+              foreignField: "_id",
+              as: "inst",
             },
-            { $unwind: { path: "$inst", preserveNullAndEmptyArrays: true } },
-            {
-              $group: {
-                _id: "$inst.modelId",
-                incidentCount: { $sum: 1 },
-                totalCost: {
-                  $sum: { $ifNull: ["$items.actualCost", "$items.estimatedCost"] },
-                },
-              },
-            },
-            { $sort: { incidentCount: -1 } },
-            { $limit: 10 },
-            {
-              $lookup: {
-                from: "materialtypes",
-                localField: "_id",
-                foreignField: "_id",
-                as: "mt",
-              },
-            },
-            { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
-            {
-              $project: {
-                _id: 0,
-                materialTypeName: "$mt.name",
-                incidentCount: 1,
-                totalCost: 1,
-              },
-            },
-          ]),
-          MaintenanceBatch.aggregate([
-            {
-              $match: {
-                ...query,
-                status: "completed",
-                startedAt: { $exists: true },
-                completedAt: { $exists: true },
-              },
-            },
-            {
-              $project: {
-                repairDays: {
-                  $divide: [
-                    { $subtract: ["$completedAt", "$startedAt"] },
-                    86_400_000,
-                  ],
+          },
+          { $unwind: { path: "$inst", preserveNullAndEmptyArrays: true } },
+          {
+            $group: {
+              _id: "$inst.modelId",
+              incidentCount: { $sum: 1 },
+              totalCost: {
+                $sum: {
+                  $ifNull: ["$items.actualCost", "$items.estimatedCost"],
                 },
               },
             },
-            { $group: { _id: null, avg: { $avg: "$repairDays" } } },
-          ]),
-          MaintenanceBatch.aggregate([
-            { $match: query },
-            { $unwind: "$items" },
-            { $group: { _id: "$items.itemStatus", count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-          ]),
-        ]);
+          },
+          { $sort: { incidentCount: -1 } },
+          { $limit: 10 },
+          {
+            $lookup: {
+              from: "materialtypes",
+              localField: "_id",
+              foreignField: "_id",
+              as: "mt",
+            },
+          },
+          { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              _id: 0,
+              materialTypeName: "$mt.name",
+              incidentCount: 1,
+              totalCost: 1,
+            },
+          },
+        ]),
+        MaintenanceBatch.aggregate([
+          {
+            $match: {
+              ...query,
+              status: "completed",
+              startedAt: { $exists: true },
+              completedAt: { $exists: true },
+            },
+          },
+          {
+            $project: {
+              repairDays: {
+                $divide: [
+                  { $subtract: ["$completedAt", "$startedAt"] },
+                  86_400_000,
+                ],
+              },
+            },
+          },
+          { $group: { _id: null, avg: { $avg: "$repairDays" } } },
+        ]),
+        MaintenanceBatch.aggregate([
+          { $match: query },
+          { $unwind: "$items" },
+          { $group: { _id: "$items.itemStatus", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]),
+      ]);
 
       const c = costAgg[0] ?? {
         totalBatches: 0,
@@ -1657,6 +1735,1300 @@ export const reportsService = {
           currentItemCount: c.totalItems,
           previousItemCount: p.totalItems,
           itemCountPercentChange: pctChange(c.totalItems, p.totalItems),
+        };
+      }
+
+      result.summary = summary;
+    }
+
+    return result;
+  },
+
+  /**
+   * Inventory export: material instances grouped by type and location with
+   * enriched metrics (utilization, damage rates, valuation) when includeIds=false.
+   */
+  async getInventoryExport(
+    organizationId: Types.ObjectId | string,
+    filters: InventoryExportFilters,
+  ) {
+    const {
+      includeIds = true,
+      locationId,
+      categoryId,
+      status,
+      search,
+    } = filters;
+
+    const instanceMatch: Record<string, any> = { organizationId };
+    if (locationId) instanceMatch.locationId = new Types.ObjectId(locationId);
+    if (status) instanceMatch.status = status;
+
+    // Narrow by category → get materialType IDs first
+    let materialTypeFilter: Types.ObjectId[] | undefined;
+    if (categoryId || search) {
+      const mtQuery: Record<string, any> = { organizationId };
+      if (categoryId) mtQuery.categoryId = new Types.ObjectId(categoryId);
+      if (search) mtQuery.name = { $regex: search, $options: "i" };
+      materialTypeFilter = await MaterialModel.find(mtQuery)
+        .distinct("_id")
+        .lean();
+      instanceMatch.modelId = { $in: materialTypeFilter };
+    }
+
+    /* --- By material type --- */
+    const byType = await MaterialInstance.aggregate([
+      { $match: instanceMatch },
+      {
+        $group: {
+          _id: { modelId: "$modelId", status: "$status" },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.modelId",
+          total: { $sum: "$count" },
+          statuses: { $push: { status: "$_id.status", count: "$count" } },
+        },
+      },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "_id",
+          foreignField: "_id",
+          as: "mt",
+        },
+      },
+      { $unwind: { path: "$mt", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "mt.categoryId",
+          foreignField: "_id",
+          as: "categories",
+        },
+      },
+      { $sort: { "mt.name": 1 } },
+    ]);
+
+    /* --- By location --- */
+    const byLocation = await MaterialInstance.aggregate([
+      { $match: instanceMatch },
+      {
+        $group: {
+          _id: { locationId: "$locationId", status: "$status" },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.locationId",
+          total: { $sum: "$count" },
+          statuses: { $push: { status: "$_id.status", count: "$count" } },
+        },
+      },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "_id",
+          foreignField: "_id",
+          as: "location",
+        },
+      },
+      { $unwind: { path: "$location", preserveNullAndEmptyArrays: true } },
+      { $sort: { "location.name": 1 } },
+    ]);
+
+    const totalInstances = await MaterialInstance.countDocuments(instanceMatch);
+
+    const typeRows = byType.map((t: any) => {
+      const statusObj: Record<string, number> = {};
+      for (const s of t.statuses) statusObj[s.status] = s.count;
+
+      return {
+        ...(includeIds ? { materialTypeId: t._id } : {}),
+        materialTypeName: t.mt?.name ?? null,
+        code: t.mt?.code ?? null,
+        pricePerDay: t.mt?.pricePerDay ?? 0,
+        categoryNames: (t.categories ?? []).map((c: any) => c.name),
+        totalInstances: t.total,
+        instancesByStatus: statusObj,
+      };
+    });
+
+    const locationRows = byLocation.map((l: any) => {
+      const statusObj: Record<string, number> = {};
+      for (const s of l.statuses) statusObj[s.status] = s.count;
+
+      return {
+        ...(includeIds ? { locationId: l._id } : {}),
+        locationName: l.location?.name ?? null,
+        totalInstances: l.total,
+        instancesByStatus: statusObj,
+      };
+    });
+
+    const result: Record<string, any> = {
+      totalInstances,
+      byMaterialType: typeRows,
+      byLocation: locationRows,
+    };
+
+    if (!includeIds) {
+      // Global status breakdown
+      const globalStatus: Record<string, number> = {};
+      for (const t of byType) {
+        for (const s of t.statuses) {
+          globalStatus[s.status] = (globalStatus[s.status] ?? 0) + s.count;
+        }
+      }
+      const available = globalStatus["available"] ?? 0;
+      const loaned = globalStatus["loaned"] ?? 0;
+      const damaged = globalStatus["damaged"] ?? 0;
+      const maintenance = globalStatus["maintenance"] ?? 0;
+
+      // Estimate total catalog value (pricePerDay × total instances per type)
+      let estimatedDailyValue = 0;
+      for (const t of byType) {
+        estimatedDailyValue += (t.mt?.pricePerDay ?? 0) * t.total;
+      }
+
+      // Top types sorted by total instances
+      const topByStock = [...typeRows]
+        .sort((a, b) => b.totalInstances - a.totalInstances)
+        .slice(0, 10)
+        .map((t) => ({ name: t.materialTypeName, total: t.totalInstances }));
+
+      // Top locations sorted by total
+      const topLocations = [...locationRows]
+        .sort((a, b) => b.totalInstances - a.totalInstances)
+        .slice(0, 10)
+        .map((l) => ({ name: l.locationName, total: l.totalInstances }));
+
+      result.summary = {
+        totalInstances,
+        totalMaterialTypes: typeRows.length,
+        totalLocations: locationRows.length,
+        globalInstancesByStatus: Object.entries(globalStatus).map(
+          ([s, count]) => ({ status: s, count }),
+        ),
+        availabilityRate:
+          totalInstances > 0
+            ? Math.round((available / totalInstances) * 10000) / 100
+            : 0,
+        utilizationRate:
+          totalInstances > 0
+            ? Math.round((loaned / totalInstances) * 10000) / 100
+            : 0,
+        damageRate:
+          totalInstances > 0
+            ? Math.round((damaged / totalInstances) * 10000) / 100
+            : 0,
+        maintenanceRate:
+          totalInstances > 0
+            ? Math.round((maintenance / totalInstances) * 10000) / 100
+            : 0,
+        estimatedDailyValue,
+        topMaterialTypesByStock: topByStock,
+        topLocationsByStock: topLocations,
+      };
+    }
+
+    return result;
+  },
+
+  /**
+   * Transfer export: transfer records with condition tracking, enriched
+   * with route analysis and condition metrics when includeIds=false.
+   */
+  async getTransferExport(
+    organizationId: Types.ObjectId | string,
+    filters: TransferExportFilters,
+  ) {
+    const { page = 1, limit = 50, includeIds = true } = filters;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query: Record<string, any> = { organizationId };
+    if (filters.startDate || filters.endDate) {
+      const df: Record<string, any> = {};
+      if (filters.startDate) df.$gte = filters.startDate;
+      if (filters.endDate) df.$lte = filters.endDate;
+      query.createdAt = df;
+    }
+    if (filters.status) query.status = filters.status;
+    if (filters.fromLocationId)
+      query.fromLocationId = new Types.ObjectId(filters.fromLocationId);
+    if (filters.toLocationId)
+      query.toLocationId = new Types.ObjectId(filters.toLocationId);
+
+    const [transfers, total] = await Promise.all([
+      Transfer.find(query)
+        .skip(skip)
+        .limit(Number(limit))
+        .populate("fromLocationId", "name")
+        .populate("toLocationId", "name")
+        .populate("pickedBy", "name email")
+        .populate("receivedBy", "name email")
+        .sort({ createdAt: -1 })
+        .lean(),
+      Transfer.countDocuments(query),
+    ]);
+
+    const rows = transfers.map((t: any) => {
+      const transitDays =
+        t.receivedAt && t.sentAt
+          ? Math.ceil(
+              (new Date(t.receivedAt).getTime() -
+                new Date(t.sentAt).getTime()) /
+                86_400_000,
+            )
+          : null;
+
+      return {
+        ...(includeIds
+          ? {
+              transferId: t._id,
+              fromLocationId: t.fromLocationId?._id,
+              toLocationId: t.toLocationId?._id,
+            }
+          : {}),
+        status: t.status,
+        fromLocation: t.fromLocationId?.name ?? null,
+        toLocation: t.toLocationId?.name ?? null,
+        itemCount: t.items?.length ?? 0,
+        pickedBy: t.pickedBy
+          ? `${t.pickedBy.name?.firstName ?? ""} ${t.pickedBy.name?.firstSurname ?? ""}`.trim()
+          : null,
+        receivedBy: t.receivedBy
+          ? `${t.receivedBy.name?.firstName ?? ""} ${t.receivedBy.name?.firstSurname ?? ""}`.trim()
+          : null,
+        sentAt: t.sentAt ?? null,
+        receivedAt: t.receivedAt ?? null,
+        transitDays,
+        senderNotes: t.senderNotes ?? null,
+        receiverNotes: t.receiverNotes ?? null,
+        createdAt: t.createdAt,
+      };
+    });
+
+    const result: Record<string, any> = {
+      rows,
+      pagination: {
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    };
+
+    if (!includeIds) {
+      const [summaryAgg, byStatus, byMonth, conditionAgg, topRoutes] =
+        await Promise.all([
+          Transfer.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: null,
+                totalTransfers: { $sum: 1 },
+                totalItems: { $sum: { $size: "$items" } },
+                avgTransitMs: {
+                  $avg: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: ["$receivedAt", null] },
+                          { $ne: ["$sentAt", null] },
+                        ],
+                      },
+                      { $subtract: ["$receivedAt", "$sentAt"] },
+                      null,
+                    ],
+                  },
+                },
+                receivedCount: {
+                  $sum: {
+                    $cond: [{ $eq: ["$status", "received"] }, 1, 0],
+                  },
+                },
+                issueCount: {
+                  $sum: {
+                    $cond: [{ $eq: ["$status", "issue_reported"] }, 1, 0],
+                  },
+                },
+              },
+            },
+          ]),
+          Transfer.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: "$status",
+                count: { $sum: 1 },
+                totalItems: { $sum: { $size: "$items" } },
+              },
+            },
+            { $sort: { count: -1 } },
+          ]),
+          Transfer.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$createdAt" },
+                  month: { $month: "$createdAt" },
+                },
+                count: { $sum: 1 },
+                totalItems: { $sum: { $size: "$items" } },
+              },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+          ]),
+          Transfer.aggregate([
+            { $match: query },
+            { $unwind: "$items" },
+            {
+              $group: {
+                _id: "$items.receivedCondition",
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { count: -1 } },
+          ]),
+          Transfer.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: {
+                  from: "$fromLocationId",
+                  to: "$toLocationId",
+                },
+                count: { $sum: 1 },
+                totalItems: { $sum: { $size: "$items" } },
+              },
+            },
+            { $sort: { count: -1 } },
+            { $limit: 10 },
+            {
+              $lookup: {
+                from: "locations",
+                localField: "_id.from",
+                foreignField: "_id",
+                as: "fromLoc",
+              },
+            },
+            {
+              $lookup: {
+                from: "locations",
+                localField: "_id.to",
+                foreignField: "_id",
+                as: "toLoc",
+              },
+            },
+            { $unwind: { path: "$fromLoc", preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: "$toLoc", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                _id: 0,
+                fromLocation: "$fromLoc.name",
+                toLocation: "$toLoc.name",
+                transferCount: "$count",
+                totalItems: 1,
+              },
+            },
+          ]),
+        ]);
+
+      const s = summaryAgg[0] ?? {
+        totalTransfers: 0,
+        totalItems: 0,
+        avgTransitMs: null,
+        receivedCount: 0,
+        issueCount: 0,
+      };
+
+      const summary: Record<string, any> = {
+        totalTransfers: s.totalTransfers,
+        totalItemsMoved: s.totalItems,
+        averageTransitDays:
+          s.avgTransitMs != null
+            ? Math.round(s.avgTransitMs / 86_400_000)
+            : null,
+        completionRate:
+          s.totalTransfers > 0
+            ? Math.round((s.receivedCount / s.totalTransfers) * 10000) / 100
+            : 0,
+        issueRate:
+          s.totalTransfers > 0
+            ? Math.round((s.issueCount / s.totalTransfers) * 10000) / 100
+            : 0,
+        transfersByStatus: byStatus.map((st: any) => ({
+          status: st._id,
+          count: st.count,
+          totalItems: st.totalItems,
+        })),
+        transfersByMonth: byMonth.map((m: any) => ({
+          year: m._id.year,
+          month: m._id.month,
+          count: m.count,
+          totalItems: m.totalItems,
+        })),
+        receivedConditionBreakdown: conditionAgg
+          .filter((c: any) => c._id != null)
+          .map((c: any) => ({
+            condition: c._id,
+            count: c.count,
+          })),
+        topRoutes,
+      };
+
+      // Period comparison
+      const prev = computePreviousPeriod(filters.startDate, filters.endDate);
+      if (prev) {
+        const prevQuery = {
+          ...query,
+          createdAt: { $gte: prev.previousStart, $lte: prev.previousEnd },
+        };
+        const [prevAgg] = await Promise.all([
+          Transfer.aggregate([
+            { $match: prevQuery },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                totalItems: { $sum: { $size: "$items" } },
+              },
+            },
+          ]),
+        ]);
+        const p = prevAgg[0] ?? { count: 0, totalItems: 0 };
+        summary.periodComparison = {
+          currentTransfers: s.totalTransfers,
+          previousTransfers: p.count,
+          percentChange: pctChange(s.totalTransfers, p.count),
+          currentItems: s.totalItems,
+          previousItems: p.totalItems,
+          itemsPercentChange: pctChange(s.totalItems, p.totalItems),
+        };
+      }
+
+      result.summary = summary;
+    }
+
+    return result;
+  },
+
+  /**
+   * Billing history export: billing events with subscription lifecycle
+   * data and enriched cost/event analytics when includeIds=false.
+   */
+  async getBillingHistoryExport(
+    organizationId: Types.ObjectId | string,
+    filters: BillingHistoryExportFilters,
+  ) {
+    const { page = 1, limit = 50, includeIds = true } = filters;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query: Record<string, any> = { organizationId };
+    if (filters.startDate || filters.endDate) {
+      const df: Record<string, any> = {};
+      if (filters.startDate) df.$gte = filters.startDate;
+      if (filters.endDate) df.$lte = filters.endDate;
+      query.createdAt = df;
+    }
+    if (filters.eventType) query.eventType = filters.eventType;
+
+    const [events, total] = await Promise.all([
+      BillingEvent.find(query)
+        .skip(skip)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
+        .lean(),
+      BillingEvent.countDocuments(query),
+    ]);
+
+    // Current subscription snapshot
+    const org = await Organization.findById(organizationId)
+      .select("subscription name")
+      .lean();
+    const sub = (org as any)?.subscription ?? {};
+
+    const rows = events.map((e: any) => ({
+      ...(includeIds
+        ? {
+            eventId: e._id,
+            stripeEventId: e.stripeEventId ?? null,
+            stripeSubscriptionId: e.stripeSubscriptionId ?? null,
+            stripeInvoiceId: e.stripeInvoiceId ?? null,
+            stripePaymentIntentId: e.stripePaymentIntentId ?? null,
+          }
+        : {}),
+      eventType: e.eventType,
+      amount: e.amount ?? null,
+      currency: e.currency ?? "usd",
+      previousPlan: e.previousPlan ?? null,
+      newPlan: e.newPlan ?? null,
+      seatChange: e.seatChange ?? null,
+      processed: e.processed,
+      error: e.error ?? null,
+      createdAt: e.createdAt,
+    }));
+
+    const result: Record<string, any> = {
+      currentSubscription: {
+        plan: sub.plan ?? "free",
+        seatCount: sub.seatCount ?? 1,
+        currentPeriodStart: sub.currentPeriodStart ?? null,
+        currentPeriodEnd: sub.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: sub.cancelAtPeriodEnd ?? false,
+        pendingPlan: sub.pendingPlan ?? null,
+        pendingPlanEffectiveDate: sub.pendingPlanEffectiveDate ?? null,
+      },
+      rows,
+      pagination: {
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    };
+
+    if (!includeIds) {
+      const [byEventType, byMonth, paymentAgg, planChanges] = await Promise.all(
+        [
+          BillingEvent.aggregate([
+            { $match: query },
+            { $group: { _id: "$eventType", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ]),
+          BillingEvent.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$createdAt" },
+                  month: { $month: "$createdAt" },
+                },
+                count: { $sum: 1 },
+                totalAmount: {
+                  $sum: { $ifNull: ["$amount", 0] },
+                },
+              },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+          ]),
+          BillingEvent.aggregate([
+            {
+              $match: {
+                ...query,
+                eventType: { $in: ["payment_succeeded", "invoice_paid"] },
+              },
+            },
+            {
+              $group: {
+                _id: "$currency",
+                totalPaid: { $sum: "$amount" },
+                paymentCount: { $sum: 1 },
+                avgPayment: { $avg: "$amount" },
+              },
+            },
+          ]),
+          BillingEvent.aggregate([
+            {
+              $match: {
+                ...query,
+                eventType: { $in: ["plan_upgraded", "plan_downgraded"] },
+              },
+            },
+            { $sort: { createdAt: -1 } },
+            {
+              $project: {
+                _id: 0,
+                eventType: 1,
+                previousPlan: 1,
+                newPlan: 1,
+                seatChange: 1,
+                createdAt: 1,
+              },
+            },
+          ]),
+        ],
+      );
+
+      const failedPayments = await BillingEvent.countDocuments({
+        ...query,
+        eventType: { $in: ["payment_failed", "invoice_payment_failed"] },
+      });
+
+      const successPayments = await BillingEvent.countDocuments({
+        ...query,
+        eventType: { $in: ["payment_succeeded", "invoice_paid"] },
+      });
+
+      const totalPaymentAttempts = successPayments + failedPayments;
+
+      const summary: Record<string, any> = {
+        totalEvents: total,
+        eventsByType: byEventType.map((e: any) => ({
+          eventType: e._id,
+          count: e.count,
+        })),
+        eventsByMonth: byMonth.map((m: any) => ({
+          year: m._id.year,
+          month: m._id.month,
+          count: m.count,
+          totalAmount: m.totalAmount,
+        })),
+        paymentSummary: paymentAgg.map((p: any) => ({
+          currency: p._id,
+          totalPaid: p.totalPaid,
+          paymentCount: p.paymentCount,
+          averagePayment: Math.round(p.avgPayment),
+        })),
+        paymentSuccessRate:
+          totalPaymentAttempts > 0
+            ? Math.round((successPayments / totalPaymentAttempts) * 10000) / 100
+            : 100,
+        failedPaymentCount: failedPayments,
+        planChangeHistory: planChanges,
+      };
+
+      // Period comparison
+      const prev = computePreviousPeriod(filters.startDate, filters.endDate);
+      if (prev) {
+        const prevQuery = {
+          ...query,
+          createdAt: { $gte: prev.previousStart, $lte: prev.previousEnd },
+        };
+        const [prevAgg] = await Promise.all([
+          BillingEvent.aggregate([
+            { $match: prevQuery },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                totalAmount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $in: [
+                          "$eventType",
+                          ["payment_succeeded", "invoice_paid"],
+                        ],
+                      },
+                      { $ifNull: ["$amount", 0] },
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
+        ]);
+        const p = prevAgg[0] ?? { count: 0, totalAmount: 0 };
+
+        const currentPaymentTotal = paymentAgg.reduce(
+          (acc: number, x: any) => acc + (x.totalPaid ?? 0),
+          0,
+        );
+
+        summary.periodComparison = {
+          currentEvents: total,
+          previousEvents: p.count,
+          eventsPercentChange: pctChange(total, p.count),
+          currentAmountPaid: currentPaymentTotal,
+          previousAmountPaid: p.totalAmount,
+          amountPercentChange: pctChange(currentPaymentTotal, p.totalAmount),
+        };
+      }
+
+      result.summary = summary;
+    }
+
+    return result;
+  },
+
+  /**
+   * Location export: location catalog with material capacities detail/summary
+   * and occupancy metrics when includeIds=false.
+   */
+  async getLocationsExport(
+    organizationId: Types.ObjectId | string,
+    filters: LocationExportFilters,
+  ) {
+    const { includeIds = true } = filters;
+
+    const match: Record<string, any> = { organizationId };
+    if (filters.locationId) match._id = new Types.ObjectId(filters.locationId);
+    if (filters.status) match.status = filters.status;
+    if (filters.isActive !== undefined) match.isActive = filters.isActive;
+    if (filters.search) match.name = { $regex: filters.search, $options: "i" };
+
+    const locations = await Location.aggregate([
+      { $match: match },
+      {
+        $unwind: {
+          path: "$materialCapacities",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "materialCapacities.materialTypeId",
+          foreignField: "_id",
+          as: "mtInfo",
+        },
+      },
+      { $unwind: { path: "$mtInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          code: { $first: "$code" },
+          status: { $first: "$status" },
+          isActive: { $first: "$isActive" },
+          address: { $first: "$address" },
+          additionalDetails: { $first: "$additionalDetails" },
+          organizationId: { $first: "$organizationId" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          capacities: {
+            $push: {
+              $cond: [
+                { $ifNull: ["$materialCapacities.materialTypeId", false] },
+                {
+                  materialTypeId: "$materialCapacities.materialTypeId",
+                  typeName: { $ifNull: ["$mtInfo.name", null] },
+                  maxQuantity: "$materialCapacities.maxQuantity",
+                  currentQuantity: "$materialCapacities.currentQuantity",
+                },
+                "$$REMOVE",
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { name: 1 } },
+    ]);
+
+    const rows = locations.map((loc: any) => {
+      const caps: any[] = loc.capacities.filter(Boolean);
+      const totalCapacity = caps.reduce(
+        (s: number, c: any) => s + (c.maxQuantity ?? 0),
+        0,
+      );
+      const totalOccupied = caps.reduce(
+        (s: number, c: any) => s + (c.currentQuantity ?? 0),
+        0,
+      );
+      const occupancyRate =
+        totalCapacity > 0
+          ? Math.round((totalOccupied / totalCapacity) * 10000) / 100
+          : 0;
+
+      return {
+        ...(includeIds
+          ? { locationId: loc._id, organizationId: loc.organizationId }
+          : {}),
+        name: loc.name,
+        code: loc.code,
+        status: loc.status,
+        isActive: loc.isActive,
+        address: loc.address ?? null,
+        additionalDetails: loc.additionalDetails ?? null,
+        materialCapacitiesDetail: caps.map((c: any) => ({
+          ...(includeIds ? { materialTypeId: c.materialTypeId } : {}),
+          typeName: c.typeName,
+          maxQuantity: c.maxQuantity,
+          currentQuantity: c.currentQuantity,
+        })),
+        materialCapacitiesSummary: {
+          totalCapacity,
+          totalOccupied,
+          occupancyRate,
+        },
+        createdAt: loc.createdAt,
+        updatedAt: loc.updatedAt,
+      };
+    });
+
+    const result: Record<string, any> = {
+      totalLocations: rows.length,
+      locations: rows,
+    };
+
+    if (!includeIds) {
+      const byStatus: Record<string, number> = {};
+      const byActive = { active: 0, inactive: 0 };
+      for (const r of rows) {
+        byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+        if (r.isActive) byActive.active++;
+        else byActive.inactive++;
+      }
+
+      const sorted = [...rows].sort(
+        (a, b) =>
+          b.materialCapacitiesSummary.occupancyRate -
+          a.materialCapacitiesSummary.occupancyRate,
+      );
+      const topByOccupancy = sorted.slice(0, 10).map((r) => ({
+        name: r.name,
+        code: r.code,
+        occupancyRate: r.materialCapacitiesSummary.occupancyRate,
+      }));
+
+      const totalCapacityAll = rows.reduce(
+        (s, r) => s + r.materialCapacitiesSummary.totalCapacity,
+        0,
+      );
+      const totalOccupiedAll = rows.reduce(
+        (s, r) => s + r.materialCapacitiesSummary.totalOccupied,
+        0,
+      );
+      const avgOccupancyRate =
+        totalCapacityAll > 0
+          ? Math.round((totalOccupiedAll / totalCapacityAll) * 10000) / 100
+          : 0;
+
+      result.summary = {
+        totalLocations: rows.length,
+        byStatus: Object.entries(byStatus).map(([status, count]) => ({
+          status,
+          count,
+        })),
+        byActive,
+        avgOccupancyRate,
+        totalCapacity: totalCapacityAll,
+        totalOccupied: totalOccupiedAll,
+        topByOccupancy,
+      };
+    }
+
+    return result;
+  },
+
+  /**
+   * Customer export: customer list with real revenue calculated from
+   * Loans, and enriched summary with top-revenue/top-loan metrics
+   * when includeIds=false.
+   */
+  async getCustomersExport(
+    organizationId: Types.ObjectId | string,
+    filters: CustomerExportFilters,
+  ) {
+    const { page = 1, limit = 50, includeIds = true } = filters;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query: Record<string, any> = { organizationId };
+    if (filters.status) query.status = filters.status;
+    if (filters.documentType) query.documentType = filters.documentType;
+    if (filters.search) {
+      query.$or = [
+        { "name.firstName": { $regex: filters.search, $options: "i" } },
+        { "name.firstSurname": { $regex: filters.search, $options: "i" } },
+        { email: { $regex: filters.search, $options: "i" } },
+        { documentNumber: { $regex: filters.search, $options: "i" } },
+      ];
+    }
+    if (filters.startDate || filters.endDate) {
+      const df: Record<string, any> = {};
+      if (filters.startDate) df.$gte = filters.startDate;
+      if (filters.endDate) df.$lte = filters.endDate;
+      query.createdAt = df;
+    }
+
+    const [customers, total] = await Promise.all([
+      Customer.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Customer.countDocuments(query),
+    ]);
+
+    // Revenue join: aggregate loans for customers on this page
+    const customerIds = customers.map((c: any) => c._id);
+    const revenueAgg = await Loan.aggregate([
+      { $match: { organizationId, customerId: { $in: customerIds } } },
+      {
+        $group: {
+          _id: "$customerId",
+          totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
+          loanCount: { $sum: 1 },
+          lastLoanAt: { $max: "$createdAt" },
+        },
+      },
+    ]);
+    const revenueMap = new Map(
+      revenueAgg.map((r: any) => [r._id.toString(), r]),
+    );
+
+    const rows = customers.map((c: any) => {
+      const rev = revenueMap.get(c._id.toString()) ?? {
+        totalRevenue: 0,
+        loanCount: 0,
+        lastLoanAt: null,
+      };
+
+      return {
+        ...(includeIds
+          ? { customerId: c._id, organizationId: c.organizationId }
+          : {}),
+        fullName: [
+          c.name?.firstName,
+          c.name?.secondName,
+          c.name?.firstSurname,
+          c.name?.secondSurname,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        email: c.email,
+        phone: c.phone ?? null,
+        documentType: c.documentType,
+        documentNumber: c.documentNumber,
+        status: c.status,
+        totalLoans: c.totalLoans ?? 0,
+        activeLoans: c.activeLoans ?? 0,
+        totalRevenue: rev.totalRevenue,
+        avgLoanAmount:
+          rev.loanCount > 0 ? Math.round(rev.totalRevenue / rev.loanCount) : 0,
+        lastLoanAt: rev.lastLoanAt,
+        createdAt: c.createdAt,
+      };
+    });
+
+    const result: Record<string, any> = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      customers: rows,
+    };
+
+    if (!includeIds) {
+      // Global aggregations for summary
+      const [statusAgg, globalRevenueAgg] = await Promise.all([
+        Customer.aggregate([
+          { $match: { organizationId } },
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+        ]),
+        Loan.aggregate([
+          { $match: { organizationId } },
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
+              loanCount: { $sum: 1 },
+            },
+          },
+        ]),
+      ]);
+
+      const globalRev = globalRevenueAgg[0] ?? {
+        totalRevenue: 0,
+        loanCount: 0,
+      };
+
+      // Top 10 by revenue (across all org customers)
+      const topByRevenue = await Loan.aggregate([
+        { $match: { organizationId } },
+        {
+          $group: {
+            _id: "$customerId",
+            totalRevenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
+          },
+        },
+        { $sort: { totalRevenue: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "customers",
+            localField: "_id",
+            foreignField: "_id",
+            as: "customer",
+          },
+        },
+        { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+      ]);
+
+      // Top 10 by loan count
+      const topByLoanCount = await Loan.aggregate([
+        { $match: { organizationId } },
+        {
+          $group: {
+            _id: "$customerId",
+            loanCount: { $sum: 1 },
+          },
+        },
+        { $sort: { loanCount: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "customers",
+            localField: "_id",
+            foreignField: "_id",
+            as: "customer",
+          },
+        },
+        { $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } },
+      ]);
+
+      const summary: Record<string, any> = {
+        totalCustomers: await Customer.countDocuments({ organizationId }),
+        byStatus: statusAgg.map((s: any) => ({
+          status: s._id,
+          count: s.count,
+        })),
+        totalRevenue: globalRev.totalRevenue,
+        totalLoans: globalRev.loanCount,
+        topByRevenue: topByRevenue.map((t: any) => ({
+          fullName: [
+            t.customer?.name?.firstName,
+            t.customer?.name?.firstSurname,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          totalRevenue: t.totalRevenue,
+        })),
+        topByLoanCount: topByLoanCount.map((t: any) => ({
+          fullName: [
+            t.customer?.name?.firstName,
+            t.customer?.name?.firstSurname,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          loanCount: t.loanCount,
+        })),
+      };
+
+      // Period comparison
+      const prev = computePreviousPeriod(filters.startDate, filters.endDate);
+      if (prev) {
+        const prevCount = await Customer.countDocuments({
+          organizationId,
+          createdAt: { $gte: prev.previousStart, $lte: prev.previousEnd },
+        });
+        const currentCount = await Customer.countDocuments({
+          organizationId,
+          createdAt: { $gte: filters.startDate!, $lte: filters.endDate! },
+        });
+        summary.periodComparison = {
+          currentNewCustomers: currentCount,
+          previousNewCustomers: prevCount,
+          percentChange: pctChange(currentCount, prevCount),
+        };
+      }
+
+      result.summary = summary;
+    }
+
+    return result;
+  },
+
+  /**
+   * Request (loan request) export: request list with conversion funnel,
+   * revenue analytics, and period comparison when includeIds=false.
+   */
+  async getRequestsExport(
+    organizationId: Types.ObjectId | string,
+    filters: RequestExportFilters,
+  ) {
+    const { page = 1, limit = 50, includeIds = true } = filters;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query: Record<string, any> = { organizationId };
+    if (filters.status) query.status = filters.status;
+    if (filters.customerId)
+      query.customerId = new Types.ObjectId(filters.customerId);
+
+    // createdAt range
+    if (filters.createdAtStart || filters.createdAtEnd) {
+      const df: Record<string, any> = {};
+      if (filters.createdAtStart) df.$gte = filters.createdAtStart;
+      if (filters.createdAtEnd) df.$lte = filters.createdAtEnd;
+      query.createdAt = df;
+    }
+    // startDate range (loan start)
+    if (filters.loanStartFrom || filters.loanStartTo) {
+      const df: Record<string, any> = {};
+      if (filters.loanStartFrom) df.$gte = filters.loanStartFrom;
+      if (filters.loanStartTo) df.$lte = filters.loanStartTo;
+      query.startDate = df;
+    }
+
+    const [requests, total] = await Promise.all([
+      LoanRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      LoanRequest.countDocuments(query),
+    ]);
+
+    const rows = requests.map((r: any) => ({
+      ...(includeIds
+        ? {
+            requestId: r._id,
+            customerId: r.customerId,
+            loanId: r.loanId ?? null,
+            createdBy: r.createdBy ?? null,
+            approvedBy: r.approvedBy ?? null,
+          }
+        : {}),
+      code: r.code,
+      status: r.status,
+      itemCount: Array.isArray(r.items) ? r.items.length : 0,
+      totalAmount: r.totalAmount ?? 0,
+      subtotal: r.subtotal ?? 0,
+      discountAmount: r.discountAmount ?? 0,
+      depositAmount: r.depositAmount ?? 0,
+      totalDays: r.totalDays ?? 0,
+      startDate: r.startDate,
+      endDate: r.endDate,
+      approvedAt: r.approvedAt ?? null,
+      rejectionReason: r.rejectionReason ?? null,
+      createdAt: r.createdAt,
+    }));
+
+    const result: Record<string, any> = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      requests: rows,
+    };
+
+    if (!includeIds) {
+      // All matching requests (unscoped by page) for global stats
+      const allQuery = { ...query };
+      const [statusAgg, monthAgg, allRequests] = await Promise.all([
+        LoanRequest.aggregate([
+          { $match: allQuery },
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+        ]),
+        LoanRequest.aggregate([
+          { $match: allQuery },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+              },
+              count: { $sum: 1 },
+              totalAmount: { $sum: { $ifNull: ["$totalAmount", 0] } },
+            },
+          },
+          { $sort: { "_id.year": 1, "_id.month": 1 } },
+        ]),
+        LoanRequest.find(allQuery)
+          .select("status totalAmount totalDays approvedAt createdAt")
+          .lean(),
+      ]);
+
+      const totalAll = allRequests.length;
+      const statusMap: Record<string, number> = {};
+      for (const s of statusAgg) statusMap[s._id] = s.count;
+
+      // Funnel metrics
+      const approved =
+        (statusMap["approved"] ?? 0) +
+        (statusMap["deposit_pending"] ?? 0) +
+        (statusMap["assigned"] ?? 0) +
+        (statusMap["ready"] ?? 0) +
+        (statusMap["shipped"] ?? 0) +
+        (statusMap["completed"] ?? 0);
+      const completed = statusMap["completed"] ?? 0;
+      const rejected = statusMap["rejected"] ?? 0;
+      const cancelled = statusMap["cancelled"] ?? 0;
+
+      // Avg approval time (for requests that have approvedAt)
+      let totalApprovalMs = 0;
+      let approvalCount = 0;
+      for (const req of allRequests as any[]) {
+        if (req.approvedAt && req.createdAt) {
+          totalApprovalMs +=
+            new Date(req.approvedAt).getTime() -
+            new Date(req.createdAt).getTime();
+          approvalCount++;
+        }
+      }
+      const avgApprovalTimeHours =
+        approvalCount > 0
+          ? Math.round((totalApprovalMs / approvalCount / 3600000) * 100) / 100
+          : null;
+
+      const totalRevenue = (allRequests as any[]).reduce(
+        (s, r) => s + (r.totalAmount ?? 0),
+        0,
+      );
+      const avgRequestValue =
+        totalAll > 0 ? Math.round(totalRevenue / totalAll) : 0;
+      const avgDuration =
+        totalAll > 0
+          ? Math.round(
+              (allRequests as any[]).reduce(
+                (s, r) => s + (r.totalDays ?? 0),
+                0,
+              ) / totalAll,
+            )
+          : 0;
+
+      const summary: Record<string, any> = {
+        totalRequests: totalAll,
+        byStatus: statusAgg.map((s: any) => ({
+          status: s._id,
+          count: s.count,
+        })),
+        byMonth: monthAgg.map((m: any) => ({
+          year: m._id.year,
+          month: m._id.month,
+          count: m.count,
+          totalAmount: m.totalAmount,
+        })),
+        funnel: {
+          approvalRate:
+            totalAll > 0 ? Math.round((approved / totalAll) * 10000) / 100 : 0,
+          completionRate:
+            totalAll > 0 ? Math.round((completed / totalAll) * 10000) / 100 : 0,
+          rejectionRate:
+            totalAll > 0 ? Math.round((rejected / totalAll) * 10000) / 100 : 0,
+          cancellationRate:
+            totalAll > 0 ? Math.round((cancelled / totalAll) * 10000) / 100 : 0,
+          avgApprovalTimeHours,
+        },
+        avgRequestValue,
+        avgDuration,
+        totalRevenue,
+      };
+
+      // Period comparison
+      const prev = computePreviousPeriod(
+        filters.createdAtStart,
+        filters.createdAtEnd,
+      );
+      if (prev) {
+        const prevQuery = {
+          ...allQuery,
+          createdAt: { $gte: prev.previousStart, $lte: prev.previousEnd },
+        };
+        const [prevAgg] = await Promise.all([
+          LoanRequest.aggregate([
+            { $match: prevQuery },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                totalAmount: { $sum: { $ifNull: ["$totalAmount", 0] } },
+              },
+            },
+          ]),
+        ]);
+        const p = prevAgg[0] ?? { count: 0, totalAmount: 0 };
+
+        summary.periodComparison = {
+          currentRequests: totalAll,
+          previousRequests: p.count,
+          requestsPercentChange: pctChange(totalAll, p.count),
+          currentRevenue: totalRevenue,
+          previousRevenue: p.totalAmount,
+          revenuePercentChange: pctChange(totalRevenue, p.totalAmount),
         };
       }
 

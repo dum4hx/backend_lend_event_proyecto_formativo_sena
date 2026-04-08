@@ -108,6 +108,10 @@ const subscriptionSchema = new Schema(
     // Used as fallback when the SubscriptionType record is deleted or disabled.
     maxSeats: { type: Number, default: -1 },
     maxCatalogItems: { type: Number, default: -1 },
+    // Pending plan change fields (used for deferred downgrades via Stripe Subscription Schedules)
+    pendingPlan: { type: String, default: null },
+    pendingPlanEffectiveDate: { type: Date, default: null },
+    stripeScheduleId: { type: String, default: null },
   },
   { _id: false },
 );

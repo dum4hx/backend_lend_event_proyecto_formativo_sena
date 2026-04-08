@@ -388,4 +388,218 @@ reportsRouter.get(
   },
 );
 
+/* ---------- Inventory & Transfer Export Schemas ---------- */
+
+const inventoryExportQuerySchema = z.object({
+  includeIds: booleanString,
+  locationId: z.string().optional(),
+  categoryId: z.string().optional(),
+  status: z.string().optional(),
+  search: z.string().optional(),
+});
+
+const transferExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+  status: z.string().optional(),
+  fromLocationId: z.string().optional(),
+  toLocationId: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+/**
+ * GET /api/v1/reports/exports/inventory
+ * Inventory export grouped by material type and location, with enriched
+ * utilization/damage/availability metrics when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/inventory",
+  requirePermission("reports:read"),
+  validateQuery(inventoryExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getInventoryExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/reports/exports/transfers
+ * Transfer export with condition tracking, route analysis, and transit
+ * time metrics when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/transfers",
+  requirePermission("reports:read"),
+  validateQuery(transferExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getTransferExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ---------- Billing History Export Schema ---------- */
+
+const billingHistoryExportQuerySchema = z.object({
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  includeIds: booleanString,
+  eventType: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+/**
+ * GET /api/v1/reports/exports/billing-history
+ * Billing history export with subscription lifecycle events, payment
+ * tracking, plan changes, and cost analytics when includeIds=false.
+ * Requires: reports:read AND billing:manage
+ */
+reportsRouter.get(
+  "/exports/billing-history",
+  requirePermission("reports:read"),
+  requirePermission("billing:manage"),
+  validateQuery(billingHistoryExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getBillingHistoryExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ---------- Location Export Schema ---------- */
+
+const locationExportQuerySchema = z.object({
+  includeIds: booleanString,
+  locationId: z.string().optional(),
+  status: z.string().optional(),
+  isActive: booleanString.optional(),
+  search: z.string().optional(),
+});
+
+/**
+ * GET /api/v1/reports/exports/locations
+ * Location catalog export with material capacity detail/summary
+ * and occupancy analytics when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/locations",
+  requirePermission("reports:read"),
+  validateQuery(locationExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getLocationsExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ---------- Customer Export Schema ---------- */
+
+const customerExportQuerySchema = z.object({
+  includeIds: booleanString,
+  status: z.string().optional(),
+  search: z.string().optional(),
+  documentType: z.string().optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+/**
+ * GET /api/v1/reports/exports/customers
+ * Customer export with real revenue from loans and enriched
+ * top-revenue/top-loan metrics when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/customers",
+  requirePermission("reports:read"),
+  validateQuery(customerExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getCustomersExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/* ---------- Request Export Schema ---------- */
+
+const requestExportQuerySchema = z.object({
+  includeIds: booleanString,
+  createdAtStart: z.coerce.date().optional(),
+  createdAtEnd: z.coerce.date().optional(),
+  loanStartFrom: z.coerce.date().optional(),
+  loanStartTo: z.coerce.date().optional(),
+  status: z.string().optional(),
+  customerId: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(200).optional().default(50),
+});
+
+/**
+ * GET /api/v1/reports/exports/requests
+ * Loan request export with conversion funnel, revenue analytics,
+ * and period comparison when includeIds=false.
+ * Requires: reports:read
+ */
+reportsRouter.get(
+  "/exports/requests",
+  requirePermission("reports:read"),
+  validateQuery(requestExportQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = req.query as any;
+      const data = await reportsService.getRequestsExport(
+        getOrgId(req),
+        filters,
+      );
+      res.json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default reportsRouter;

@@ -2,6 +2,8 @@ import { Loan } from "../loan/models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { User } from "../user/models/user.model.ts";
+import { Organization } from "../organization/models/organization.model.ts";
+import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import { emailService } from "../../utils/email.ts";
 import {
@@ -16,6 +18,8 @@ import { incidentService } from "../incident/incident.service.ts";
 const OVERDUE_DETECTION_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 const REQUEST_EXPIRATION_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 const REFUND_REMINDER_INTERVAL_MS = 4 * 60 * 60 * 1000; // every 4 hours
+const SUBSCRIPTION_EXPIRATION_INTERVAL_MS = 30 * 60 * 1000; // every 30 minutes
+const SUBSCRIPTION_GRACE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /* ---------- Overdue Loan Detection ---------- */
 
@@ -261,11 +265,61 @@ async function sendRefundReminders(): Promise<void> {
   }
 }
 
+/* ---------- Subscription Expiration Detection ---------- */
+
+/**
+ * Suspends organizations with expired paid subscriptions that haven't been
+ * updated by Stripe webhooks within the grace period.
+ *
+ * This is a safety net — Stripe webhooks handle the real-time case, and
+ * this job catches any missed events.
+ */
+async function detectExpiredSubscriptions(): Promise<void> {
+  try {
+    const gracePeriodCutoff = new Date(
+      Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS,
+    );
+
+    // Find active orgs with paid plans whose billing period ended before the grace cutoff
+    const expiredOrgs = await Organization.find({
+      status: "active",
+      "subscription.plan": { $ne: "free" },
+      "subscription.currentPeriodEnd": { $lt: gracePeriodCutoff },
+    }).select("_id subscription.plan subscription.currentPeriodEnd");
+
+    if (expiredOrgs.length === 0) return;
+
+    for (const org of expiredOrgs) {
+      try {
+        await organizationService.suspend(org._id);
+        logger.info("Organization suspended due to expired subscription", {
+          organizationId: org._id.toString(),
+          plan: org.subscription?.plan,
+          currentPeriodEnd: org.subscription?.currentPeriodEnd,
+        });
+      } catch (err) {
+        logger.error("Failed to suspend expired organization", {
+          organizationId: org._id.toString(),
+          error: err,
+        });
+      }
+    }
+
+    logger.info("Subscription expiration detection completed", {
+      suspendedCount: expiredOrgs.length,
+    });
+  } catch (err) {
+    logger.error("Failed to detect expired subscriptions", { error: err });
+  }
+}
+
 /* ---------- Scheduler Startup ---------- */
 
 let overdueInterval: ReturnType<typeof setInterval> | null = null;
 let expirationInterval: ReturnType<typeof setInterval> | null = null;
 let refundReminderInterval: ReturnType<typeof setInterval> | null = null;
+let subscriptionExpirationInterval: ReturnType<typeof setInterval> | null =
+  null;
 
 /**
  * Starts all scheduled background jobs.
@@ -293,10 +347,17 @@ export function startScheduledJobs(): void {
     REFUND_REMINDER_INTERVAL_MS,
   );
 
+  void detectExpiredSubscriptions();
+  subscriptionExpirationInterval = setInterval(
+    detectExpiredSubscriptions,
+    SUBSCRIPTION_EXPIRATION_INTERVAL_MS,
+  );
+
   logger.info("Scheduled background jobs started", {
     overdueDetectionIntervalMs: OVERDUE_DETECTION_INTERVAL_MS,
     requestExpirationIntervalMs: REQUEST_EXPIRATION_INTERVAL_MS,
     refundReminderIntervalMs: REFUND_REMINDER_INTERVAL_MS,
+    subscriptionExpirationIntervalMs: SUBSCRIPTION_EXPIRATION_INTERVAL_MS,
   });
 }
 
@@ -315,5 +376,9 @@ export function stopScheduledJobs(): void {
   if (refundReminderInterval) {
     clearInterval(refundReminderInterval);
     refundReminderInterval = null;
+  }
+  if (subscriptionExpirationInterval) {
+    clearInterval(subscriptionExpirationInterval);
+    subscriptionExpirationInterval = null;
   }
 }

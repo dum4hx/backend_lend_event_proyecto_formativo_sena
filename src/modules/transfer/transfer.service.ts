@@ -285,9 +285,9 @@ class TransferService {
       });
       if (!request)
         throw AppError.notFound("Solicitud de transferencia no encontrada");
-      if (request.status !== "approved" && request.status !== "requested") {
+      if (request.status !== "approved") {
         throw AppError.badRequest(
-          "Solo se puede iniciar una transferencia para una solicitud solicitada o aprobada",
+          "Solo se puede iniciar una transferencia para una solicitud aprobada",
         );
       }
     }

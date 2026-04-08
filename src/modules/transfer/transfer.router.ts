@@ -226,7 +226,7 @@ transferRouter.patch(
  */
 transferRouter.post(
   "/",
-  requirePermission("transfers:create"),
+  requirePermission("transfers:send"),
   validateBody(TransferZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -289,7 +289,7 @@ transferRouter.get(
  */
 transferRouter.patch(
   "/:id/receive",
-  requirePermission("transfers:update"),
+  requirePermission("transfers:receive"),
   validateBody(
     z.object({
       receiverNotes: z

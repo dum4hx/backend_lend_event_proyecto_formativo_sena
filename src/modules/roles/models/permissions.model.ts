@@ -12,6 +12,7 @@ export const permissionCategories = [
   "Requests",
   "Loans",
   "Inspections",
+  "Incidents",
   "Invoices",
   "Reports",
   "Platform",
@@ -23,6 +24,11 @@ export const permissionCategories = [
   "Permissions",
   "Locations",
   "Transfers",
+  "Pricing",
+  "Payment_methods",
+  "Operations",
+  "Maintenance",
+  "Code_schemes",
 ] as const;
 
 export type PermissionCategory = (typeof permissionCategories)[number];
@@ -33,7 +39,7 @@ export const PermissionZodSchema = z.object({
   _id: z
     .string()
     .min(3)
-    .regex(/^[a-z_]+:[a-z_]+$/, "Format must be 'resource:action'"),
+    .regex(/^[a-z_]+(?::[a-z_]+)+$/, "Format must be 'resource:action'"),
   displayName: z.string().min(1).max(100).trim(),
   description: z.string().max(500).trim(),
   category: z.enum(permissionCategories),
