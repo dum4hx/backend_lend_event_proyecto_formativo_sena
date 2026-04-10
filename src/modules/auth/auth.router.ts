@@ -29,6 +29,14 @@ import { twoFactorService } from "./two_factor.service.ts";
 
 const authRouter = Router();
 
+// Prevent browser/proxy caching for auth responses.
+authRouter.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 /* ---------- Validation Schemas ---------- */
 
 const registerSchema = z.object({
@@ -206,7 +214,11 @@ authRouter.post(
       }
 
       const payload = await verifyRefreshToken(refreshToken);
-      const tokens = await authService.refreshTokens(payload.sub, payload.org);
+      const tokens = await authService.refreshTokens(
+        payload.sub,
+        payload.org,
+        refreshToken,
+      );
 
       // Set new cookies
       res.cookie(COOKIE_NAME, tokens.accessToken, accessTokenCookieOptions);
@@ -221,6 +233,9 @@ authRouter.post(
         message: "Tokens actualizados",
       });
     } catch (err) {
+      // If refresh fails, force a clean browser auth state.
+      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
       next(err);
     }
   },
@@ -228,17 +243,56 @@ authRouter.post(
 
 /**
  * POST /api/v1/auth/logout
- * Clears authentication cookies.
+ * Revokes current refresh session and clears authentication cookies.
  */
-authRouter.post("/logout", (req: Request, res: Response) => {
-  res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
-  res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+authRouter.post(
+  "/logout",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME] as
+        | string
+        | undefined;
 
-  res.json({
-    status: "success",
-    message: "Sesión cerrada exitosamente",
-  });
-});
+      if (refreshToken) {
+        await authService.revokeRefreshSession(refreshToken);
+      }
+
+      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+
+      res.json({
+        status: "success",
+        message: "Sesión cerrada exitosamente",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/auth/logout-all
+ * Revokes every active refresh session for the authenticated user.
+ */
+authRouter.post(
+  "/logout-all",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await authService.revokeAllRefreshSessions(req.user!.userId);
+
+      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+
+      res.json({
+        status: "success",
+        message: "Todas las sesiones activas fueron cerradas exitosamente",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * POST /api/v1/auth/change-password

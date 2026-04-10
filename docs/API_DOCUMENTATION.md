@@ -362,7 +362,7 @@ When the access token expires, call the refresh endpoint:
 POST /api/v1/auth/refresh
 ```
 
-The server reads the `refresh_token` cookie and issues new tokens automatically.
+The server reads the `refresh_token` cookie, validates that it is still active in server-side session storage, rotates it, and issues a new token pair.
 
 ### Logout
 
@@ -370,7 +370,15 @@ The server reads the `refresh_token` cookie and issues new tokens automatically.
 POST /api/v1/auth/logout
 ```
 
-Clears both authentication cookies.
+Revokes the current refresh session on the server and clears both authentication cookies.
+
+### Cache-Control for Authenticated Responses
+
+All authentication responses and authenticated API responses include anti-cache headers to avoid storing sensitive content in browser/proxy caches:
+
+- `Cache-Control: no-store, no-cache, must-revalidate, private`
+- `Pragma: no-cache`
+- `Expires: 0`
 
 ### Role-Based Access Control (RBAC)
 
@@ -655,31 +663,60 @@ Re-validates credentials and sends a new OTP to the user's email. Use when the o
 
 Refreshes access token using refresh token cookie.
 
-**Request:** No body required. `refresh_token` cookie must be present.
+**Request:** No body required. `refresh_token` cookie must be present and active.
 
 **Response:** `200 OK`
 
 ```json
 {
   "status": "success",
-  "message": "Tokens refreshed"
+  "message": "Tokens actualizados"
 }
 ```
+
+**Error Responses:**
+
+| Status | Condition |
+| ------ | --------- |
+| 401    | Missing, expired, revoked, or invalid refresh token |
 
 ---
 
 #### POST /auth/logout
 
-Clears authentication cookies.
+Revokes the current refresh session and clears authentication cookies.
 
 **Response:** `200 OK`
 
 ```json
 {
   "status": "success",
-  "message": "Logged out successfully"
+  "message": "Sesión cerrada exitosamente"
 }
 ```
+
+---
+
+#### POST /auth/logout-all
+
+Revokes all active refresh sessions for the authenticated user and clears local auth cookies.
+
+**Auth:** Required (`access_token` cookie)
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Todas las sesiones activas fueron cerradas exitosamente"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition |
+| ------ | --------- |
+| 401    | Unauthenticated request |
 
 ---
 

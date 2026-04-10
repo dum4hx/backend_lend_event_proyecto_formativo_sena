@@ -99,5 +99,24 @@ test.describe.serial("Auth Module", () => {
     expect(body.data.user.email).toBe(createdUserEmail);
   });
 
+  test("POST /auth/logout should revoke refresh session", async ({ request }) => {
+    const logoutResponse = await request.post("auth/logout");
+
+    expect(logoutResponse.status()).toBe(200);
+    const logoutBody = await logoutResponse.json();
+    expect(logoutBody.status).toBe("success");
+
+    const refreshAfterLogout = await request.post("auth/refresh");
+    expect(refreshAfterLogout.status()).toBe(401);
+  });
+
+  test("POST /auth/logout-all should reject unauthenticated requests", async ({
+    request,
+  }) => {
+    const response = await request.post("auth/logout-all");
+
+    expect(response.status()).toBe(401);
+  });
+
   // Additional tests for logout, refresh...
 });

@@ -21,6 +21,7 @@ import { organizationService } from "../organization/organization.service.ts";
 import { PasswordResetToken } from "./models/password_reset_token.model.ts";
 import { InviteToken } from "./models/invite_token.model.ts";
 import { EmailVerificationToken } from "./models/email_verification_token.model.ts";
+import { RefreshTokenSession } from "./models/refresh_token_session.model.ts";
 import { emailService } from "../../utils/email.ts";
 import { logger } from "../../utils/logger.ts";
 import roleService from "../roles/roles.service.ts";
@@ -41,6 +42,7 @@ const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS || "48",
   10,
 );
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://app.test.local";
 
 /* ---------- Internal Helpers ---------- */
@@ -61,6 +63,79 @@ async function cleanupPendingRegistration(
 /* ---------- Auth Service ---------- */
 
 export const authService = {
+  hashRefreshToken(rawToken: string): string {
+    return crypto.createHash("sha256").update(rawToken).digest("hex");
+  },
+
+  async persistRefreshSession(
+    userId: Types.ObjectId | string,
+    organizationId: Types.ObjectId | string,
+    refreshToken: string,
+  ): Promise<void> {
+    const tokenHash = authService.hashRefreshToken(refreshToken);
+
+    await RefreshTokenSession.create({
+      userId,
+      organizationId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    });
+  },
+
+  async rotateRefreshSession(
+    userId: Types.ObjectId | string,
+    organizationId: Types.ObjectId | string,
+    currentRefreshToken: string,
+    nextRefreshToken: string,
+  ): Promise<void> {
+    const currentHash = authService.hashRefreshToken(currentRefreshToken);
+    const nextHash = authService.hashRefreshToken(nextRefreshToken);
+
+    const activeSession = await RefreshTokenSession.findOne({
+      userId,
+      organizationId,
+      tokenHash: currentHash,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!activeSession) {
+      throw AppError.unauthorized(
+        "Sesión inválida o expirada. Por favor inicia sesión nuevamente.",
+      );
+    }
+
+    activeSession.revokedAt = new Date();
+    activeSession.lastUsedAt = new Date();
+    activeSession.replacedByTokenHash = nextHash;
+    await activeSession.save();
+
+    await RefreshTokenSession.create({
+      userId,
+      organizationId,
+      tokenHash: nextHash,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    });
+  },
+
+  async revokeRefreshSession(refreshToken: string): Promise<void> {
+    const tokenHash = authService.hashRefreshToken(refreshToken);
+
+    await RefreshTokenSession.updateOne(
+      { tokenHash, revokedAt: null },
+      { revokedAt: new Date(), lastUsedAt: new Date() },
+    );
+  },
+
+  async revokeAllRefreshSessions(
+    userId: Types.ObjectId | string,
+  ): Promise<void> {
+    await RefreshTokenSession.updateMany(
+      { userId, revokedAt: null },
+      { revokedAt: new Date(), lastUsedAt: new Date() },
+    );
+  },
+
   /**
    * Checks if the user has super-admin permissions.
    */
@@ -417,6 +492,12 @@ export const authService = {
       email: user.email,
     });
 
+    await authService.persistRefreshSession(
+      user._id,
+      organization._id,
+      tokens.refreshToken,
+    );
+
     logger.info("Email verified and account activated", {
       userId: user._id.toString(),
       organizationId: organization._id.toString(),
@@ -573,6 +654,12 @@ export const authService = {
       email: user.email,
     });
 
+    await authService.persistRefreshSession(
+      user._id,
+      org._id,
+      tokens.refreshToken,
+    );
+
     const permissions = await roleService.getRolePermissions(
       user.roleId,
       org._id.toString(),
@@ -613,6 +700,7 @@ export const authService = {
   async refreshTokens(
     userId: string,
     organizationId: string,
+    currentRefreshToken: string,
   ): Promise<TokenPair> {
     const user = await User.findById(userId);
     if (!user) {
@@ -623,13 +711,22 @@ export const authService = {
       throw AppError.unauthorized("La cuenta no está activa");
     }
 
-    return generateTokenPair({
+    const tokenPair = await generateTokenPair({
       sub: user._id.toString(),
       org: organizationId,
       roleId: user.roleId,
       roleName: await roleService.getRoleName(user.roleId),
       email: user.email,
     });
+
+    await authService.rotateRefreshSession(
+      user._id,
+      organizationId,
+      currentRefreshToken,
+      tokenPair.refreshToken,
+    );
+
+    return tokenPair;
   },
 
   /**
@@ -944,6 +1041,9 @@ export const authService = {
 
     user.password = newPassword;
     await user.save();
+
+    // Invalidate every active refresh token session after password change.
+    await authService.revokeAllRefreshSessions(user._id);
 
     logger.info("Password changed", { userId: userId.toString() });
   },

@@ -116,6 +116,11 @@ export const authenticate = async (
       email: payload.email,
     };
 
+    // Prevent intermediary/proxy/browser caching of authenticated responses.
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     // Inject organizationId into request body for downstream validators
     // Some route validators expect `organizationId` in the body (e.g. POST /materials/types).
     // The organization should come from the token, not the client — set it here so zod
