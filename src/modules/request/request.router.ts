@@ -76,11 +76,11 @@ const createRequestSchema = LoanRequestBaseZodSchema.pick({
   .refine(
     (data) => {
       if (!data.depositDueDate) return true;
-      return data.depositDueDate <= data.startDate;
+      return data.depositDueDate >= data.startDate;
     },
     {
       message:
-        "La fecha de vencimiento del depósito no puede ser posterior a la fecha de inicio",
+        "La fecha de vencimiento del depósito no puede ser anterior a la fecha de inicio",
       path: ["depositDueDate"],
     },
   );

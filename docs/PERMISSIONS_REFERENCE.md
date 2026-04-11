@@ -2,7 +2,7 @@
 
 Generated at: 2026-03-08T21:18:03.050Z
 
-Total permissions: 55
+Total permissions: 56
 
 This document is generated from the MongoDB `permissions` collection.
 Each section explains the purpose of a permission and the action it allows.
@@ -64,6 +64,7 @@ Each section explains the purpose of a permission and the action it allows.
 - [`platform:manage`](#platformmanage)
 - [`reports:read`](#reportsread)
 - [`requests:approve`](#requestsapprove)
+- [`requests:assign`](#requestsassign)
 - [`requests:cancel`](#requestscancel)
 - [`requests:create`](#requestscreate)
 - [`requests:delete`](#requestsdelete)
@@ -546,6 +547,17 @@ Each section explains the purpose of a permission and the action it allows.
 - **Allowed Action:** Approve or reject pending loan requests.
 - **Resource Target:** Requests
 - **Roles:** `super_admin`, `owner`, `manager`, `warehouse_operator`
+
+### `requests:assign`
+
+- **Display Name:** Asignar Materiales a Solicitud
+- **Category:** Requests
+- **Scope:** Organization
+- **Active:** Yes
+- **Purpose:** Allows assigning material instances to a loan request in a single transactional operation, marking the request as assigned.
+- **Allowed Action:** Assign material instances and transition request to `assigned` status.
+- **Resource Target:** Requests
+- **Roles:** `super_admin`, `owner`, `warehouse_operator`
 
 ### `requests:cancel`
 
