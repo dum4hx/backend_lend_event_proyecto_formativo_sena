@@ -760,17 +760,16 @@ export const authService = {
       );
     }
 
-    // Validate location IDs are provided and belong to the organization
-    if (userData.locations && userData.locations.length > 0) {
-      await organizationService.validateLocationIds(
-        organizationId,
-        userData.locations,
-      );
-    } else {
-      throw AppError.badRequest(
-        "Se debe asignar al menos una ubicación al usuario",
-      );
-    }
+    // Validate role-location assignment rules and location ownership
+    await roleService.assertLocationsAllowedForRole(
+      organizationId,
+      userData.roleId,
+      userData.locations,
+    );
+    await organizationService.validateLocationIds(
+      organizationId,
+      userData.locations,
+    );
 
     // Generate a placeholder password (user will set their own via invite link)
     const placeholderPassword = await userService.generateNewPassword();

@@ -1076,6 +1076,8 @@ Invites a new user to the organization. Sends an invitation email with a time-li
 - The invite link expires after 48 hours by default (configurable via `INVITE_EXPIRY_HOURS` env var).
 - The invited user must click the link and set a password to activate their account via `POST /auth/accept-invite`.
 - `locations` must contain valid Location MongoDB ObjectId strings representing organization locations the user will be associated with.
+- Only owner role users can be assigned to multiple locations.
+- For non-owner roles (including custom roles), exactly one location must be provided.
 - `roleId` is required and must be a valid role identifier for the organization; the API response returns the resolved role name in the `role` field.
 
 ---
@@ -1111,6 +1113,13 @@ Resends the invitation email for a user still in `invited` status.
 Updates a user's profile.
 
 **Permission Required:** `users:update`
+
+**Notes:**
+
+- If `locations` is included, all provided IDs must belong to the organization.
+- Role-location constraints are enforced server-side on update as well:
+- Only owner role users can have multiple locations.
+- Non-owner roles are restricted to a single location.
 
 ---
 

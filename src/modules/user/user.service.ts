@@ -1,11 +1,17 @@
 import { Types, type ClientSession } from "mongoose";
 import { User, type UserInput } from "./models/user.model.ts";
-import { type UserRole } from "../roles/models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import rolesService from "../roles/roles.service.ts";
 import crypto from "crypto";
+
+const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner"]);
+
+function isOwnerRoleName(roleName?: string | null): boolean {
+  if (!roleName) return false;
+  return OWNER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
+}
 
 /* ---------- User Service ---------- */
 
@@ -114,11 +120,31 @@ export const userService = {
     organizationId: Types.ObjectId | string,
     data: Partial<Omit<UserInput, "organizationId" | "password">>,
   ): Promise<InstanceType<typeof User>> {
-    const user = await User.findOneAndUpdate(
-      { _id: userId, organizationId },
-      { $set: data },
-      { new: true, runValidators: true },
-    );
+    const existingUser = await User.findOne({ _id: userId, organizationId });
+
+    if (!existingUser) {
+      throw AppError.notFound("Usuario no encontrado");
+    }
+
+    if (data.locations !== undefined || data.roleId !== undefined) {
+      const resolvedLocations =
+        data.locations ??
+        (existingUser.locations ?? []).map((loc) => loc.toString());
+      const resolvedRoleId = data.roleId ?? existingUser.roleId;
+
+      await rolesService.assertLocationsAllowedForRole(
+        organizationId,
+        resolvedRoleId,
+        resolvedLocations,
+      );
+      await organizationService.validateLocationIds(
+        organizationId,
+        resolvedLocations,
+      );
+    }
+
+    Object.assign(existingUser, data);
+    const user = await existingUser.save();
 
     if (!user) {
       throw AppError.notFound("Usuario no encontrado");
@@ -150,7 +176,7 @@ export const userService = {
     }
 
     // Cannot demote the owner
-    if ((await user.getRoleName()) === "owner") {
+    if (isOwnerRoleName(await user.getRoleName())) {
       throw AppError.badRequest(
         "No se puede cambiar el rol del propietario de la organización",
       );
@@ -169,11 +195,20 @@ export const userService = {
     const newRoleName = orgRoles.find(
       (role) => role._id.toString() === newRoleId,
     )?.name;
-    if (newRoleName === "owner") {
+    if (isOwnerRoleName(newRoleName)) {
       throw AppError.badRequest(
         "No se puede promover a un usuario al rol de propietario",
       );
     }
+
+    const currentLocationIds = (user.locations ?? []).map((loc) =>
+      loc.toString(),
+    );
+    await rolesService.assertLocationsAllowedForRole(
+      organizationId,
+      newRoleId,
+      currentLocationIds,
+    );
 
     user.roleId = newRoleId;
     await user.save();
@@ -206,7 +241,7 @@ export const userService = {
     }
 
     // Cannot deactivate owner
-    if ((await user.getRoleName()) === "owner") {
+    if (isOwnerRoleName(await user.getRoleName())) {
       throw AppError.badRequest(
         "No se puede desactivar al propietario de la organización",
       );
@@ -284,7 +319,7 @@ export const userService = {
     }
 
     // Cannot delete owner
-    if ((await user.getRoleName()) === "owner") {
+    if (isOwnerRoleName(await user.getRoleName())) {
       throw AppError.badRequest(
         "No se puede eliminar al propietario de la organización",
       );

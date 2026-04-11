@@ -6,6 +6,13 @@ import { Role } from "./models/role.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { super_admin_only_permsissions } from "./models/role.model.ts";
 
+const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner"]);
+
+function isOwnerRoleName(roleName?: string | null): boolean {
+  if (!roleName) return false;
+  return OWNER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
+}
+
 /* ---------- Permission dependency map ---------- */
 
 const require = createRequire(import.meta.url);
@@ -334,6 +341,37 @@ export const rolesService = {
       throw AppError.notFound("Rol no encontrado");
     }
     return role.name;
+  },
+
+  /**
+   * Validates whether the provided locations are compatible with the role.
+   * Only owner roles can be assigned to multiple locations.
+   */
+  async assertLocationsAllowedForRole(
+    organizationId: Types.ObjectId | string,
+    roleId: string,
+    locationIds: string[],
+  ): Promise<void> {
+    if (!locationIds || locationIds.length === 0) {
+      throw AppError.badRequest("Se debe asignar al menos una ubicación");
+    }
+
+    const role = await Role.findOne({ _id: roleId, organizationId })
+      .select("name")
+      .lean();
+
+    if (!role) {
+      throw AppError.badRequest(
+        "roleId inválido: El rol no pertenece a la organización",
+      );
+    }
+
+    const allowsMultipleLocations = isOwnerRoleName(role.name);
+    if (!allowsMultipleLocations && locationIds.length > 1) {
+      throw AppError.badRequest(
+        "Solo el rol de Dueño puede tener múltiples ubicaciones",
+      );
+    }
   },
 };
 
