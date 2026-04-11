@@ -279,9 +279,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "incidents:read",
     "incidents:update",
     "incidents:acknowledge",
-    "transfers:create",
     "transfers:read",
-    "transfers:update",
     "transfers:send",
     "transfers:receive",
     "pricing:read",
@@ -313,9 +311,6 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "invoices:read",
     "pricing:read",
     "payment_methods:read",
-    "transfers:create",
-    "transfers:read",
-    "transfers:accept",
   ],
 };
 
