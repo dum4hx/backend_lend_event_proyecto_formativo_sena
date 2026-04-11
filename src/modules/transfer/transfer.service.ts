@@ -10,6 +10,7 @@ import {
 } from "./models/transfer_rejection_reason.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Location } from "../location/models/location.model.ts";
+import { LocationService } from "../location/location.service.ts";
 import { User } from "../user/models/user.model.ts";
 import { Types, startSession, type ClientSession } from "mongoose";
 
@@ -449,6 +450,12 @@ class TransferService {
         },
         { session },
       );
+
+      await LocationService.recalculateMaterialCapacitiesCurrentQuantity({
+        organizationId,
+        locationIds: [transfer.fromLocationId, transfer.toLocationId],
+        session,
+      });
 
       return transfer;
     });

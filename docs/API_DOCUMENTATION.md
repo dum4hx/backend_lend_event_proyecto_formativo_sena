@@ -3173,6 +3173,12 @@ Retrieves a paginated list of all locations in the organization.
           "additionalDetails": "Piso 2"
         },
         "isActive": true,
+        "occupied": 12,
+        "occupancySummary": {
+          "totalCapacity": 40,
+          "occupied": 12,
+          "occupancyRate": 30
+        },
         "createdAt": "2026-02-20T10:30:00.000Z",
         "updatedAt": "2026-02-20T10:30:00.000Z"
       }
@@ -3186,6 +3192,12 @@ Retrieves a paginated list of all locations in the organization.
   }
 }
 ```
+
+**Fuente de verdad de ocupación:**
+- `occupied` es la fuente de verdad para la ocupación total de la sede.
+- `occupancySummary.occupied` siempre refleja el mismo valor que `occupied`.
+- `materialCapacities[].currentQuantity` se expone como desglose por tipo cuando existe configuración de capacidades.
+- Si una sede tiene inventario pero no tiene entrada de capacidad para un tipo de material, `occupied` sigue reflejando correctamente la ocupación total.
 
 ---
 
@@ -3233,6 +3245,12 @@ Retrieves a single location by its ID.
       "department": "Cundinamarca",
       "city": "Bogotá",
       "additionalDetails": "Piso 2"
+    },
+    "occupied": 12,
+    "occupancySummary": {
+      "totalCapacity": 40,
+      "occupied": 12,
+      "occupancyRate": 30
     },
     "createdAt": "2026-02-20T10:30:00.000Z",
     "updatedAt": "2026-02-20T10:30:00.000Z"

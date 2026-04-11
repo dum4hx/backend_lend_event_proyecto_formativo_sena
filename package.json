@@ -16,6 +16,7 @@
     "seed:loan-request": "npx tsx --env-file=.env src/modules/request/seeders/loan_request.seeder.ts",
     "fix:owner-perms": "npx tsx --env-file=.env scripts/fix_owner_role_permissions.ts",
     "migrate:drop-incident-indexes": "npx tsx --env-file=.env scripts/drop_incident_indexes.ts",
+    "migrate:recalculate-location-occupancy": "npx tsx --env-file=.env scripts/recalculate_location_occupancy.ts",
     "migrate:backfill-location-codes": "npx tsx --env-file=.env scripts/backfill_location_codes.ts",
     "migrate:backfill-entity-codes": "npx tsx --env-file=.env scripts/backfill_entity_codes.ts",
     "test": "npx playwright test",

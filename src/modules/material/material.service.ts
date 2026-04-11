@@ -1597,6 +1597,11 @@ export const materialService = {
 
     await MaterialInstance.deleteOne({ _id: id });
 
+    await LocationService.recalculateMaterialCapacitiesCurrentQuantity({
+      organizationId,
+      locationIds: [instance.locationId],
+    });
+
     return;
   },
 
