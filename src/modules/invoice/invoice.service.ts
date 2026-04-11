@@ -80,7 +80,11 @@ export const invoiceService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "email name")
-        .populate("loanId", "startDate endDate")
+        .populate("loanId", "startDate endDate code")
+        .populate({
+          path: "payments.paymentMethodId",
+          model: "PaymentMethod",
+        })
         .sort({ [sortBy]: sortDirection }),
       Invoice.countDocuments(query),
     ]);
@@ -150,7 +154,11 @@ export const invoiceService = {
     })
       .populate("customerId", "email name phone address")
       .populate("loanId")
-      .populate("inspectionId");
+      .populate("inspectionId")
+      .populate({
+        path: "payments.paymentMethodId",
+        model: "PaymentMethod",
+      });
 
     if (!invoice) {
       throw AppError.notFound("Factura no encontrada");

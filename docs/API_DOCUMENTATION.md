@@ -6507,6 +6507,54 @@ Lists all invoices.
 | type      | query    | string  | No       | `rental`, `damage`, `deposit`  |
 | overdue   | query    | boolean | No       | Filter overdue invoices        |
 
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "invoices": [
+      {
+        "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+        "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+        "customerId": {
+          "_id": "65e2f3c0e1a2b3c4d5e6f7c3",
+          "email": "client@example.com",
+          "name": "Event Co"
+        },
+        "loanId": {
+          "_id": "65e2f3c0e1a2b3c4d5e6f7d4",
+          "startDate": "2026-03-01T10:00:00.000Z",
+          "endDate": "2026-03-05T10:00:00.000Z",
+          "code": "LOAN-2026-001"
+        },
+        "invoiceNumber": "INV-2026-00001",
+        "type": "damage",
+        "lineItems": [
+          {
+            "description": "Material dañado",
+            "quantity": 1,
+            "unitPrice": 50000,
+            "totalPrice": 50000
+          }
+        ],
+        "subtotal": 50000,
+        "taxAmount": 0,
+        "totalAmount": 50000,
+        "amountPaid": 0,
+        "amountDue": 50000,
+        "status": "pending",
+        "dueDate": "2026-04-04T10:00:00.000Z",
+        "createdAt": "2026-03-10T14:20:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
 ---
 
 #### GET /invoices/summary

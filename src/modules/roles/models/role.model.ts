@@ -232,8 +232,6 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "packages:update",
     "packages:delete",
     "requests:read",
-    "requests:approve",
-    "requests:cancel",
     "loans:read",
     "inspections:read",
     "incidents:read",
