@@ -17,7 +17,6 @@ import {
 
 const FALLBACK_PATTERNS: Record<EntityType, string> = {
   loan: "LN-{SEQ:4}",
-  loan_request: "REQ-{SEQ:4}",
   invoice: "INV-{YYYY}-{SEQ:4}",
   inspection: "INSP-{YYYY}-{SEQ:4}",
   incident: "INC-{YYYY}-{SEQ:4}",
@@ -28,7 +27,6 @@ const FALLBACK_PATTERNS: Record<EntityType, string> = {
 // Deterministic ObjectIds used as schemeId for fallback counters
 const FALLBACK_SCHEME_IDS: Record<EntityType, Types.ObjectId> = {
   loan: new Types.ObjectId("000000000000000000000001"),
-  loan_request: new Types.ObjectId("000000000000000000000002"),
   invoice: new Types.ObjectId("000000000000000000000003"),
   inspection: new Types.ObjectId("000000000000000000000004"),
   incident: new Types.ObjectId("000000000000000000000005"),

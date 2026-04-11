@@ -142,6 +142,11 @@ const loanRequestSchema = new Schema(
       ref: "User",
       required: true,
     },
+    locationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Location",
+      required: true,
+    },
     items: {
       type: [requestItemMongooseSchema],
       required: true,

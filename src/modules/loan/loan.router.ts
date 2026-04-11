@@ -68,9 +68,14 @@ loanRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
       const query = req.query as any;
 
-      const result = await loanService.listLoans(organizationId, query);
+      const result = await loanService.listLoans(
+        organizationId,
+        user.id,
+        query,
+      );
 
       res.json({
         status: "success",
@@ -92,8 +97,9 @@ loanRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
 
-      const result = await loanService.listLoans(organizationId, {
+      const result = await loanService.listLoans(organizationId, user.id, {
         overdue: true,
         sortBy: "endDate",
         sortOrder: "asc",
@@ -123,6 +129,7 @@ loanRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
       const loanId = req.params.id;
       const { groupByMaterialType } = req.query as any;
 
@@ -132,7 +139,12 @@ loanRouter.get(
 
       const opts =
         groupByMaterialType !== undefined ? { groupByMaterialType } : undefined;
-      const loan = await loanService.getLoanById(loanId, organizationId, opts);
+      const loan = await loanService.getLoanById(
+        loanId,
+        organizationId,
+        user.id,
+        opts,
+      );
 
       res.json({
         status: "success",

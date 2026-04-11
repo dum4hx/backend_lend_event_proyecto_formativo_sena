@@ -234,11 +234,6 @@ async function seedDefaultSchemes(
       pattern: "LO-{YYYY}-{SEQ:4}",
     },
     {
-      entityType: "loan_request",
-      name: "Predeterminado Solicitud",
-      pattern: "REQ-{YYYY}-{SEQ:4}",
-    },
-    {
       entityType: "invoice",
       name: "Predeterminado Factura",
       pattern: "INV-{YYYY}-{SEQ:4}",

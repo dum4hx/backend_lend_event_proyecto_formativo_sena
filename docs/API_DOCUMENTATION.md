@@ -676,8 +676,8 @@ Refreshes access token using refresh token cookie.
 
 **Error Responses:**
 
-| Status | Condition |
-| ------ | --------- |
+| Status | Condition                                           |
+| ------ | --------------------------------------------------- |
 | 401    | Missing, expired, revoked, or invalid refresh token |
 
 ---
@@ -714,8 +714,8 @@ Revokes all active refresh sessions for the authenticated user and clears local 
 
 **Error Responses:**
 
-| Status | Condition |
-| ------ | --------- |
+| Status | Condition               |
+| ------ | ----------------------- |
 | 401    | Unauthenticated request |
 
 ---
@@ -5082,6 +5082,15 @@ Creates a new package (bundle of materials).
 
 ### Loan Request Endpoints
 
+**Location-based filtering:** All GET endpoints in this section only return requests whose `locationId` matches at least one of the authenticated user's assigned locations. If the user has no matching location, no results are returned.
+
+**Populated user references:** All request endpoints populate the following user reference fields when present:
+
+| Field        | Type   | Description                                                       |
+| ------------ | ------ | ----------------------------------------------------------------- |
+| `createdBy`  | object | User who created the request. Populated with `name` and `email`.  |
+| `approvedBy` | object | User who approved the request. Populated with `name` and `email`. |
+
 #### GET /requests
 
 Lists all loan requests in the organization.
@@ -5098,6 +5107,8 @@ Lists all loan requests in the organization.
 
 Creates a new loan request (commercial advisor action).
 
+**Auth:** `authenticate` + `requireActiveOrganization` + `requests:create`
+
 | Parameter      | Location | Type   | Required | Description                                                                       |
 | -------------- | -------- | ------ | -------- | --------------------------------------------------------------------------------- |
 | customerId     | body     | string | Yes      | Customer ID                                                                       |
@@ -5107,6 +5118,17 @@ Creates a new loan request (commercial advisor action).
 | depositDueDate | body     | string | Yes      | Date by which deposit must be paid (ISO 8601). Cannot be after `startDate`.       |
 | depositAmount  | body     | number | Yes      | Deposit amount in the organization's currency. Use `0` if no deposit is required. |
 | notes          | body     | string | No       | Additional notes                                                                  |
+
+**Automatic Fields:**
+
+The following fields are automatically populated by the server:
+
+| Field      | Type   | Description                                                                                               |
+| ---------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| code       | string | Unique request identifier, auto-generated from the organization's `loan` code scheme (e.g. `LO-2026-001`) |
+| locationId | string | Organization location ID of the authenticated user (extracted from `user.locations[0]`)                   |
+
+**Note:** Requests and Loans share the same code scheme (`loan`). When a loan is created from a request, it inherits the request's code.
 
 `items[]` contract (recommended):
 
@@ -5356,6 +5378,14 @@ Cancels a loan request and releases any assigned materials back to available sta
 
 ### Loan Endpoints
 
+**Location-based filtering:** All GET endpoints in this section only return loans whose `locationId` matches at least one of the authenticated user's assigned locations. If the user has no matching location, no results are returned.
+
+**Populated user references:** All loan endpoints populate the following user reference fields when present:
+
+| Field          | Type   | Description                                                                |
+| -------------- | ------ | -------------------------------------------------------------------------- |
+| `checkedOutBy` | object | User who checked out the loan (pickup). Populated with `name` and `email`. |
+
 #### GET /loans
 
 Lists all loans in the organization.
@@ -5376,7 +5406,7 @@ Gets all overdue loans (auto-updates overdue status).
 
 #### GET /loans/:id
 
-Gets a specific loan with full details. The response includes populated `customerId`, `requestId`, and `materialInstances`.
+Gets a specific loan with full details. The response includes populated `customerId`, `requestId`, `checkedOutBy`, and `materialInstances`.
 
 **Query Parameters:**
 
@@ -5471,6 +5501,8 @@ Creates a loan from a ready request (pickup / checkout action).
 On success:
 
 - A new `Loan` is created with `status: "active"`.
+- The loan **inherits the request's `code`** (both use the organization's `loan` code scheme).
+- The loan **inherits the request's `locationId`** (the user's assigned location at creation time).
 - The source request transitions to `status: "shipped"` and its `loanId` field is populated with the new loan's ID.
 - All assigned material instances are marked as `loaned`.
 - Each material instance's `conditionAtCheckout` is captured from the instance's current condition.
@@ -9395,14 +9427,15 @@ Base path: `/api/v1/code-schemes`
 
 All endpoints require `authenticate` + active organization middleware.
 
-Code schemes define patterns used to auto-generate human-readable codes for multiple entities: Loans, Loan Requests, Invoices, Inspections, Incidents, Maintenance Batches, and Material Instances (e.g. `LO-2026-0001`, `INV-2026-0012`, `MI-000042`).
+Code schemes define patterns used to auto-generate human-readable codes for multiple entities: Loans (which include both loans and loan requests), Invoices, Inspections, Incidents, Maintenance Batches, and Material Instances (e.g. `LO-2026-0001`, `INV-2026-0012`, `MI-000042`).
+
+**Important:** Loan Requests and Loans now share the same `loan` code scheme. When a loan is created from a request, it inherits the request's code. There is no separate `loan_request` entity type.
 
 ### Supported Entity Types
 
 | Entity Type         | Default Pattern       | Auto-generated Field                        |
 | ------------------- | --------------------- | ------------------------------------------- |
-| `loan`              | `LO-{YYYY}-{SEQ:4}`   | `code`                                      |
-| `loan_request`      | `REQ-{YYYY}-{SEQ:4}`  | `code`                                      |
+| `loan`              | `LO-{YYYY}-{SEQ:4}`   | `code` (for both loans and loan requests)   |
 | `invoice`           | `INV-{YYYY}-{SEQ:4}`  | `invoiceNumber`                             |
 | `inspection`        | `INSP-{YYYY}-{SEQ:4}` | `inspectionNumber`                          |
 | `incident`          | `INC-{YYYY}-{SEQ:4}`  | `incidentNumber`                            |

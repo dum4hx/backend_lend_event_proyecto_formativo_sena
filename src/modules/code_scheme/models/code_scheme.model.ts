@@ -5,7 +5,6 @@ import { Schema, model, type InferSchemaType, Types } from "mongoose";
 
 export const entityTypeOptions = [
   "loan",
-  "loan_request",
   "invoice",
   "inspection",
   "incident",

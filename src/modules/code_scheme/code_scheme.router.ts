@@ -35,7 +35,7 @@ const listQuerySchema = z.object({
 /**
  * GET /api/v1/code-schemes
  * Lists all code schemes for the organization.
- * Optional query: ?entityType=loan | loan_request
+ * Optional query: ?entityType=loan | invoice | inspection | ...
  * Requires: code_schemes:read
  */
 codeSchemeRouter.get(

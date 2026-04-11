@@ -79,7 +79,9 @@ function normalizeRequestItem(
   const resolvedType = item.type ?? fallbackType;
 
   if (resolvedType !== "material" && resolvedType !== "package") {
-    throw AppError.badRequest(`Tipo inválido para el elemento en el índice ${itemIndex}`);
+    throw AppError.badRequest(
+      `Tipo inválido para el elemento en el índice ${itemIndex}`,
+    );
   }
 
   const resolvedReferenceId =
@@ -173,6 +175,7 @@ export const requestService = {
    */
   async listRequests(
     organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
     query: ListRequestsQuery,
   ): Promise<{
     requests: LoanRequestDocument[];
@@ -192,6 +195,13 @@ export const requestService = {
 
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { organizationId };
+
+    // Restrict to user's assigned locations
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+    filter.locationId = { $in: userLocationIds };
 
     if (status) {
       filter.status = status;
@@ -215,6 +225,8 @@ export const requestService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "email name")
+        .populate("createdBy", "_id name email")
+        .populate("approvedBy", "_id name email")
         .populate("assignedMaterials.materialInstanceId", "serialNumber")
         .sort({ [sortBy]: sortDirection }),
       LoanRequest.countDocuments(filter),
@@ -234,12 +246,22 @@ export const requestService = {
   async getRequestById(
     requestId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
   ): Promise<LoanRequestDocument> {
+    // Resolve user's locations
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
+      locationId: { $in: userLocationIds },
     })
       .populate("customerId", "email name phone address")
+      .populate("createdBy", "_id name email")
+      .populate("approvedBy", "_id name email")
       .populate(
         "assignedMaterials.materialInstanceId",
         "serialNumber status modelId",
@@ -311,17 +333,28 @@ export const requestService = {
     today.setHours(0, 0, 0, 0);
 
     if (startDate < today) {
-      throw AppError.badRequest("La fecha de inicio no puede estar en el pasado");
+      throw AppError.badRequest(
+        "La fecha de inicio no puede estar en el pasado",
+      );
     }
 
     if (endDate <= startDate) {
-      throw AppError.badRequest("La fecha de fin debe ser posterior a la fecha de inicio");
+      throw AppError.badRequest(
+        "La fecha de fin debe ser posterior a la fecha de inicio",
+      );
     }
 
-    // Generate unique code for this request
+    // Resolve the user's location
+    const user = await User.findById(userId).select("locations").lean();
+    const locationId = user?.locations?.[0];
+    if (!locationId) {
+      throw AppError.badRequest("El usuario no tiene una ubicación asignada");
+    }
+
+    // Generate unique code for this request (shares the "loan" code scheme)
     const code = await codeGenerationService.generateCode({
       organizationId,
-      entityType: "loan_request",
+      entityType: "loan",
     });
 
     const request = await LoanRequest.create({
@@ -329,14 +362,15 @@ export const requestService = {
       items: normalizedItems,
       organizationId,
       createdBy: userId,
+      locationId: new Types.ObjectId(String(locationId)),
       status: "pending",
       code,
     });
 
-    const populatedRequest = await LoanRequest.findById(request._id).populate(
-      "customerId",
-      "email name",
-    );
+    const populatedRequest = await LoanRequest.findById(request._id)
+      .populate("customerId", "email name")
+      .populate("createdBy", "_id name email")
+      .populate("approvedBy", "_id name email");
 
     logger.info("Loan request created", {
       requestId: request._id.toString(),
@@ -431,7 +465,9 @@ export const requestService = {
       (id, i, ids) => ids.indexOf(id) !== i,
     );
     if (duplicated.length > 0) {
-      throw AppError.badRequest("materialInstanceId duplicado en las asignaciones");
+      throw AppError.badRequest(
+        "materialInstanceId duplicado en las asignaciones",
+      );
     }
 
     const session = await startSession();
@@ -556,6 +592,8 @@ export const requestService = {
           session,
         })
           .populate("customerId", "email name phone address")
+          .populate("createdBy", "_id name email")
+          .populate("approvedBy", "_id name email")
           .populate(
             "assignedMaterials.materialInstanceId",
             "serialNumber status modelId",
@@ -584,7 +622,9 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Solicitud no encontrada o no está en estado aprobado");
+      throw AppError.notFound(
+        "Solicitud no encontrada o no está en estado aprobado",
+      );
     }
 
     // Validate all material instances are available
@@ -671,7 +711,9 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Solicitud no encontrada o no está en un estado facturable");
+      throw AppError.notFound(
+        "Solicitud no encontrada o no está en un estado facturable",
+      );
     }
 
     if ((request.depositAmount ?? 0) === 0) {
@@ -710,7 +752,9 @@ export const requestService = {
     });
 
     if (!request) {
-      throw AppError.notFound("Solicitud no encontrada o no está en un estado facturable");
+      throw AppError.notFound(
+        "Solicitud no encontrada o no está en un estado facturable",
+      );
     }
 
     if ((request.totalAmount ?? 0) === 0) {
@@ -720,7 +764,9 @@ export const requestService = {
     }
 
     if (request.rentalFeePaidAt) {
-      throw AppError.conflict("La tarifa de alquiler ya ha sido registrada como pagada");
+      throw AppError.conflict(
+        "La tarifa de alquiler ya ha sido registrada como pagada",
+      );
     }
 
     request.rentalFeePaidAt = new Date();

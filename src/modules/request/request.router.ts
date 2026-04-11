@@ -125,9 +125,14 @@ requestRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
       const query = req.query as any;
 
-      const result = await requestService.listRequests(organizationId, query);
+      const result = await requestService.listRequests(
+        organizationId,
+        user.id,
+        query,
+      );
 
       res.json({
         status: "success",
@@ -149,6 +154,7 @@ requestRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
       const requestId = req.params.id;
 
       if (typeof requestId !== "string") {
@@ -158,6 +164,7 @@ requestRouter.get(
       const request = await requestService.getRequestById(
         requestId,
         organizationId,
+        user.id,
       );
 
       res.json({

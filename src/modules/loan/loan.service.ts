@@ -3,6 +3,7 @@ import { Loan, type LoanDocument } from "./models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Organization } from "../organization/models/organization.model.ts";
+import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { Inspection } from "../inspection/models/inspection.model.ts";
 import { logger } from "../../utils/logger.ts";
@@ -12,7 +13,6 @@ import {
   LOAN_TRANSITIONS,
   LOAN_REQUEST_TRANSITIONS,
 } from "../shared/state_machine.ts";
-import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
 /* ---------- Internal Helpers ---------- */
 
@@ -77,7 +77,9 @@ export const loanService = {
         }).session(session);
 
         if (!request) {
-          throw AppError.notFound("Solicitud no encontrada o no está lista para retiro");
+          throw AppError.notFound(
+            "Solicitud no encontrada o no está lista para retiro",
+          );
         }
 
         // Enforce payment precondition: deposit must be paid when amount > 0
@@ -125,16 +127,12 @@ export const loanService = {
               }
             : { amount: 0, status: "not_required" as const, transactions: [] };
 
-        // Build material instance details (also capture locationId from the first instance)
-        let loanLocationId: Types.ObjectId | undefined;
+        // Build material instance details
         const materialInstancesPayload = await Promise.all(
           instanceIds.map(async (id: any) => {
             const instance = await MaterialInstance.findById(id)
-              .select("modelId locationId")
+              .select("modelId")
               .session(session);
-            if (!loanLocationId && instance?.locationId) {
-              loanLocationId = instance.locationId as Types.ObjectId;
-            }
             return {
               materialInstanceId: id,
               materialTypeId: instance?.modelId ?? id,
@@ -143,19 +141,16 @@ export const loanService = {
           }),
         );
 
+        // Loan inherits locationId from its source request
+        const loanLocationId = request.locationId;
         if (!loanLocationId) {
           throw AppError.badRequest(
-            "No se puede determinar la ubicación de origen del préstamo: no se encontraron instancias de material válidas",
+            "No se puede determinar la ubicación de origen del préstamo: la solicitud no tiene ubicación asignada",
           );
         }
 
-        // Generate unique code for this loan
-        const code = await codeGenerationService.generateCode({
-          organizationId,
-          entityType: "loan",
-          context: { locationId: loanLocationId },
-          session,
-        });
+        // Loan inherits the code from its source request
+        const code = request.code;
 
         // Create the loan
         const [loan]: any = await (Loan as any).create(
@@ -188,6 +183,7 @@ export const loanService = {
         const populatedLoan = await Loan.findById(loan._id)
           .session(session)
           .populate("customerId", "email name")
+          .populate("checkedOutBy", "_id name email")
           .populate(
             "materialInstances.materialInstanceId",
             "serialNumber modelId",
@@ -279,7 +275,9 @@ export const loanService = {
     });
 
     if (!loan) {
-      throw AppError.notFound("Préstamo no encontrado o no está en estado devuelto");
+      throw AppError.notFound(
+        "Préstamo no encontrado o no está en estado devuelto",
+      );
     }
 
     transitionLoanStatus(loan, "closed");
@@ -305,7 +303,9 @@ export const loanService = {
     });
 
     if (!inspection) {
-      throw AppError.badRequest("El préstamo debe ser inspeccionado antes de completarse");
+      throw AppError.badRequest(
+        "El préstamo debe ser inspeccionado antes de completarse",
+      );
     }
 
     // Update materials to available (or damaged based on inspection)
@@ -354,7 +354,9 @@ export const loanService = {
     }
 
     if (newEndDate <= loan.endDate) {
-      throw AppError.badRequest("La nueva fecha de fin debe ser posterior a la fecha de fin actual");
+      throw AppError.badRequest(
+        "La nueva fecha de fin debe ser posterior a la fecha de fin actual",
+      );
     }
 
     loan.endDate = newEndDate;
@@ -374,6 +376,7 @@ export const loanService = {
    */
   async listLoans(
     organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
     query: {
       page?: number;
       limit?: number;
@@ -402,6 +405,13 @@ export const loanService = {
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { organizationId };
 
+    // Restrict to user's assigned locations
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+    filter.locationId = { $in: userLocationIds };
+
     if (status) filter.status = status;
     if (customerId) filter.customerId = customerId;
     if (overdue === true) {
@@ -415,6 +425,7 @@ export const loanService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "email name")
+        .populate("checkedOutBy", "_id name email")
         .sort({ [sortBy]: sortDirection }),
       Loan.countDocuments(filter),
     ]);
@@ -453,7 +464,9 @@ export const loanService = {
 
     const deposit = (loan as any).deposit;
     if (!deposit || deposit.amount === 0) {
-      throw AppError.badRequest("Este préstamo no tiene depósito para reembolsar");
+      throw AppError.badRequest(
+        "Este préstamo no tiene depósito para reembolsar",
+      );
     }
 
     // Ensure the loan has a completed inspection before allowing a refund
@@ -508,13 +521,26 @@ export const loanService = {
   async getLoanById(
     loanId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
     opts?: { groupByMaterialType?: boolean },
   ): Promise<LoanDocument> {
     const loanIdObj = new Types.ObjectId(loanId);
     const orgIdObj = new Types.ObjectId(organizationId);
 
+    // Resolve user's locations for access filtering
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+
     const pipeline: any[] = [
-      { $match: { _id: loanIdObj, organizationId: orgIdObj } },
+      {
+        $match: {
+          _id: loanIdObj,
+          organizationId: orgIdObj,
+          locationId: { $in: userLocationIds },
+        },
+      },
       // Populate customer — write result back into customerId field directly
       {
         $lookup: {
@@ -537,6 +563,17 @@ export const loanService = {
         },
       },
       { $unwind: { path: "$requestId", preserveNullAndEmptyArrays: true } },
+      // Populate checkedOutBy user
+      {
+        $lookup: {
+          from: "users",
+          localField: "checkedOutBy",
+          foreignField: "_id",
+          as: "checkedOutBy",
+          pipeline: [{ $project: { _id: 1, name: 1, email: 1 } }],
+        },
+      },
+      { $unwind: { path: "$checkedOutBy", preserveNullAndEmptyArrays: true } },
       // Unwind materialInstances for per-instance lookups
       { $unwind: "$materialInstances" },
       // Populate materialInstance details — write result back into materialInstances.materialInstanceId
