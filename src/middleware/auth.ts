@@ -49,6 +49,50 @@ export function getAuthUser(req: Request): AuthenticatedUser {
 const COOKIE_NAME = "access_token";
 const REFRESH_COOKIE_NAME = "refresh_token";
 
+const DEFAULT_ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
+const DEFAULT_REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseDurationToMs(
+  rawValue: string | undefined,
+  fallbackMs: number,
+): number {
+  if (!rawValue) return fallbackMs;
+
+  const value = rawValue.trim().toLowerCase();
+  const match = value.match(/^(\d+)(ms|s|m|h|d)?$/);
+  if (!match) return fallbackMs;
+
+  const amount = Number(match[1]);
+  const unit = match[2] ?? "s";
+
+  if (!Number.isFinite(amount) || amount <= 0) return fallbackMs;
+
+  switch (unit) {
+    case "ms":
+      return amount;
+    case "s":
+      return amount * 1000;
+    case "m":
+      return amount * 60 * 1000;
+    case "h":
+      return amount * 60 * 60 * 1000;
+    case "d":
+      return amount * 24 * 60 * 60 * 1000;
+    default:
+      return fallbackMs;
+  }
+}
+
+const ACCESS_TOKEN_COOKIE_MAX_AGE_MS = parseDurationToMs(
+  process.env.JWT_ACCESS_EXPIRATION,
+  DEFAULT_ACCESS_TOKEN_MAX_AGE_MS,
+);
+
+const REFRESH_TOKEN_COOKIE_MAX_AGE_MS = parseDurationToMs(
+  process.env.JWT_REFRESH_EXPIRATION,
+  DEFAULT_REFRESH_TOKEN_MAX_AGE_MS,
+);
+
 export const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -59,12 +103,12 @@ export const cookieOptions = {
 
 export const accessTokenCookieOptions = {
   ...cookieOptions,
-  maxAge: 15 * 60 * 1000, // 15 minutes
+  maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
 };
 
 export const refreshTokenCookieOptions = {
   ...cookieOptions,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
   path: "/api/v1/auth", // Only sent to auth endpoints
 };
 
