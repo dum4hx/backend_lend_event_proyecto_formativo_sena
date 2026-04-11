@@ -10,7 +10,7 @@ export const connectDB = async () => {
     // Throw error if no connection string stablished
     if (!connectionString) {
       logger.error(connectionString);
-      throw AppError.internal("No database connection string set");
+      throw AppError.internal("No se ha establecido una cadena de conexión a la base de datos");
     }
 
     logger.info("Connecting to mongoDB");
