@@ -1,4 +1,4 @@
-import { Types, startSession } from "mongoose";
+import { Types, startSession, type ClientSession } from "mongoose";
 import { Loan, type LoanDocument } from "./models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
@@ -6,8 +6,10 @@ import { Organization } from "../organization/models/organization.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { Inspection } from "../inspection/models/inspection.model.ts";
+import { Invoice } from "../invoice/models/invoice.model.ts";
 import { logger } from "../../utils/logger.ts";
 import { pricingService } from "../pricing/pricing.service.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 import {
   validateTransition,
   LOAN_TRANSITIONS,
@@ -46,6 +48,134 @@ function enrichDepositWithRefundInfo(deposit: any): any {
       deposit.status === "partially_applied",
     refundableAmount: Math.max(0, deposit.amount - alreadyApplied),
   };
+}
+
+/**
+ * Calculates and applies a late fee to an overdue loan.
+ * Idempotent: skips if a late_fee invoice already exists with the same amount;
+ * voids and recreates when the accrued amount has changed.
+ *
+ * Mutates the loan in memory (lateFees, totalAmount) but does NOT save it.
+ * The caller MUST save the loan within the same session.
+ */
+export async function applyLateFee(params: {
+  loan: any;
+  organizationId: string | Types.ObjectId;
+  triggeredBy: Types.ObjectId;
+  session: ClientSession;
+}): Promise<void> {
+  const { loan, organizationId, triggeredBy, session } = params;
+
+  const effectiveDate: Date = loan.returnedAt ?? new Date();
+  const endDate = new Date(loan.endDate);
+
+  if (effectiveDate <= endDate) return;
+
+  const daysOverdue = Math.ceil(
+    (effectiveDate.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (daysOverdue <= 0) return;
+
+  // Load organisation late-fee settings
+  const org = await Organization.findById(organizationId)
+    .select("settings")
+    .session(session);
+
+  const mode = org?.settings?.lateFeeMode ?? "fixed";
+  const value = org?.settings?.lateFeeValue ?? 0;
+
+  if (value <= 0) return; // no late-fee configured
+
+  // Original rental subtotal (from frozen pricing snapshot)
+  const subtotal = (loan.pricingSnapshot ?? []).reduce(
+    (sum: number, item: any) => sum + (item.totalPrice ?? 0),
+    0,
+  );
+
+  let lateFeeAmount: number;
+  if (mode === "percentage") {
+    lateFeeAmount = Math.round(subtotal * value * daysOverdue * 100) / 100;
+  } else {
+    lateFeeAmount = Math.round(value * daysOverdue * 100) / 100;
+  }
+
+  if (lateFeeAmount <= 0) return;
+
+  // Idempotency — check for an existing non-cancelled late_fee invoice
+  const existingInvoice = await Invoice.findOne({
+    loanId: loan._id,
+    organizationId,
+    type: "late_fee",
+    status: { $nin: ["cancelled", "refunded"] },
+  }).session(session);
+
+  if (existingInvoice) {
+    const existingAmount = existingInvoice.totalAmount ?? 0;
+    if (Math.abs(existingAmount - lateFeeAmount) < 0.01) {
+      return; // same amount — nothing to do
+    }
+
+    // Void the outdated invoice and reverse its effect on the loan
+    existingInvoice.status = "cancelled";
+    existingInvoice.notes =
+      (existingInvoice.notes ?? "") +
+      "\nAnulada automáticamente: recalculada por cambio en días de mora";
+    await existingInvoice.save({ session });
+
+    loan.lateFees = Math.max(0, (loan.lateFees ?? 0) - existingAmount);
+    loan.totalAmount = Math.max(0, (loan.totalAmount ?? 0) - existingAmount);
+  }
+
+  // Create the new late_fee invoice
+  const dueDays = org?.settings?.lateFeeDueDays ?? 30;
+  const invoiceDueDate = new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000);
+
+  const dailyRate =
+    mode === "percentage" ? Math.round(subtotal * value * 100) / 100 : value;
+
+  const invoiceNumber = await codeGenerationService.generateCode({
+    organizationId: String(organizationId),
+    entityType: "invoice",
+    context: {
+      ...(loan.locationId ? { locationId: loan.locationId } : {}),
+    },
+    session,
+  });
+
+  await (Invoice as any).create(
+    [
+      {
+        organizationId,
+        customerId: loan.customerId,
+        loanId: loan._id,
+        type: "late_fee",
+        lineItems: [
+          {
+            description: `Cargo por mora: ${daysOverdue} día(s) de retraso`,
+            quantity: daysOverdue,
+            unitPrice: dailyRate,
+            totalPrice: lateFeeAmount,
+            referenceId: loan._id,
+            referenceType: "Loan",
+          },
+        ],
+        subtotal: lateFeeAmount,
+        taxRate: 0,
+        taxAmount: 0,
+        totalAmount: lateFeeAmount,
+        amountDue: lateFeeAmount,
+        status: "pending",
+        dueDate: invoiceDueDate,
+        createdBy: triggeredBy,
+        invoiceNumber,
+      },
+    ],
+    { session },
+  );
+
+  // Update loan financial summary (caller saves)
+  loan.lateFees = (loan.lateFees ?? 0) + lateFeeAmount;
+  loan.totalAmount = (loan.totalAmount ?? 0) + lateFeeAmount;
 }
 
 export interface CreateLoanFromRequestInput {
@@ -207,10 +337,12 @@ export const loanService = {
 
   /**
    * Returns a loan and updates material status to 'returned'.
+   * If the loan is overdue, calculates and applies a late fee.
    */
   async returnLoan(
     loanId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
     notes?: string,
   ): Promise<LoanDocument> {
     const session = await startSession();
@@ -249,6 +381,14 @@ export const loanService = {
         if (loanDeposit?.amount > 0 && loanDeposit.status === "held") {
           loanDeposit.status = "refund_pending";
         }
+
+        // Apply late fee if the loan was returned past its end date
+        await applyLateFee({
+          loan,
+          organizationId,
+          triggeredBy: new Types.ObjectId(userId),
+          session,
+        });
 
         await loan.save({ session });
 

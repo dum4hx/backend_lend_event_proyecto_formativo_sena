@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 import { Types } from "mongoose";
 import {
-  LoanRequestZodSchema,
+  LoanRequestBaseZodSchema,
   requestStatusOptions,
 } from "./models/request.model.ts";
 import { requestService } from "./request.service.ts";
@@ -56,7 +56,7 @@ const createRequestItemSchema = z.object({
   quantity: z.number().int().positive().default(1),
 });
 
-const createRequestSchema = LoanRequestZodSchema.pick({
+const createRequestSchema = LoanRequestBaseZodSchema.pick({
   customerId: true,
   startDate: true,
   endDate: true,

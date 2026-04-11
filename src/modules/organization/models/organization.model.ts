@@ -62,6 +62,17 @@ export const OrganizationSettingsZodSchema = z.object({
     .max(365, "Máximo 365 días")
     .optional(),
   requireFullPaymentBeforeCheckout: z.boolean().optional(),
+  lateFeeMode: z.enum(["percentage", "fixed"]).optional(),
+  lateFeeValue: z
+    .number()
+    .min(0, "El valor de la mora debe ser mayor o igual a 0")
+    .optional(),
+  lateFeeDueDays: z
+    .number()
+    .int()
+    .min(1, "Mínimo 1 día")
+    .max(365, "Máximo 365 días")
+    .optional(),
 });
 
 export type OrganizationSettingsInput = z.infer<
@@ -81,6 +92,22 @@ const settingsSchema = new Schema(
     requireFullPaymentBeforeCheckout: {
       type: Boolean,
       default: false,
+    },
+    lateFeeMode: {
+      type: String,
+      enum: ["percentage", "fixed"],
+      default: "fixed",
+    },
+    lateFeeValue: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lateFeeDueDays: {
+      type: Number,
+      default: 30,
+      min: 1,
+      max: 365,
     },
   },
   { _id: false },

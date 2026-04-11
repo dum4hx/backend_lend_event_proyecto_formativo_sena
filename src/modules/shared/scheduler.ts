@@ -1,9 +1,11 @@
+import { Types, startSession } from "mongoose";
 import { Loan } from "../loan/models/loan.model.ts";
 import { LoanRequest } from "../request/models/request.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { Organization } from "../organization/models/organization.model.ts";
 import { organizationService } from "../organization/organization.service.ts";
+import { applyLateFee } from "../loan/loan.service.ts";
 import { logger } from "../../utils/logger.ts";
 import { emailService } from "../../utils/email.ts";
 import {
@@ -44,8 +46,34 @@ async function detectOverdueLoans(): Promise<void> {
       } catch {
         continue; // skip loans whose status doesn't allow this transition
       }
-      loan.status = "overdue";
-      await loan.save();
+
+      // Transition to overdue + apply late fee atomically
+      const loanSession = await startSession();
+      try {
+        await loanSession.withTransaction(async () => {
+          const freshLoan = await Loan.findById(loan._id).session(loanSession);
+          if (!freshLoan || freshLoan.status !== "active") return;
+
+          freshLoan.status = "overdue";
+
+          await applyLateFee({
+            loan: freshLoan,
+            organizationId: freshLoan.organizationId,
+            triggeredBy: freshLoan.checkedOutBy as Types.ObjectId,
+            session: loanSession,
+          });
+
+          await freshLoan.save({ session: loanSession });
+        });
+      } catch (txnErr) {
+        logger.error("Failed to transition loan to overdue with late fee", {
+          loanId: loan._id.toString(),
+          error: txnErr,
+        });
+        continue; // skip incident/email on failure
+      } finally {
+        await loanSession.endSession();
+      }
 
       // Create overdue incident (idempotent — skips if one already exists)
       try {

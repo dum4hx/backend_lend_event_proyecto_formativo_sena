@@ -315,6 +315,10 @@ export const inspectionService = {
             { session },
           );
 
+          // Update loan financial summary with damage costs
+          (loan as any).damageFees = totalDamageCost;
+          loan.totalAmount = (loan.totalAmount ?? 0) + totalDamageCost;
+
           // Auto-apply deposit to the invoice if one exists
           const loanDeposit = (loan as any).deposit;
           const depositAmt: number = loanDeposit?.amount ?? 0;
@@ -344,6 +348,9 @@ export const inspectionService = {
               reference: `Aplicado a la factura ${invoiceNumber}`,
             });
             loanDeposit.status = newDepositStatus;
+            await loan.save({ session });
+          } else {
+            // No deposit — still need to persist the loan financial update
             await loan.save({ session });
           }
         } else if (totalDamageCost === 0) {
