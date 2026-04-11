@@ -14,6 +14,41 @@ import { conditionAfterToInstanceStatus } from "../shared/instance_status_mapper
 import { materialService } from "../material/material.service.ts";
 import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 
+/**
+ * Transforms inspection document to convert roleId -> role, name -> profile, and modelId -> materialType
+ */
+function transformInspection(inspection: any) {
+  const inspectionObj = inspection.toObject ? inspection.toObject() : inspection;
+  
+  // Transform inspectedBy.name -> inspectedBy.profile and inspectedBy.roleId -> inspectedBy.role
+  if (inspectionObj.inspectedBy) {
+    // Convert name -> profile
+    if (inspectionObj.inspectedBy.name) {
+      inspectionObj.inspectedBy.profile = inspectionObj.inspectedBy.name;
+      delete inspectionObj.inspectedBy.name;
+    }
+    
+    // Convert roleId -> role
+    if (inspectionObj.inspectedBy.roleId) {
+      inspectionObj.inspectedBy.role = inspectionObj.inspectedBy.roleId;
+      delete inspectionObj.inspectedBy.roleId;
+    }
+  }
+  
+  // Transform items[].materialInstanceId.modelId -> items[].materialType
+  if (inspectionObj.items && Array.isArray(inspectionObj.items)) {
+    inspectionObj.items = inspectionObj.items.map((item: any) => {
+      if (item.materialInstanceId?.modelId) {
+        item.materialType = item.materialInstanceId.modelId;
+        delete item.materialInstanceId.modelId;
+      }
+      return item;
+    });
+  }
+  
+  return inspectionObj;
+}
+
 export const inspectionService = {
   /**
    * Lists all inspections with pagination and optional loan filter.
@@ -37,14 +72,28 @@ export const inspectionService = {
         .skip(skip)
         .limit(limit)
         .populate("loanId", "customerId startDate endDate code")
-        .populate("inspectedBy", "email profile.firstName")
-        .populate("items.materialInstanceId", "serialNumber modelId")
+        .populate({
+          path: "inspectedBy",
+          select: "email name roleId",
+          populate: {
+            path: "roleId",
+            select: "name",
+          },
+        })
+        .populate({
+          path: "items.materialInstanceId",
+          select: "serialNumber modelId",
+          populate: {
+            path: "modelId",
+            select: "_id name",
+          },
+        })
         .sort({ createdAt: -1 }),
       Inspection.countDocuments(query),
     ]);
 
     return {
-      inspections,
+      inspections: inspections.map(transformInspection),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -60,14 +109,28 @@ export const inspectionService = {
       organizationId,
     })
       .populate("loanId")
-      .populate("inspectedBy", "email profile")
-      .populate("items.materialInstanceId", "serialNumber modelId");
+      .populate({
+        path: "inspectedBy",
+        select: "email name roleId",
+        populate: {
+          path: "roleId",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "items.materialInstanceId",
+        select: "serialNumber modelId",
+        populate: {
+          path: "modelId",
+          select: "_id name",
+        },
+      });
 
     if (!inspection) {
       throw AppError.notFound("Inspección no encontrada");
     }
 
-    return inspection;
+    return transformInspection(inspection);
   },
 
   /**
