@@ -4,13 +4,27 @@ import { AppError } from "../../errors/AppError.ts";
 import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import rolesService from "../roles/roles.service.ts";
+import { LocationService } from "../location/location.service.ts";
 import crypto from "crypto";
 
 const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner"]);
+const LOCATION_MANAGER_ROLE_NAME_VARIANTS = new Set([
+  "gerente",
+  "gerente de sede",
+  "manager",
+  "branch manager",
+  "propietario",
+  "owner",
+]);
 
 function isOwnerRoleName(roleName?: string | null): boolean {
   if (!roleName) return false;
   return OWNER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
+}
+
+function isLocationManagerRoleName(roleName?: string | null): boolean {
+  if (!roleName) return false;
+  return LOCATION_MANAGER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
 }
 
 /* ---------- User Service ---------- */
@@ -126,6 +140,32 @@ export const userService = {
       throw AppError.notFound("Usuario no encontrado");
     }
 
+    if (data.roleId && data.roleId !== existingUser.roleId) {
+      const [currentRoleName, nextRoleName, managedLocationsCount] =
+        await Promise.all([
+          rolesService.getRoleName(existingUser.roleId),
+          rolesService.getRoleName(data.roleId),
+          LocationService.countLocationsByManager(
+            existingUser._id,
+            organizationId,
+          ),
+        ]);
+
+      if (
+        managedLocationsCount > 0 &&
+        isLocationManagerRoleName(currentRoleName) &&
+        !isLocationManagerRoleName(nextRoleName)
+      ) {
+        throw AppError.conflict(
+          "No se puede cambiar el rol porque el usuario aún tiene sedes asignadas como gerente. Reasigna primero sus sedes",
+          {
+            code: "LOCATION_MANAGER_ROLE_CHANGE_BLOCKED",
+            managedLocationsCount,
+          },
+        );
+      }
+    }
+
     if (data.locations !== undefined || data.roleId !== undefined) {
       const resolvedLocations =
         data.locations ??
@@ -210,6 +250,25 @@ export const userService = {
       currentLocationIds,
     );
 
+    const [currentRoleName, managedLocationsCount] = await Promise.all([
+      rolesService.getRoleName(user.roleId),
+      LocationService.countLocationsByManager(user._id, organizationId),
+    ]);
+
+    if (
+      managedLocationsCount > 0 &&
+      isLocationManagerRoleName(currentRoleName) &&
+      !isLocationManagerRoleName(newRoleName)
+    ) {
+      throw AppError.conflict(
+        "No se puede cambiar el rol porque el usuario aún tiene sedes asignadas como gerente. Reasigna primero sus sedes",
+        {
+          code: "LOCATION_MANAGER_ROLE_CHANGE_BLOCKED",
+          managedLocationsCount,
+        },
+      );
+    }
+
     user.roleId = newRoleId;
     await user.save();
 
@@ -244,6 +303,21 @@ export const userService = {
     if (isOwnerRoleName(await user.getRoleName())) {
       throw AppError.badRequest(
         "No se puede desactivar al propietario de la organización",
+      );
+    }
+
+    const managedLocationsCount = await LocationService.countLocationsByManager(
+      user._id,
+      organizationId,
+    );
+
+    if (managedLocationsCount > 0) {
+      throw AppError.conflict(
+        "No se puede desactivar al usuario porque aún tiene sedes asignadas como gerente. Reasigna primero sus sedes",
+        {
+          code: "LOCATION_MANAGER_DEACTIVATION_BLOCKED",
+          managedLocationsCount,
+        },
       );
     }
 
@@ -322,6 +396,21 @@ export const userService = {
     if (isOwnerRoleName(await user.getRoleName())) {
       throw AppError.badRequest(
         "No se puede eliminar al propietario de la organización",
+      );
+    }
+
+    const managedLocationsCount = await LocationService.countLocationsByManager(
+      user._id,
+      organizationId,
+    );
+
+    if (managedLocationsCount > 0) {
+      throw AppError.conflict(
+        "No se puede eliminar al usuario porque aún tiene sedes asignadas como gerente. Reasigna primero sus sedes",
+        {
+          code: "LOCATION_MANAGER_DELETE_BLOCKED",
+          managedLocationsCount,
+        },
       );
     }
 
