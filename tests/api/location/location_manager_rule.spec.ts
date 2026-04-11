@@ -16,7 +16,9 @@ test.describe("Location Manager Rule", () => {
   let currentUserId: string;
   let currentUserEmail: string;
   let nonManagerRoleId: string;
+  let managerRoleId: string;
   let locationId: string;
+  let alternateManagerId: string;
 
   test.beforeAll(async ({ request }) => {
     const meRes = await request.get("auth/me");
@@ -33,11 +35,17 @@ test.describe("Location Manager Rule", () => {
       return normalized !== "gerente" && normalized !== "propietario";
     });
 
-    if (!nonManagerRole) {
-      throw new Error("No se encontró un rol no gerente para las pruebas");
+    const managerRole = (rolesBody.data.items as Array<any>).find((role) => {
+      const normalized = (role.name ?? "").toLowerCase().trim();
+      return normalized === "gerente" || normalized === "manager";
+    });
+
+    if (!nonManagerRole || !managerRole) {
+      throw new Error("No se encontraron roles requeridos para las pruebas");
     }
 
     nonManagerRoleId = nonManagerRole._id;
+    managerRoleId = managerRole._id;
   });
 
   test("POST /locations - debe rechazar creación sin managerId", async ({ request }) => {
@@ -171,6 +179,24 @@ test.describe("Location Manager Rule", () => {
     locationId = body.data._id;
   });
 
+  test("POST /locations - debe rechazar asignar el mismo gerente en dos sedes", async ({
+    request,
+  }) => {
+    const response = await request.post("locations", {
+      data: {
+        code: `LOC${Date.now()}DUP`,
+        name: `Sede gerente duplicado ${Date.now()}`,
+        managerId: currentUserId,
+        address: buildAddress(),
+      },
+    });
+
+    expect(response.status()).toBe(409);
+    const body = await response.json();
+    expect(body.code).toBe("CONFLICT");
+    expect(body.message).toContain("solo se permite una sede activa");
+  });
+
   test("PATCH /locations/:id - debe rechazar intento de quitar manager", async ({
     request,
   }) => {
@@ -235,13 +261,27 @@ test.describe("Location Manager Rule", () => {
   test("POST /locations/import - debe procesar filas válidas e inválidas", async ({
     request,
   }) => {
+    const inviteManagerRes = await request.post("users/invite", {
+      data: {
+        name: { firstName: "Manager", firstSurname: "Import" },
+        email: generateRandomEmail(),
+        phone: `+57300${Math.floor(Math.random() * 10000000)}`,
+        roleId: managerRoleId,
+        locations: [locationId],
+      },
+    });
+
+    expect(inviteManagerRes.status()).toBe(201);
+    const inviteManagerBody = await inviteManagerRes.json();
+    alternateManagerId = inviteManagerBody.data.user.id;
+
     const response = await request.post("locations/import", {
       data: {
         rows: [
           {
             code: `LOC${Date.now()}A`,
             name: `Import válida ${Date.now()}`,
-            managerId: currentUserId,
+            managerId: alternateManagerId,
             address: buildAddress(),
           },
           {

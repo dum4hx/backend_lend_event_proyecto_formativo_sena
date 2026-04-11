@@ -136,6 +136,8 @@ const MANAGER_ROLE_NAME_VARIANTS = new Set([
   "branch manager",
 ]);
 
+const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner", "dueño", "dueno"]);
+
 // ============================================================================
 // SERVICE CLASS
 // ============================================================================
@@ -146,9 +148,38 @@ export class LocationService {
     return MANAGER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
   }
 
+  private static isOwnerRoleName(roleName?: string | null): boolean {
+    if (!roleName) return false;
+    return OWNER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
+  }
+
+  private static async syncUserLocationAssignment(params: {
+    userId: string;
+    organizationId: Types.ObjectId | string;
+    locationId: Types.ObjectId | string;
+    roleName?: string | null;
+  }): Promise<void> {
+    const { userId, organizationId, locationId, roleName } = params;
+
+    if (this.isOwnerRoleName(roleName)) {
+      await User.updateOne(
+        { _id: userId, organizationId },
+        { $addToSet: { locations: locationId } },
+      );
+      return;
+    }
+
+    // Non-owner users can only be associated with one location at a time.
+    await User.updateOne(
+      { _id: userId, organizationId },
+      { $set: { locations: [locationId] } },
+    );
+  }
+
   private static async validateManagerAssignment(
     managerId: string,
     organizationId: Types.ObjectId | string,
+    options?: { currentLocationId?: string },
   ) {
     if (!Types.ObjectId.isValid(managerId)) {
       throw AppError.badRequest("Formato de ID de gerente no válido");
@@ -188,6 +219,33 @@ export class LocationService {
       throw AppError.conflict("El gerente asignado debe estar activo", {
         code: "LOCATION_MANAGER_INACTIVE",
       });
+    }
+
+    const conflictingLocationQuery: Record<string, unknown> = {
+      organizationId,
+      managerId: manager._id,
+    };
+
+    if (options?.currentLocationId) {
+      conflictingLocationQuery._id = { $ne: options.currentLocationId };
+    }
+
+    const conflictingLocation = await Location.findOne(conflictingLocationQuery)
+      .select("_id name code")
+      .lean();
+
+    if (conflictingLocation && !this.isOwnerRoleName(roleName)) {
+      throw AppError.conflict(
+        "El usuario ya está asignado a otra sede. Para roles distintos a Dueño solo se permite una sede activa",
+        {
+          code: "LOCATION_MANAGER_ALREADY_ASSIGNED",
+          conflictingLocation: {
+            id: conflictingLocation._id.toString(),
+            name: conflictingLocation.name,
+            code: conflictingLocation.code,
+          },
+        },
+      );
     }
 
     return {
@@ -384,7 +442,7 @@ export class LocationService {
   static async createLocation(data: CreateLocationData) {
     const { userId, ...locationData } = data;
 
-    await this.validateManagerAssignment(
+    const validatedManager = await this.validateManagerAssignment(
       locationData.managerId,
       locationData.organizationId,
     );
@@ -412,11 +470,27 @@ export class LocationService {
     // Create and return new location
     const location = await Location.create(locationData);
 
-    // Automatically associate the creator with the location
-    await User.updateOne(
-      { _id: userId },
-      { $addToSet: { locations: location._id } },
-    );
+    const [creator, managerRoleName] = await Promise.all([
+      User.findById(userId).select("_id roleId organizationId").lean(),
+      Promise.resolve(validatedManager.roleName),
+    ]);
+
+    if (creator && creator.organizationId.toString() === locationData.organizationId.toString()) {
+      const creatorRoleName = await rolesService.getRoleName(creator.roleId);
+      await this.syncUserLocationAssignment({
+        userId,
+        organizationId: locationData.organizationId,
+        locationId: location._id,
+        roleName: creatorRoleName,
+      });
+    }
+
+    await this.syncUserLocationAssignment({
+      userId: locationData.managerId,
+      organizationId: locationData.organizationId,
+      locationId: location._id,
+      roleName: managerRoleName,
+    });
 
     const locationWithManager = await Location.findById(location._id).populate(
       this.getManagerPopulateConfig(),
@@ -468,6 +542,8 @@ export class LocationService {
       }
     }
 
+    const previousManagerId = existingLocation.managerId?.toString();
+
     const resolvedManagerId =
       data.managerId ?? existingLocation.managerId?.toString();
 
@@ -485,8 +561,18 @@ export class LocationService {
       existingLocation.managerId === undefined ||
       existingLocation.managerId === null
     ) {
-      await this.validateManagerAssignment(resolvedManagerId, organizationId);
+      await this.validateManagerAssignment(resolvedManagerId, organizationId, {
+        currentLocationId: id,
+      });
     }
+
+    const resolvedManager = await this.validateManagerAssignment(
+      resolvedManagerId,
+      organizationId,
+      {
+        currentLocationId: id,
+      },
+    );
 
     // Update with organization scope
     const location = await Location.findOneAndUpdate(
@@ -494,6 +580,20 @@ export class LocationService {
       { $set: { ...data, managerId: resolvedManagerId } },
       { new: true, runValidators: true }, // Return new document + validate
     ).populate(this.getManagerPopulateConfig());
+
+    if (previousManagerId && previousManagerId !== resolvedManagerId) {
+      await User.updateOne(
+        { _id: previousManagerId, organizationId },
+        { $pull: { locations: id } },
+      );
+    }
+
+    await this.syncUserLocationAssignment({
+      userId: resolvedManagerId,
+      organizationId,
+      locationId: id,
+      roleName: resolvedManager.roleName,
+    });
 
     return await this.mapLocationWithManager(location);
   }
