@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import { Types, type ClientSession } from "mongoose";
 import { Location } from "./models/location.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
@@ -124,6 +124,11 @@ interface ImportLocationsData {
   rows: ImportLocationRowInput[];
 }
 
+interface LocationOccupancySnapshot {
+  occupied: number;
+  byMaterialType: Map<string, number>;
+}
+
 /**
  * Valid role names that can be assigned as location managers.
  * Only Manager/Gerente roles can be assigned to a specific location.
@@ -143,6 +148,139 @@ const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner", "dueño", "due
 // ============================================================================
 
 export class LocationService {
+  private static async getLocationOccupancySnapshots(params: {
+    organizationId: Types.ObjectId | string;
+    locationIds: Array<Types.ObjectId | string>;
+    session?: ClientSession;
+  }): Promise<Map<string, LocationOccupancySnapshot>> {
+    const { organizationId, locationIds, session } = params;
+
+    if (locationIds.length === 0) {
+      return new Map();
+    }
+
+    const organizationObjectId =
+      organizationId instanceof Types.ObjectId
+        ? organizationId
+        : new Types.ObjectId(String(organizationId));
+
+    const locationObjectIds = locationIds.map((locationId) =>
+      locationId instanceof Types.ObjectId
+        ? locationId
+        : new Types.ObjectId(String(locationId)),
+    );
+
+    const aggregateQuery = MaterialInstance.aggregate<{
+      _id: {
+        locationId: Types.ObjectId;
+        modelId: Types.ObjectId;
+      };
+      quantity: number;
+    }>([
+      {
+        $match: {
+          organizationId: organizationObjectId,
+          locationId: { $in: locationObjectIds },
+          status: { $ne: "retired" },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            locationId: "$locationId",
+            modelId: "$modelId",
+          },
+          quantity: { $sum: 1 },
+        },
+      },
+    ]);
+
+    if (session) {
+      aggregateQuery.session(session);
+    }
+
+    const rows = await aggregateQuery;
+
+    const result = new Map<string, LocationOccupancySnapshot>();
+    for (const row of rows) {
+      const locationKey = row._id.locationId.toString();
+      const modelKey = row._id.modelId.toString();
+      const existing =
+        result.get(locationKey) ??
+        ({ occupied: 0, byMaterialType: new Map<string, number>() } as LocationOccupancySnapshot);
+
+      existing.byMaterialType.set(modelKey, row.quantity);
+      existing.occupied += row.quantity;
+      result.set(locationKey, existing);
+    }
+
+    return result;
+  }
+
+  private static applyLiveOccupancyToLocation(
+    locationInput: any,
+    snapshot?: LocationOccupancySnapshot,
+  ) {
+    const location = locationInput?.toObject
+      ? locationInput.toObject()
+      : locationInput;
+
+    const materialCapacities = Array.isArray(location.materialCapacities)
+      ? location.materialCapacities.map((entry: any) => {
+          const materialTypeKey = String(entry.materialTypeId);
+          const liveQuantity =
+            snapshot?.byMaterialType.get(materialTypeKey) ?? 0;
+
+          return {
+            ...entry,
+            currentQuantity: liveQuantity,
+          };
+        })
+      : [];
+
+    const totalCapacity = materialCapacities.reduce(
+      (sum: number, entry: any) => sum + (entry.maxQuantity ?? 0),
+      0,
+    );
+
+    const occupied = snapshot?.occupied ?? 0;
+    const occupancyRate =
+      totalCapacity > 0
+        ? Math.round((occupied / totalCapacity) * 10000) / 100
+        : 0;
+
+    return {
+      ...location,
+      materialCapacities,
+      occupied,
+      occupancySummary: {
+        totalCapacity,
+        occupied,
+        occupancyRate,
+      },
+    };
+  }
+
+  private static async enrichLocationsWithLiveOccupancy(
+    organizationId: Types.ObjectId | string,
+    locations: any[],
+  ) {
+    if (!locations.length) return locations;
+
+    const locationIds = locations.map((location) => String(location._id));
+    const snapshots = await this.getLocationOccupancySnapshots({
+      organizationId,
+      locationIds,
+    });
+
+    return locations.map((location) =>
+      this.applyLiveOccupancyToLocation(
+        location,
+        snapshots.get(String(location._id)),
+      ),
+    );
+  }
+
   private static isValidManagerRoleName(roleName?: string | null): boolean {
     if (!roleName) return false;
     return MANAGER_ROLE_NAME_VARIANTS.has(roleName.trim().toLowerCase());
@@ -373,9 +511,14 @@ export class LocationService {
       items.map((item) => this.mapLocationWithManager(item)),
     );
 
+    const enrichedItems = await this.enrichLocationsWithLiveOccupancy(
+      organizationId,
+      itemsWithManager,
+    );
+
     // Return data with pagination metadata
     return {
-      items: itemsWithManager,
+      items: enrichedItems,
       pagination: {
         page,
         limit,
@@ -420,11 +563,16 @@ export class LocationService {
       throw AppError.notFound("Ubicación no encontrada");
     }
 
-    if (options?.includeManager) {
-      return await this.mapLocationWithManager(location);
-    }
+    const mappedLocation = options?.includeManager
+      ? await this.mapLocationWithManager(location)
+      : location.toObject();
 
-    return location;
+    const [enriched] = await this.enrichLocationsWithLiveOccupancy(
+      organizationId,
+      [mappedLocation],
+    );
+
+    return enriched;
   }
 
   /**
@@ -894,5 +1042,65 @@ export class LocationService {
    */
   static async getLocationsCount(organizationId: string): Promise<number> {
     return await Location.countDocuments({ organizationId });
+  }
+
+  static async recalculateMaterialCapacitiesCurrentQuantity(params: {
+    organizationId: Types.ObjectId | string;
+    locationIds?: Array<Types.ObjectId | string>;
+    session?: ClientSession;
+  }): Promise<{ processed: number }> {
+    const { organizationId, locationIds, session } = params;
+
+    const locationQuery: Record<string, unknown> = { organizationId };
+    if (locationIds && locationIds.length > 0) {
+      locationQuery._id = {
+        $in: locationIds.map((id) =>
+          id instanceof Types.ObjectId ? id : new Types.ObjectId(String(id)),
+        ),
+      };
+    }
+
+    const query = Location.find(locationQuery).select("_id materialCapacities");
+    if (session) {
+      query.session(session);
+    }
+
+    const locations = await query;
+    if (locations.length === 0) {
+      return { processed: 0 };
+    }
+
+    const snapshots = await this.getLocationOccupancySnapshots({
+      organizationId,
+      locationIds: locations.map((location) => location._id),
+      ...(session ? { session } : {}),
+    });
+
+    const bulkOps = locations.map((location) => {
+      const snapshot = snapshots.get(location._id.toString());
+      const materialCapacities = (location.materialCapacities ?? []).map((entry: any) => ({
+        materialTypeId: entry.materialTypeId,
+        maxQuantity: entry.maxQuantity,
+        currentQuantity:
+          snapshot?.byMaterialType.get(String(entry.materialTypeId)) ?? 0,
+      }));
+
+      return {
+        updateOne: {
+          filter: { _id: location._id },
+          update: {
+            $set: {
+              materialCapacities,
+            },
+          },
+        },
+      };
+    });
+
+    if (bulkOps.length > 0) {
+      await Location.bulkWrite(bulkOps, session ? { session } : undefined);
+    }
+
+    return { processed: locations.length };
   }
 }
