@@ -48,7 +48,7 @@ const inviteUserSchema = z.object({
     z.string().refine((val) => Types.ObjectId.isValid(val), {
       message: "ID de ubicación no válido",
     }),
-  ),
+  ).min(1, "Debe seleccionar al menos una ubicación"),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/),
   roleId: z.string(),
 });

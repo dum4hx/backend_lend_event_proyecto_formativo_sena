@@ -52,7 +52,7 @@ export const UserZodSchema = z.object({
     z.string().refine((val) => Types.ObjectId.isValid(val), {
       message: "Formato de ID de ubicación no válido",
     }),
-  ),
+  ).min(1, "Debe seleccionar al menos una ubicación"),
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Formato de ID de organización no válido",
   }),
