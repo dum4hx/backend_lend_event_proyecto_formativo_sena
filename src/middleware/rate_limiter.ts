@@ -49,7 +49,7 @@ export const createRateLimiter = (options: RateLimitOptions) => {
     windowMs,
     maxRequests,
     keyGenerator = defaultKeyGenerator,
-    message = "Too many requests. Please try again later.",
+    message = "Demasiadas solicitudes. Por favor intenta de nuevo más tarde.",
   } = options;
 
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -122,7 +122,7 @@ export const authRateLimiter = createRateLimiter({
   maxRequests: process.env.NODE_ENV === "test" ? 1000 : 5,
   keyGenerator: (req) =>
     `auth:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`,
-  message: "Too many authentication attempts. Please try again later.",
+  message: "Demasiados intentos de autenticación. Por favor intenta de nuevo más tarde.",
 });
 
 /**
@@ -134,7 +134,7 @@ export const passwordResetRateLimiter = createRateLimiter({
   maxRequests: 4,
   keyGenerator: (req) =>
     `pwd-reset:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`,
-  message: "Too many password reset attempts. Please try again in an hour.",
+  message: "Demasiados intentos de restablecimiento de contraseña. Por favor intenta de nuevo en una hora.",
 });
 
 /**
@@ -161,5 +161,5 @@ export const paymentRateLimiter = createRateLimiter({
     }
     return `payment:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`;
   },
-  message: "Too many payment requests. Please try again later.",
+  message: "Demasiadas solicitudes de pago. Por favor intenta de nuevo más tarde.",
 });

@@ -66,12 +66,12 @@ export function validateTransition(
   const allowed = map[current];
   if (!allowed) {
     throw AppError.conflict(
-      `Unknown status "${current}" — cannot determine valid transitions`,
+      `Estado desconocido "${current}" — no se pueden determinar las transiciones válidas`,
     );
   }
   if (!allowed.includes(next)) {
     throw AppError.conflict(
-      `Invalid status transition from "${current}" to "${next}"`,
+      `Transición de estado no válida de "${current}" a "${next}"`,
     );
   }
 }
