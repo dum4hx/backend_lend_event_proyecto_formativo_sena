@@ -86,6 +86,22 @@ const listLocationsQuerySchema = paginationSchema.extend({
  */
 const createLocationSchema = LocationZodSchema;
 const updateLocationSchema = LocationZodSchema.partial();
+const importLocationRowSchema = LocationZodSchema.partial()
+  .required({ name: true, code: true, address: true })
+  .extend({
+    managerId: z.string().optional(),
+    managerEmail: z.email("Formato de correo electrónico no válido").optional(),
+  })
+  .refine((row) => !!row.managerId || !!row.managerEmail, {
+    message: "Cada fila debe incluir managerId o managerEmail",
+    path: ["managerId"],
+  });
+
+const importLocationsSchema = z.object({
+  rows: z
+    .array(importLocationRowSchema)
+    .min(1, "Debes enviar al menos una fila para importar"),
+});
 
 // ============================================================================
 // ENDPOINTS
@@ -163,6 +179,40 @@ locationRouter.get(
 );
 
 /**
+ * POST /api/v1/locations/import
+ * Imports multiple locations in a single request.
+ *
+ * Each row must include a manager via managerId or managerEmail.
+ * The backend validates manager existence, organization, active status,
+ * and role compatibility for every row.
+ */
+locationRouter.post(
+  "/import",
+  requirePermission("locations:create"),
+  validateBody(importLocationsSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const userId = getUserId(req).toString();
+
+      const result = await LocationService.importLocations({
+        organizationId,
+        userId,
+        rows: req.body.rows,
+      });
+
+      res.status(200).json({
+        status: "success",
+        message: "Importación de ubicaciones procesada",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
  * GET /api/v1/locations/:id
  * Gets a specific location by its ID
  *
@@ -195,6 +245,7 @@ locationRouter.get(
       const location = await LocationService.getLocationById(
         id,
         organizationId,
+        { includeManager: true },
       );
 
       // Successful response

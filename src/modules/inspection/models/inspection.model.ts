@@ -140,7 +140,7 @@ const itemInspectionMongooseSchema = new Schema(
     // Transition tracking
     transitionedToStatus: {
       type: String,
-      enum: ["available", "maintenance", "damaged", "retired"],
+      enum: ["available", "maintenance", "damaged", "lost", "retired"],
     },
   },
   { _id: true },

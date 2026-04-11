@@ -1,5 +1,6 @@
-import { Types } from "mongoose";
+import { Types, startSession } from "mongoose";
 import { Invoice, type InvoiceDocument } from "./models/invoice.model.ts";
+import { Loan } from "../loan/models/loan.model.ts";
 import { PaymentMethod } from "../payment/models/payment_method.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
@@ -79,7 +80,11 @@ export const invoiceService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "email name")
-        .populate("loanId", "startDate endDate")
+        .populate("loanId", "startDate endDate code")
+        .populate({
+          path: "payments.paymentMethodId",
+          model: "PaymentMethod",
+        })
         .sort({ [sortBy]: sortDirection }),
       Invoice.countDocuments(query),
     ]);
@@ -149,7 +154,11 @@ export const invoiceService = {
     })
       .populate("customerId", "email name phone address")
       .populate("loanId")
-      .populate("inspectionId");
+      .populate("inspectionId")
+      .populate({
+        path: "payments.paymentMethodId",
+        model: "PaymentMethod",
+      });
 
     if (!invoice) {
       throw AppError.notFound("Factura no encontrada");
@@ -294,7 +303,9 @@ export const invoiceService = {
   },
 
   /**
-   * Voids (cancels) an invoice
+   * Voids (cancels) an invoice.
+   * If the invoice is a damage invoice linked to a loan, reverses
+   * loan.damageFees and loan.totalAmount accordingly.
    */
   async voidInvoice(params: {
     id: string;
@@ -303,21 +314,66 @@ export const invoiceService = {
   }) {
     const { id, organizationId, reason } = params;
 
-    const invoice = await Invoice.findOne({
-      _id: id,
-      organizationId,
-      status: { $in: ["pending", "partially_paid"] },
-    });
+    const session = await startSession();
+    let result: InvoiceDocument | undefined;
 
-    if (!invoice) {
-      throw AppError.notFound("Factura no encontrada o no se puede anular");
+    try {
+      await session.withTransaction(async () => {
+        const invoice = await Invoice.findOne(
+          {
+            _id: id,
+            organizationId,
+            status: { $in: ["pending", "partially_paid"] },
+          },
+          null,
+          { session },
+        );
+
+        if (!invoice) {
+          throw AppError.notFound("Factura no encontrada o no se puede anular");
+        }
+
+        invoice.status = "cancelled";
+        invoice.notes = (invoice.notes ?? "") + `\nVoid reason: ${reason}`;
+        await invoice.save({ session });
+
+        // If this is a damage or late_fee invoice, reverse the loan financial summary
+        const loanId = (invoice as any).loanId;
+        if (
+          (invoice.type === "damage" || invoice.type === "late_fee") &&
+          loanId
+        ) {
+          const loan = await Loan.findOne(
+            { _id: loanId, organizationId },
+            null,
+            { session },
+          );
+
+          if (loan) {
+            const voided = invoice.totalAmount ?? 0;
+            if (invoice.type === "damage") {
+              (loan as any).damageFees = Math.max(
+                0,
+                ((loan as any).damageFees ?? 0) - voided,
+              );
+            } else {
+              (loan as any).lateFees = Math.max(
+                0,
+                ((loan as any).lateFees ?? 0) - voided,
+              );
+            }
+            loan.totalAmount = Math.max(0, (loan.totalAmount ?? 0) - voided);
+            await loan.save({ session });
+          }
+        }
+
+        result = invoice as unknown as InvoiceDocument;
+      });
+
+      return result as InvoiceDocument;
+    } finally {
+      await session.endSession();
     }
-
-    invoice.status = "cancelled";
-    invoice.notes = (invoice.notes ?? "") + `\nVoid reason: ${reason}`;
-    await invoice.save();
-
-    return invoice;
   },
 
   /**

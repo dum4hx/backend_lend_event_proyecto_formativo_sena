@@ -82,7 +82,14 @@ transferRouter.get(
         filters.status = { $ne: "fulfilled" };
       }
 
-      const data = await transferService.listRequests(getOrgId(req), filters);
+      const userLocationIds = await transferService.getUserLocationIds(
+        getUserId(req),
+      );
+      const data = await transferService.listRequests(
+        getOrgId(req),
+        filters,
+        userLocationIds,
+      );
       res.status(200).json({ status: "success", data });
     } catch (err) {
       next(err);
@@ -99,9 +106,13 @@ transferRouter.get(
   requirePermission("transfers:read"),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
+      const userLocationIds = await transferService.getUserLocationIds(
+        getUserId(req),
+      );
       const data = await transferService.getRequest(
         getOrgId(req),
         req.params.id,
+        userLocationIds,
       );
       res.status(200).json({ status: "success", data });
     } catch (err) {
@@ -255,7 +266,14 @@ transferRouter.get(
       const filters: any = {};
       if (status) filters.status = status;
 
-      const data = await transferService.listTransfers(getOrgId(req), filters);
+      const userLocationIds = await transferService.getUserLocationIds(
+        getUserId(req),
+      );
+      const data = await transferService.listTransfers(
+        getOrgId(req),
+        filters,
+        userLocationIds,
+      );
       res.status(200).json({ status: "success", data });
     } catch (err) {
       next(err);
@@ -272,9 +290,13 @@ transferRouter.get(
   requirePermission("transfers:read"),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
+      const userLocationIds = await transferService.getUserLocationIds(
+        getUserId(req),
+      );
       const data = await transferService.getTransferDetails(
         getOrgId(req),
         req.params.id,
+        userLocationIds,
       );
       res.status(200).json({ status: "success", data });
     } catch (err) {

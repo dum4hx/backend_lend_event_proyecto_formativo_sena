@@ -3113,6 +3113,14 @@ Manage physical locations such as warehouses, offices, and operation points with
 
 **Location Code:** Each location has a unique alphanumeric `code` (1-10 characters, uppercase) that serves as a business identifier and can be referenced in loan and request documents. This code must be provided by the user when creating or updating a location and is unique within the organization.
 
+**Regla obligatoria de gerente de sede:**
+
+- Ninguna ubicación puede existir sin `managerId`.
+- La relación es many-to-one: un mismo gerente puede administrar múltiples ubicaciones.
+- El gerente debe existir, pertenecer a la misma organización, estar activo y tener un rol válido de gerente.
+- **Solo los roles "Gerente" (Manager) pueden ser asignados como managers de sedes.** El rol Owner (Propietario) tiene acceso global a todas las sedes pero no puede ser asignado como manager específico de una sede.
+- El backend es la fuente de verdad para esta validación.
+
 ### GET /locations
 
 Retrieves a paginated list of all locations in the organization.
@@ -3135,7 +3143,7 @@ Retrieves a paginated list of all locations in the organization.
 ```json
 {
   "status": "success",
-  "message": "Locations fetched successfully",
+  "message": "Ubicaciones obtenidas exitosamente",
   "data": {
     "items": [
       {
@@ -3143,6 +3151,18 @@ Retrieves a paginated list of all locations in the organization.
         "code": "BOG01",
         "name": "Bodega Principal",
         "organizationId": "507f1f77bcf86cd799439012",
+        "managerId": "507f1f77bcf86cd799439099",
+        "manager": {
+          "_id": "507f1f77bcf86cd799439099",
+          "email": "gerente@empresa.com",
+          "roleId": "507f1f77bcf86cd799439020",
+          "roleName": "Gerente",
+          "name": {
+            "firstName": "Laura",
+            "firstSurname": "Pérez"
+          },
+          "status": "active"
+        },
         "address": {
           "streetType": "Calle",
           "primaryNumber": "10",
@@ -3153,6 +3173,12 @@ Retrieves a paginated list of all locations in the organization.
           "additionalDetails": "Piso 2"
         },
         "isActive": true,
+        "occupied": 12,
+        "occupancySummary": {
+          "totalCapacity": 40,
+          "occupied": 12,
+          "occupancyRate": 30
+        },
         "createdAt": "2026-02-20T10:30:00.000Z",
         "updatedAt": "2026-02-20T10:30:00.000Z"
       }
@@ -3166,6 +3192,12 @@ Retrieves a paginated list of all locations in the organization.
   }
 }
 ```
+
+**Fuente de verdad de ocupación:**
+- `occupied` es la fuente de verdad para la ocupación total de la sede.
+- `occupancySummary.occupied` siempre refleja el mismo valor que `occupied`.
+- `materialCapacities[].currentQuantity` se expone como desglose por tipo cuando existe configuración de capacidades.
+- Si una sede tiene inventario pero no tiene entrada de capacidad para un tipo de material, `occupied` sigue reflejando correctamente la ocupación total.
 
 ---
 
@@ -3187,19 +3219,38 @@ Retrieves a single location by its ID.
 ```json
 {
   "status": "success",
-  "message": "Location fetched successfully",
+  "message": "Ubicación obtenida exitosamente",
   "data": {
     "_id": "507f1f77bcf86cd799439011",
     "code": "BOG01",
     "name": "Bodega Principal",
     "organizationId": "507f1f77bcf86cd799439012",
+    "managerId": "507f1f77bcf86cd799439099",
+    "manager": {
+      "_id": "507f1f77bcf86cd799439099",
+      "email": "gerente@empresa.com",
+      "roleId": "507f1f77bcf86cd799439020",
+      "roleName": "Gerente",
+      "name": {
+        "firstName": "Laura",
+        "firstSurname": "Pérez"
+      },
+      "status": "active"
+    },
     "address": {
-      "country": "CO",
-      "state": "Cundinamarca",
+      "streetType": "Calle",
+      "primaryNumber": "10",
+      "secondaryNumber": "45",
+      "complementaryNumber": "20",
+      "department": "Cundinamarca",
       "city": "Bogotá",
-      "street": "Calle 10",
-      "propertyNumber": "45-20",
-      "additionalInfo": "Piso 2"
+      "additionalDetails": "Piso 2"
+    },
+    "occupied": 12,
+    "occupancySummary": {
+      "totalCapacity": 40,
+      "occupied": 12,
+      "occupancyRate": 30
     },
     "createdAt": "2026-02-20T10:30:00.000Z",
     "updatedAt": "2026-02-20T10:30:00.000Z"
@@ -3227,6 +3278,7 @@ Creates a new location in the organization.
 | ----------------------------------- | -------- | -------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
 | code                                | string   | Yes      | 1-10 chars, regex  | Unique alphanumeric code (uppercase only, pattern `^[A-Z0-9]+$`). Business identifier for location.   |
 | name                                | string   | Yes      | 1-100 characters   | Location name                                                                                         |
+| managerId                           | string   | Yes      | Valid ObjectId     | Usuario gerente asignado a la sede. Debe existir, estar activo, pertenecer a la organización y tener rol válido de gerente. |
 | address.streetType                  | string   | Yes      | Enum (9 values)    | One of: Calle, Carrera, Avenida, Avenida Calle, Avenida Carrera, Diagonal, Transversal, Circular, Via |
 | address.primaryNumber               | string   | Yes      | 1-20 characters    | Primary street/road number                                                                            |
 | address.secondaryNumber             | string   | Yes      | 1-20 characters    | Cross street number                                                                                   |
@@ -3247,6 +3299,7 @@ Creates a new location in the organization.
 {
   "code": "MDE01",
   "name": "Bodega Norte",
+  "managerId": "507f1f77bcf86cd799439099",
   "address": {
     "streetType": "Carrera",
     "primaryNumber": "50",
@@ -3270,19 +3323,32 @@ Creates a new location in the organization.
 ```json
 {
   "status": "success",
-  "message": "Location created successfully",
+  "message": "Ubicación creada exitosamente",
   "data": {
     "_id": "507f1f77bcf86cd799439013",
     "code": "MDE01",
     "name": "Bodega Norte",
     "organizationId": "507f1f77bcf86cd799439012",
+    "managerId": "507f1f77bcf86cd799439099",
+    "manager": {
+      "_id": "507f1f77bcf86cd799439099",
+      "email": "gerente@empresa.com",
+      "roleId": "507f1f77bcf86cd799439020",
+      "roleName": "Gerente",
+      "name": {
+        "firstName": "Laura",
+        "firstSurname": "Pérez"
+      },
+      "status": "active"
+    },
     "address": {
-      "country": "Colombia",
-      "state": "Antioquia",
+      "streetType": "Carrera",
+      "primaryNumber": "50",
+      "secondaryNumber": "32",
+      "complementaryNumber": "10",
+      "department": "Antioquia",
       "city": "Medellín",
-      "street": "Carrera 50",
-      "propertyNumber": "32-10",
-      "additionalInfo": "Bodega 3, entrada por el costado"
+      "additionalDetails": "Bodega 3, entrada por el costado"
     },
     "createdAt": "2026-02-27T15:45:00.000Z",
     "updatedAt": "2026-02-27T15:45:00.000Z"
@@ -3293,7 +3359,8 @@ Creates a new location in the organization.
 #### Error Responses
 
 - **400 Bad Request** – Validation errors (missing required fields, invalid format, invalid code format)
-- **409 Conflict** – Location with the same name or code already exists in the organization
+- **404 Not Found** – `managerId` no existe
+- **409 Conflict** – Location with the same name/code already exists, o `managerId` no cumple organización/rol/estado
 
 ---
 
@@ -3318,6 +3385,7 @@ Same fields as POST, but all are optional. Only provided fields will be updated.
 | ------------------ | -------- | -------- | ----------------- | -------------------------------------------------------------------------------------------------------------- |
 | code               | string   | No       | 1-10 chars, regex | Unique alphanumeric code (uppercase only). If provided and conflicts with another location, returns 409 error. |
 | name               | string   | No       | 1-100 characters  | Location name                                                                                                  |
+| managerId          | string   | No       | Valid ObjectId    | Si se envía, se valida igual que en creación. Si no se envía, se conserva el actual; no se permite dejar la ubicación sin gerente. |
 | address            | object   | No       | -                 | Address fields (all optional)                                                                                  |
 | materialCapacities | object[] | No       | -                 | Array of material capacity mappings                                                                            |
 
@@ -3325,10 +3393,10 @@ Same fields as POST, but all are optional. Only provided fields will be updated.
 
 ```json
 {
-  "code": "MDE02",
+  "managerId": "507f1f77bcf86cd799439099",
   "address": {
-    "state": "Cundinamarca",
-    "additionalInfo": "Piso 3, oficina 301"
+    "department": "Cundinamarca",
+    "additionalDetails": "Piso 3, oficina 301"
   }
 }
 ```
@@ -3338,19 +3406,32 @@ Same fields as POST, but all are optional. Only provided fields will be updated.
 ```json
 {
   "status": "success",
-  "message": "Location updated successfully",
+  "message": "Ubicación actualizada exitosamente",
   "data": {
     "_id": "507f1f77bcf86cd799439011",
     "code": "BOG01",
     "name": "Bodega Principal",
     "organizationId": "507f1f77bcf86cd799439012",
+    "managerId": "507f1f77bcf86cd799439099",
+    "manager": {
+      "_id": "507f1f77bcf86cd799439099",
+      "email": "gerente@empresa.com",
+      "roleId": "507f1f77bcf86cd799439020",
+      "roleName": "Gerente",
+      "name": {
+        "firstName": "Laura",
+        "firstSurname": "Pérez"
+      },
+      "status": "active"
+    },
     "address": {
-      "country": "CO",
-      "state": "Cundinamarca",
+      "streetType": "Calle",
+      "primaryNumber": "10",
+      "secondaryNumber": "45",
+      "complementaryNumber": "20",
+      "department": "Cundinamarca",
       "city": "Bogotá",
-      "street": "Calle 10",
-      "propertyNumber": "45-20",
-      "additionalInfo": "Piso 3, oficina 301"
+      "additionalDetails": "Piso 3, oficina 301"
     },
     "createdAt": "2026-02-20T10:30:00.000Z",
     "updatedAt": "2026-02-27T16:00:00.000Z"
@@ -3362,7 +3443,58 @@ Same fields as POST, but all are optional. Only provided fields will be updated.
 
 - **400 Bad Request** – Invalid location ID, validation errors, or invalid code format
 - **404 Not Found** – Location does not exist
-- **409 Conflict** – Code already exists in the organization (when updating code field)
+- **409 Conflict** – Code already exists, o manager inválido (rol/estado/organización), o ubicación legacy sin gerente pendiente de corrección
+
+---
+
+### POST /locations/import
+
+Importa múltiples ubicaciones en una sola solicitud.
+
+**Authentication Required:** Yes  
+**Permission Required:** `locations:create`
+
+#### Request Body
+
+| Field                  | Type     | Required | Description |
+| ---------------------- | -------- | -------- | ----------- |
+| rows                   | object[] | Yes      | Filas a importar |
+| rows[].name            | string   | Yes      | Nombre de ubicación |
+| rows[].code            | string   | Yes      | Código único por organización |
+| rows[].managerId       | string   | Conditional | Requerido si no se envía `managerEmail` |
+| rows[].managerEmail    | string   | Conditional | Requerido si no se envía `managerId`; se resuelve al usuario de la misma organización |
+| rows[].address         | object   | Yes      | Dirección de la ubicación |
+| rows[].status          | string   | No       | Estado de ubicación |
+| rows[].additionalDetails | string | No       | Detalles adicionales |
+
+#### Success Response (200 OK)
+
+```json
+{
+  "status": "success",
+  "message": "Importación de ubicaciones procesada",
+  "data": {
+    "totalRows": 3,
+    "createdCount": 1,
+    "failedCount": 2,
+    "results": [
+      {
+        "row": 1,
+        "status": "created",
+        "locationId": "507f1f77bcf86cd799439013"
+      },
+      {
+        "row": 2,
+        "status": "failed",
+        "error": {
+          "code": "BAD_REQUEST",
+          "message": "Cada fila debe incluir managerId o managerEmail"
+        }
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -6392,6 +6524,54 @@ Lists all invoices.
 | status    | query    | string  | No       | `pending`, `paid`, `cancelled` |
 | type      | query    | string  | No       | `rental`, `damage`, `deposit`  |
 | overdue   | query    | boolean | No       | Filter overdue invoices        |
+
+**Response:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "invoices": [
+      {
+        "_id": "65e2f3c0e1a2b3c4d5e6f7a1",
+        "organizationId": "65e2f3c0e1a2b3c4d5e6f7b2",
+        "customerId": {
+          "_id": "65e2f3c0e1a2b3c4d5e6f7c3",
+          "email": "client@example.com",
+          "name": "Event Co"
+        },
+        "loanId": {
+          "_id": "65e2f3c0e1a2b3c4d5e6f7d4",
+          "startDate": "2026-03-01T10:00:00.000Z",
+          "endDate": "2026-03-05T10:00:00.000Z",
+          "code": "LOAN-2026-001"
+        },
+        "invoiceNumber": "INV-2026-00001",
+        "type": "damage",
+        "lineItems": [
+          {
+            "description": "Material dañado",
+            "quantity": 1,
+            "unitPrice": 50000,
+            "totalPrice": 50000
+          }
+        ],
+        "subtotal": 50000,
+        "taxAmount": 0,
+        "totalAmount": 50000,
+        "amountPaid": 0,
+        "amountDue": 50000,
+        "status": "pending",
+        "dueDate": "2026-04-04T10:00:00.000Z",
+        "createdAt": "2026-03-10T14:20:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
 
 ---
 

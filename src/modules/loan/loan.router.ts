@@ -240,6 +240,7 @@ loanRouter.post(
     try {
       const organizationId = getOrgId(req);
       const loanId = req.params.id;
+      const user = getAuthUser(req);
 
       if (!loanId || typeof loanId !== "string") {
         throw AppError.badRequest("ID de préstamo no válido");
@@ -248,6 +249,7 @@ loanRouter.post(
       const loan = await loanService.returnLoan(
         loanId,
         organizationId,
+        user.id,
         req.body.notes,
       );
 

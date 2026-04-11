@@ -41,7 +41,7 @@ const requestItemZodSchema = z.object({
 
 /* ---------- Zod Schema for API Validation ---------- */
 
-export const LoanRequestZodSchema = z.object({
+export const LoanRequestBaseZodSchema = z.object({
   organizationId: z.string().refine((val) => Types.ObjectId.isValid(val), {
     message: "Formato de ID de organización no válido",
   }),
@@ -57,13 +57,37 @@ export const LoanRequestZodSchema = z.object({
   notes: z.string().max(1000).trim().optional(),
 });
 
-export const LoanRequestUpdateZodSchema = z.object({
-  items: z.array(requestItemZodSchema).min(1).optional(),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
-  depositDueDate: z.coerce.date(),
-  notes: z.string().max(1000).trim().optional(),
+export const LoanRequestZodSchema = LoanRequestBaseZodSchema.refine(
+  (data) => data.depositDueDate >= data.startDate,
+  {
+    message:
+      "La fecha límite de depósito no puede ser anterior a la fecha de inicio",
+    path: ["depositDueDate"],
+  },
+).refine((data) => data.depositDueDate <= data.endDate, {
+  message:
+    "La fecha límite de depósito no puede ser posterior a la fecha de fin",
+  path: ["depositDueDate"],
 });
+
+export const LoanRequestUpdateZodSchema = z
+  .object({
+    items: z.array(requestItemZodSchema).min(1).optional(),
+    startDate: z.coerce.date().optional(),
+    endDate: z.coerce.date().optional(),
+    depositDueDate: z.coerce.date(),
+    notes: z.string().max(1000).trim().optional(),
+  })
+  .refine((data) => !data.startDate || data.depositDueDate >= data.startDate, {
+    message:
+      "La fecha límite de depósito no puede ser anterior a la fecha de inicio",
+    path: ["depositDueDate"],
+  })
+  .refine((data) => !data.endDate || data.depositDueDate <= data.endDate, {
+    message:
+      "La fecha límite de depósito no puede ser posterior a la fecha de fin",
+    path: ["depositDueDate"],
+  });
 
 export const RequestApprovalZodSchema = z.object({
   approved: z.boolean(),

@@ -58,6 +58,9 @@ export const LocationZodSchema = z.object({
     .max(10, "El código no puede exceder 10 caracteres")
     .toUpperCase()
     .regex(/^[A-Z0-9]+$/, "El código solo puede contener letras y números"),
+  managerId: z.string().refine((val) => Types.ObjectId.isValid(val), {
+    message: "Formato de ID de gerente no válido",
+  }),
   address: AddressZodSchema,
   status: LocationStatusEnum.default("available"),
   /**
@@ -130,6 +133,12 @@ const locationSchema = new Schema(
       ref: "Organization",
       required: true,
       index: true, // Optimizes queries by organization
+    },
+    managerId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
     address: {
       type: addressMongooseSchema,

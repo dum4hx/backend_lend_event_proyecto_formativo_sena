@@ -10,6 +10,7 @@ import {
 } from "./models/transfer_rejection_reason.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
 import { Location } from "../location/models/location.model.ts";
+import { LocationService } from "../location/location.service.ts";
 import { User } from "../user/models/user.model.ts";
 import { Types, startSession, type ClientSession } from "mongoose";
 
@@ -131,11 +132,33 @@ class TransferService {
   /**
    * List transfer requests
    */
+  async getUserLocationIds(
+    userId: string | Types.ObjectId,
+  ): Promise<Types.ObjectId[]> {
+    const user = await User.findById(userId).select("locations").lean();
+    if (!user) return [];
+    return (user.locations ?? []).map((id) => new Types.ObjectId(String(id)));
+  }
+
   async listRequests(
     organizationId: string | Types.ObjectId,
     filters: any = {},
+    locationIds?: Types.ObjectId[],
   ) {
-    return TransferRequest.find({ organizationId, ...filters })
+    const locationFilter =
+      locationIds && locationIds.length > 0
+        ? {
+            $or: [
+              { fromLocationId: { $in: locationIds } },
+              { toLocationId: { $in: locationIds } },
+            ],
+          }
+        : {};
+    return TransferRequest.find({
+      organizationId,
+      ...filters,
+      ...locationFilter,
+    })
       .populate("requestedBy", "name email")
       .populate("fromLocationId", "name")
       .populate("toLocationId", "name")
@@ -148,10 +171,21 @@ class TransferService {
   async getRequest(
     organizationId: string | Types.ObjectId,
     requestId: string | Types.ObjectId,
+    locationIds?: Types.ObjectId[],
   ) {
+    const locationFilter =
+      locationIds && locationIds.length > 0
+        ? {
+            $or: [
+              { fromLocationId: { $in: locationIds } },
+              { toLocationId: { $in: locationIds } },
+            ],
+          }
+        : {};
     const request = await TransferRequest.findOne({
       _id: requestId,
       organizationId,
+      ...locationFilter,
     })
       .populate("requestedBy", "name email")
       .populate("fromLocationId", "name")
@@ -450,6 +484,12 @@ class TransferService {
         { session },
       );
 
+      await LocationService.recalculateMaterialCapacitiesCurrentQuantity({
+        organizationId,
+        locationIds: [transfer.fromLocationId, transfer.toLocationId],
+        session,
+      });
+
       return transfer;
     });
   }
@@ -460,8 +500,18 @@ class TransferService {
   async listTransfers(
     organizationId: string | Types.ObjectId,
     filters: any = {},
+    locationIds?: Types.ObjectId[],
   ) {
-    return Transfer.find({ organizationId, ...filters })
+    const locationFilter =
+      locationIds && locationIds.length > 0
+        ? {
+            $or: [
+              { fromLocationId: { $in: locationIds } },
+              { toLocationId: { $in: locationIds } },
+            ],
+          }
+        : {};
+    return Transfer.find({ organizationId, ...filters, ...locationFilter })
       .populate("pickedBy", "name email")
       .populate("receivedBy", "name email")
       .populate("fromLocationId", "name")
@@ -475,8 +525,22 @@ class TransferService {
   async getTransferDetails(
     organizationId: string | Types.ObjectId,
     transferId: string | Types.ObjectId,
+    locationIds?: Types.ObjectId[],
   ) {
-    const transfer = await Transfer.findOne({ _id: transferId, organizationId })
+    const locationFilter =
+      locationIds && locationIds.length > 0
+        ? {
+            $or: [
+              { fromLocationId: { $in: locationIds } },
+              { toLocationId: { $in: locationIds } },
+            ],
+          }
+        : {};
+    const transfer = await Transfer.findOne({
+      _id: transferId,
+      organizationId,
+      ...locationFilter,
+    })
       .populate("pickedBy", "name email")
       .populate("receivedBy", "name email")
       .populate("fromLocationId", "name")
