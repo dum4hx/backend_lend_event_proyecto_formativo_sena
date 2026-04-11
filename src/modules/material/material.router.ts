@@ -586,6 +586,10 @@ materialRouter.get(
         byUserAccessibleLocation,
       } = req.query as any;
 
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
+
       if (byUserAccessibleLocation) {
         const result = await materialService.listInstancesByUserLocation({
           status: status as string | undefined,
@@ -606,6 +610,7 @@ materialRouter.get(
         search: search as string | undefined,
         organizationId: getOrgId(req),
         byLocation: byLocation as boolean | undefined,
+        locationIds: userLocationIds,
       });
 
       res.json({ status: "success", data: result });
@@ -625,9 +630,13 @@ materialRouter.get(
   requirePermission("materials:read"),
   async (req: Request<{ code: string }>, res: Response, next: NextFunction) => {
     try {
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
       const { instance, matchedBy } = await materialService.scanInstance(
         getOrgId(req),
         req.params.code,
+        userLocationIds,
       );
 
       res.json({ status: "success", data: { instance, matchedBy } });
@@ -646,9 +655,13 @@ materialRouter.get(
   requirePermission("materials:read"),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
       const instance = await materialService.getInstance(
         req.params.id,
         getOrgId(req),
+        userLocationIds,
       );
 
       res.json({ status: "success", data: { instance } });
@@ -673,9 +686,13 @@ materialRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const organizationId = getOrgId(req);
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
       const instance = await materialService.createInstance(
         organizationId,
         req.body,
+        userLocationIds,
       );
 
       res.status(201).json({ status: "success", data: { instance } });
@@ -700,10 +717,14 @@ materialRouter.patch(
   validateBody(MaterialInstanceUpdateZodSchema),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
       const instance = await materialService.updateInstance(
         getOrgId(req),
         req.params.id,
         req.body,
+        userLocationIds,
       );
 
       res.json({ status: "success", data: { instance } });
@@ -724,6 +745,9 @@ materialRouter.patch(
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const { status, notes, source } = req.body;
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
       const updated = await materialService.updateInstanceStatus(
         getOrgId(req),
         req.params.id,
@@ -731,6 +755,7 @@ materialRouter.patch(
         notes,
         req.user!.userId,
         source,
+        userLocationIds,
       );
 
       res.json({ status: "success", data: { instance: updated } });
@@ -749,7 +774,14 @@ materialRouter.delete(
   requirePermission("materials:delete"),
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
-      await materialService.deleteInstance(getOrgId(req), req.params.id);
+      const userLocationIds = await materialService.getUserLocationIds(
+        req.user!.userId,
+      );
+      await materialService.deleteInstance(
+        getOrgId(req),
+        req.params.id,
+        userLocationIds,
+      );
 
       res.json({
         status: "success",

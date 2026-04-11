@@ -369,7 +369,7 @@ export const rolesService = {
     const allowsMultipleLocations = isOwnerRoleName(role.name);
     if (!allowsMultipleLocations && locationIds.length > 1) {
       throw AppError.badRequest(
-        "Solo el rol de Dueño puede tener múltiples ubicaciones",
+        "Solo el rol de Propietario puede tener múltiples ubicaciones",
       );
     }
   },

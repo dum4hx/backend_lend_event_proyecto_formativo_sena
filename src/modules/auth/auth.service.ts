@@ -815,16 +815,15 @@ export const authService = {
     // Build invite URL and send email
     const inviteUrl = `${FRONTEND_URL}/accept-invite?token=${rawToken}&email=${encodeURIComponent(userData.email.toLowerCase())}`;
     const orgName = org?.name ?? "your organization";
+    const firstName = userData.name?.firstName ?? "there";
 
-    if (process.env.NODE_ENV !== "test") {
-      await emailService.sendInviteEmail(
-        userData.email,
-        userData.name.firstName,
-        orgName,
-        inviteUrl,
-        INVITE_EXPIRY_HOURS,
-      );
-    }
+    await emailService.sendInviteEmail(
+      userData.email,
+      firstName,
+      orgName,
+      inviteUrl,
+      INVITE_EXPIRY_HOURS,
+    );
 
     logger.info("User invited", {
       organizationId: organizationId.toString(),

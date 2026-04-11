@@ -521,6 +521,14 @@ export const materialService = {
   },
 
   /* Material Instances */
+  async getUserLocationIds(
+    userId: Types.ObjectId | string,
+  ): Promise<Types.ObjectId[]> {
+    const user = await User.findById(userId).select("locations").lean();
+    if (!user) return [];
+    return (user.locations ?? []).map((id) => new Types.ObjectId(String(id)));
+  },
+
   async listInstances(opts: {
     page?: number | string | undefined;
     limit?: number | string | undefined;
@@ -529,6 +537,7 @@ export const materialService = {
     search?: string | undefined;
     organizationId?: Types.ObjectId | string | undefined;
     byLocation?: boolean | undefined;
+    locationIds?: Types.ObjectId[] | undefined;
   }) {
     const {
       page = 1,
@@ -538,6 +547,7 @@ export const materialService = {
       search,
       organizationId,
       byLocation = false,
+      locationIds,
     } = opts;
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -550,6 +560,9 @@ export const materialService = {
       match.modelId = new Types.ObjectId(String(materialTypeId));
     }
     if (search) match.serialNumber = { $regex: search, $options: "i" };
+    if (locationIds && locationIds.length > 0) {
+      match.locationId = { $in: locationIds };
+    }
 
     if (!byLocation) {
       const [instances, total] = await Promise.all([
@@ -1197,9 +1210,16 @@ export const materialService = {
     };
   },
 
-  async getInstance(id: string, organizationId?: Types.ObjectId | string) {
+  async getInstance(
+    id: string,
+    organizationId?: Types.ObjectId | string,
+    locationIds?: Types.ObjectId[],
+  ) {
     const query: Record<string, unknown> = { _id: id };
     if (organizationId) query.organizationId = organizationId;
+    if (locationIds && locationIds.length > 0) {
+      query.locationId = { $in: locationIds };
+    }
 
     const instance = await MaterialInstance.findOne(query).populate(
       "modelId",
@@ -1216,6 +1236,7 @@ export const materialService = {
   async createInstance(
     organizationId: Types.ObjectId | string,
     payload: Record<string, unknown>,
+    locationIds?: Types.ObjectId[],
   ) {
     const writePayload = payload as MaterialInstanceWritePayload;
 
@@ -1226,6 +1247,13 @@ export const materialService = {
     const materialType = await MaterialModel.findById(String(payload.modelId));
     if (!materialType) {
       throw AppError.notFound("Tipo de material no encontrado");
+    }
+
+    if (payload.locationId && locationIds && locationIds.length > 0) {
+      const targetLocId = new Types.ObjectId(String(payload.locationId));
+      if (!locationIds.some((lid) => lid.equals(targetLocId))) {
+        throw AppError.forbidden("No tiene acceso a la ubicación especificada");
+      }
     }
 
     if (payload.locationId) {
@@ -1309,6 +1337,7 @@ export const materialService = {
     organizationId: Types.ObjectId | string,
     id: string,
     payload: Record<string, unknown>,
+    locationIds?: Types.ObjectId[],
   ) {
     const writePayload = payload as MaterialInstanceWritePayload;
 
@@ -1319,6 +1348,21 @@ export const materialService = {
 
     if (!instance) {
       throw AppError.notFound("Instancia de material no encontrada");
+    }
+
+    if (locationIds && locationIds.length > 0) {
+      const currentLocId = new Types.ObjectId(String(instance.locationId));
+      if (!locationIds.some((lid) => lid.equals(currentLocId))) {
+        throw AppError.notFound("Instancia de material no encontrada");
+      }
+      if (writePayload.locationId) {
+        const newLocId = new Types.ObjectId(String(writePayload.locationId));
+        if (!locationIds.some((lid) => lid.equals(newLocId))) {
+          throw AppError.forbidden(
+            "No tiene acceso a la ubicación especificada",
+          );
+        }
+      }
     }
 
     if (writePayload.modelId) {
@@ -1418,9 +1462,13 @@ export const materialService = {
   async scanInstance(
     organizationId: Types.ObjectId | string,
     code: string,
+    locationIds?: Types.ObjectId[],
   ): Promise<{ instance: unknown; matchedBy: "barcode" | "serialNumber" }> {
-    const orgFilter = {
+    const orgFilter: Record<string, unknown> = {
       organizationId: new Types.ObjectId(String(organizationId)),
+      ...(locationIds && locationIds.length > 0
+        ? { locationId: { $in: locationIds } }
+        : {}),
     };
 
     let instance = await MaterialInstance.findOne({
@@ -1463,6 +1511,7 @@ export const materialService = {
     notes?: string,
     actorUserId?: Types.ObjectId | string,
     source: "manual" | "scanner" | "system" = "manual",
+    locationIds?: Types.ObjectId[],
   ) {
     const instance = await MaterialInstance.findOne({
       _id: id,
@@ -1470,6 +1519,13 @@ export const materialService = {
     });
     if (!instance) {
       throw AppError.notFound("Instancia de material no encontrada");
+    }
+
+    if (locationIds && locationIds.length > 0) {
+      const locId = new Types.ObjectId(String(instance.locationId));
+      if (!locationIds.some((lid) => lid.equals(locId))) {
+        throw AppError.notFound("Instancia de material no encontrada");
+      }
     }
 
     const currentStatus = instance.status;
@@ -1512,7 +1568,11 @@ export const materialService = {
     return renameProperty(instance, "modelId", "model");
   },
 
-  async deleteInstance(organizationId: Types.ObjectId | string, id: string) {
+  async deleteInstance(
+    organizationId: Types.ObjectId | string,
+    id: string,
+    locationIds?: Types.ObjectId[],
+  ) {
     const instance = await MaterialInstance.findOne({
       _id: id,
       organizationId,
@@ -1520,6 +1580,13 @@ export const materialService = {
 
     if (!instance) {
       throw AppError.notFound("Instancia de material no encontrada");
+    }
+
+    if (locationIds && locationIds.length > 0) {
+      const locId = new Types.ObjectId(String(instance.locationId));
+      if (!locationIds.some((lid) => lid.equals(locId))) {
+        throw AppError.notFound("Instancia de material no encontrada");
+      }
     }
 
     if (!["available", "retired"].includes(instance.status)) {
