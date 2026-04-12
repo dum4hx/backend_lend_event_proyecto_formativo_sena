@@ -1676,7 +1676,10 @@ Gets the current organization's policy settings.
   "data": {
     "settings": {
       "damageDueDays": 30,
-      "requireFullPaymentBeforeCheckout": false
+      "requireFullPaymentBeforeCheckout": false,
+      "lateFeeMode": "fixed",
+      "lateFeeValue": 25000,
+      "lateFeeDueDays": 30
     }
   }
 }
@@ -1684,10 +1687,13 @@ Gets the current organization's policy settings.
 
 **Settings reference:**
 
-| Field                              | Type    | Default | Description                                                                                                      |
-| ---------------------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `damageDueDays`                    | integer | `30`    | Number of days after inspection to set as the due date for damage invoices (1–365).                              |
-| `requireFullPaymentBeforeCheckout` | boolean | `false` | When `true`, `POST /loans/from-request/:requestId` will reject checkout unless the rental fee has been recorded. |
+| Field                              | Type    | Default     | Description                                                                                                      |
+| ---------------------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| `damageDueDays`                    | integer | `30`        | Number of days after inspection to set as the due date for damage invoices (1–365).                              |
+| `requireFullPaymentBeforeCheckout` | boolean | `false`     | When `true`, `POST /loans/from-request/:requestId` will reject checkout unless the rental fee has been recorded. |
+| `lateFeeMode`                      | string  | `"fixed"` | Charge mode for overdue loans: `"fixed"` (fixed amount per day) or `"percentage"` (% of rental subtotal per day). |
+| `lateFeeValue`                     | number  | `0`         | Late fee amount (in fixed mode: amount in cents per day; in percentage mode: decimal value like 0.05 for 5%).   |
+| `lateFeeDueDays`                   | integer | `30`        | Number of days after late fee invoice is generated to set as the due date (1–365).                               |
 
 ---
 
@@ -1697,10 +1703,13 @@ Updates the organization's policy settings. Only the fields provided in the body
 
 **Auth:** `authenticate` + `requirePermission("organization:update")`
 
-| Parameter                        | Location | Type    | Required | Description                                    |
-| -------------------------------- | -------- | ------- | -------- | ---------------------------------------------- |
-| damageDueDays                    | body     | integer | No       | Damage invoice due-date window in days (1–365) |
-| requireFullPaymentBeforeCheckout | body     | boolean | No       | Require rental fee payment before checkout     |
+| Parameter                        | Location | Type    | Required | Description                                                                                                     |
+| -------------------------------- | -------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| damageDueDays                    | body     | integer | No       | Damage invoice due-date window in days (1–365)                                                                  |
+| requireFullPaymentBeforeCheckout | body     | boolean | No       | Require rental fee payment before checkout                                                                      |
+| lateFeeMode                      | body     | string  | No       | Overdue charge mode: `"fixed"` or `"percentage"`                                                                |
+| lateFeeValue                     | body     | number  | No       | Late fee amount (cents per day if fixed; decimal if percentage, e.g., 0.05 = 5%)                                |
+| lateFeeDueDays                   | body     | integer | No       | Days to set as due date for late fee invoices (1–365)                                                            |
 
 **Response:** `200 OK`
 
@@ -1710,7 +1719,10 @@ Updates the organization's policy settings. Only the fields provided in the body
   "data": {
     "settings": {
       "damageDueDays": 15,
-      "requireFullPaymentBeforeCheckout": true
+      "requireFullPaymentBeforeCheckout": true,
+      "lateFeeMode": "percentage",
+      "lateFeeValue": 0.05,
+      "lateFeeDueDays": 14
     }
   }
 }
@@ -5514,14 +5526,9 @@ Returns material instances that can fulfil the request's material-type needs, cl
 
 **Auth:** `authenticate` + `requireActiveOrganization` + `requests:read`
 
-Each returned instance carries an `availability` tag:
+Only instances whose current status is `available` are returned. Each instance carries an `availability` field set to `"available"`.
 
-| Tag         | Meaning                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| `available` | Instance status is currently `available` — can be assigned immediately               |
-| `upcoming`  | Instance is `reserved` or `loaned` but will be free before the request's `startDate` |
-
-Instances that are `damaged`, `maintenance`, `retired`, `lost`, or won't be free in time are excluded.
+Instances that are `reserved`, `loaned`, `damaged`, `maintenance`, `retired`, or `lost` are excluded.
 
 **Response shape** (same split as `GET /materials/instances?byUserAccessibleLocation=true`):
 
@@ -5533,8 +5540,7 @@ Instances that are `damaged`, `maintenance`, `retired`, `lost`, or won't be free
       {
         "location": { "_id": "...", "name": "Warehouse A" },
         "instances": [
-          { "_id": "...", "serialNumber": "SN-001", "status": "available", "availability": "available", "model": { ... } },
-          { "_id": "...", "serialNumber": "SN-002", "status": "reserved", "availability": "upcoming", "model": { ... } }
+          { "_id": "...", "serialNumber": "SN-001", "status": "available", "availability": "available", "model": { ... } }
         ]
       }
     ],
@@ -6613,11 +6619,11 @@ Dismisses an open or acknowledged incident. Dismissal means the incident was a f
 
 Lists all invoices.
 
-| Parameter | Location | Type    | Required | Description                    |
-| --------- | -------- | ------- | -------- | ------------------------------ |
-| status    | query    | string  | No       | `pending`, `paid`, `cancelled` |
-| type      | query    | string  | No       | `rental`, `damage`, `deposit`  |
-| overdue   | query    | boolean | No       | Filter overdue invoices        |
+| Parameter | Location | Type    | Required | Description                                                                                                                        |
+| --------- | -------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| status    | query    | string  | No       | `pending`, `paid`, `partially_paid`, `overdue`, `cancelled`, `refunded`                                                             |
+| type      | query    | string  | No       | `damage`, `late_fee`, `deposit_shortfall`, `additional_service`, `penalty`. (Note: `rental` invoices are auto-generated at checkout) |
+| overdue   | query    | boolean | No       | Filter overdue invoices (status `pending` with `dueDate < now`)                                                                    |
 
 **Response:** `200 OK`
 
@@ -9724,6 +9730,7 @@ Code schemes define patterns used to auto-generate human-readable codes for mult
 | `incident`          | `INC-{YYYY}-{SEQ:4}`  | `incidentNumber`                            |
 | `maintenance_batch` | `MNT-{YYYY}-{SEQ:4}`  | `batchNumber`                               |
 | `material_instance` | `MI-{SEQ:6}`          | `serialNumber` (fallback when not provided) |
+| `ticket`            | `TKT-{YYYY}-{SEQ:4}`  | `code`                                      |
 
 ### Supported Pattern Tokens
 
@@ -10049,6 +10056,7 @@ Creates a new ticket. The creator must belong to the specified location. The opt
       "toLocationId": "681e...",
       "items": [{ "materialTypeId": "680f...", "quantity": 10 }]
     },
+    "code": "TKT-2026-0001",
     "createdAt": "2026-06-15T10:00:00.000Z",
     "updatedAt": "2026-06-15T10:00:00.000Z"
   }
@@ -10139,9 +10147,11 @@ Retrieves a single ticket by ID. Only the creator or the assignee may view it.
 
 ---
 
-### GET /tickets/:id/capable-users
+### GET /tickets/capable-users
 
-**Smart endpoint.** Returns the list of active users in the ticket's location whose role holds the domain-specific permission needed to _fulfill_ the request. Only the ticket creator or assignee may call this endpoint.
+**Smart endpoint.** Returns the list of active users in a location whose role holds the domain-specific permission needed to _fulfill_ a given ticket type. **Does not require an existing ticket** — useful for pre-populating an assignee picker before creating a ticket.
+
+The calling user is excluded from the results (you cannot assign a ticket to yourself).
 
 The permission looked up per ticket type is:
 
@@ -10154,6 +10164,13 @@ The permission looked up per ticket type is:
 | `generic`             | `tickets:approve`          |
 
 **Permission:** `tickets:read`
+
+**Query parameters:**
+
+| Param      | Type   | Required | Description                                                                                           |
+| ---------- | ------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| type       | string | Yes      | One of: `transfer_request`, `incident_report`, `maintenance_request`, `inspection_request`, `generic` |
+| locationId | string | Yes      | ObjectId of the location to search users in                                                           |
 
 **Response `200`:**
 
@@ -10175,6 +10192,21 @@ The permission looked up per ticket type is:
   }
 }
 ```
+
+**Errors:**
+
+- `400` — Invalid `locationId` format or unsupported ticket type.
+- `404` — Location not found or inactive.
+
+---
+
+### GET /tickets/:id/capable-users
+
+**Smart endpoint.** Same as `GET /tickets/capable-users`, but derives the ticket type and location from an existing ticket. Only the ticket creator or assignee may call this endpoint. The ticket creator is excluded from results.
+
+**Permission:** `tickets:read`
+
+**Response `200`:** Same shape as `GET /tickets/capable-users`.
 
 **Errors:**
 

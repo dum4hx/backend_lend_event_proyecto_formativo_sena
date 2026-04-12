@@ -10,6 +10,7 @@ export const entityTypeOptions = [
   "incident",
   "maintenance_batch",
   "material_instance",
+  "ticket",
 ] as const;
 export type EntityType = (typeof entityTypeOptions)[number];
 

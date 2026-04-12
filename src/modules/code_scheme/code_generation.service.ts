@@ -22,6 +22,7 @@ const FALLBACK_PATTERNS: Record<EntityType, string> = {
   incident: "INC-{YYYY}-{SEQ:4}",
   maintenance_batch: "MNT-{YYYY}-{SEQ:4}",
   material_instance: "MI-{SEQ:6}",
+  ticket: "TKT-{YYYY}-{SEQ:4}",
 };
 
 // Deterministic ObjectIds used as schemeId for fallback counters
@@ -32,6 +33,7 @@ const FALLBACK_SCHEME_IDS: Record<EntityType, Types.ObjectId> = {
   incident: new Types.ObjectId("000000000000000000000005"),
   maintenance_batch: new Types.ObjectId("000000000000000000000006"),
   material_instance: new Types.ObjectId("000000000000000000000007"),
+  ticket: new Types.ObjectId("000000000000000000000008"),
 };
 
 /* ---------- Service ---------- */

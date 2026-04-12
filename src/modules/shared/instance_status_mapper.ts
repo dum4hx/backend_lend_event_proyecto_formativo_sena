@@ -19,7 +19,7 @@ export function conditionAfterToInstanceStatus(
     case "damaged":
       return "damaged";
     case "lost":
-      return "lost";
+      return "retired";
     default:
       return null;
   }
@@ -38,7 +38,7 @@ export function incidentTypeOnCreateToInstanceStatus(
     case "damage":
       return "damaged";
     case "lost":
-      return "lost";
+      return "retired";
     case "issue":
       return "maintenance";
     case "replacement":

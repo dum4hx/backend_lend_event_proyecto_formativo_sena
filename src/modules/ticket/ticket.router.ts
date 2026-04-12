@@ -17,6 +17,7 @@ import {
   listTicketsQuerySchema,
   resolveTicketBodySchema,
   rejectTicketBodySchema,
+  capableUsersQuerySchema,
 } from "./ticket.schemas.ts";
 
 const ticketRouter = Router();
@@ -62,6 +63,33 @@ ticketRouter.get(
         getOrgId(req),
         getUserId(req),
         (req as any).query,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /tickets/capable-users?type=...&locationId=...
+ * Devuelve los usuarios activos en una sede cuyo rol incluye el permiso
+ * de dominio necesario para satisfacer un tipo de solicitud dado.
+ * No requiere un ticket existente.
+ * Requiere: tickets:read
+ */
+ticketRouter.get(
+  "/capable-users",
+  requirePermission("tickets:read"),
+  validateQuery(capableUsersQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { type, locationId } = (req as any).query;
+      const data = await ticketService.findCapableUsersByQuery(
+        getOrgId(req),
+        getUserId(req),
+        type,
+        locationId,
       );
       res.status(200).json({ status: "success", data });
     } catch (err) {

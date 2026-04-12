@@ -182,9 +182,9 @@ requestRouter.get(
 /**
  * GET /api/v1/requests/:id/available-materials
  * Returns material instances that can fulfil the request's needs,
- * split by user-accessible locations. Each instance includes an
- * `availability` tag: "available" (free now) or "upcoming" (will be
- * free before the request's start date).
+ * split by user-accessible locations. Only instances with status
+ * "available" are returned. Each instance includes an
+ * `availability` field set to "available".
  * Requires: requests:read
  */
 requestRouter.get(

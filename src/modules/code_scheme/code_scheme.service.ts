@@ -258,6 +258,11 @@ async function seedDefaultSchemes(
       name: "Predeterminado Instancia Material",
       pattern: "MI-{SEQ:6}",
     },
+    {
+      entityType: "ticket",
+      name: "Predeterminado Ticket",
+      pattern: "TKT-{YYYY}-{SEQ:4}",
+    },
   ];
 
   for (const def of defaults) {

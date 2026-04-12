@@ -39,8 +39,7 @@ export const incidentReportPayloadSchema = z.object({
     error: "La severidad debe ser low, medium, high o critical",
   }),
   context: z.enum(["transit", "storage", "loan", "maintenance", "other"], {
-    error:
-      "El contexto debe ser transit, storage, loan, maintenance u other",
+    error: "El contexto debe ser transit, storage, loan, maintenance u other",
   }),
   description: z.string().max(2000, "Máximo 2000 caracteres").optional(),
 });
@@ -52,7 +51,10 @@ export const maintenanceRequestPayloadSchema = z.object({
   entryReason: z.enum(["damaged", "other"], {
     error: "La razón de entrada debe ser damaged u other",
   }),
-  estimatedCost: z.number().min(0, "El costo estimado no puede ser negativo").optional(),
+  estimatedCost: z
+    .number()
+    .min(0, "El costo estimado no puede ser negativo")
+    .optional(),
   notes: z.string().max(1000, "Máximo 1000 caracteres").optional(),
 });
 
@@ -139,3 +141,12 @@ export const listTicketsQuerySchema = z.object({
 });
 
 export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
+
+export const capableUsersQuerySchema = z.object({
+  type: z.enum(ticketTypeOptions, {
+    error: `El tipo debe ser uno de: ${ticketTypeOptions.join(", ")}`,
+  }),
+  locationId: objectIdString("ubicación"),
+});
+
+export type CapableUsersQuery = z.infer<typeof capableUsersQuerySchema>;

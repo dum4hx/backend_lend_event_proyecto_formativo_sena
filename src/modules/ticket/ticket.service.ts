@@ -3,6 +3,7 @@ import { Ticket } from "./models/ticket.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { Location } from "../location/models/location.model.ts";
 import { Role } from "../roles/models/role.model.ts";
+import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 import { Types } from "mongoose";
 import {
   validateTransition,
@@ -101,6 +102,13 @@ class TicketService {
       });
     }
 
+    // Generate unique ticket code via Code Scheme
+    const code = await codeGenerationService.generateCode({
+      organizationId: String(organizationId),
+      entityType: "ticket",
+      context: { locationId: data.locationId },
+    });
+
     const ticket = await Ticket.create({
       organizationId,
       locationId: data.locationId,
@@ -113,6 +121,7 @@ class TicketService {
         responseDeadline: new Date(data.responseDeadline),
       }),
       payload: payloadResult.data,
+      code,
     });
 
     return ticket.toObject();
@@ -346,6 +355,44 @@ class TicketService {
   /* ------------------------------------------------------------------ */
 
   /**
+   * Standalone query — returns capable users for a given ticket type and
+   * location, without requiring an existing ticket.
+   */
+  async findCapableUsersByQuery(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    type: string,
+    locationId: string,
+  ) {
+    if (!Types.ObjectId.isValid(locationId)) {
+      throw AppError.badRequest("Formato de ID de ubicación no válido");
+    }
+
+    // Validate location belongs to the org
+    const location = await Location.findOne({
+      _id: locationId,
+      organizationId,
+      isActive: true,
+    });
+    if (!location) {
+      throw AppError.notFound("Ubicación no encontrada o inactiva");
+    }
+
+    const requiredPermission = TICKET_TYPE_DOMAIN_PERMISSION[type];
+    if (!requiredPermission) {
+      throw AppError.badRequest(`Tipo de ticket no soportado: ${type}`);
+    }
+
+    return this.findCapableUsers(
+      organizationId,
+      type,
+      locationId,
+      requiredPermission,
+      userId,
+    );
+  }
+
+  /**
    * Returns the list of active users in the ticket's location whose role
    * includes the domain-specific permission required to fulfill the ticket
    * type (e.g. `transfers:create` for a transfer_request).
@@ -383,7 +430,26 @@ class TicketService {
       );
     }
 
-    // Find all roles in this org whose permissions include the required one
+    return this.findCapableUsers(
+      organizationId,
+      ticket.type,
+      ticket.locationId.toString(),
+      requiredPermission,
+      ticket.createdBy,
+    );
+  }
+
+  /**
+   * Core logic: find users in a location whose role has the required permission.
+   * Excludes `excludeUserId` (typically the requester / ticket creator).
+   */
+  private async findCapableUsers(
+    organizationId: string | Types.ObjectId,
+    ticketType: string,
+    locationId: string,
+    requiredPermission: string,
+    excludeUserId?: string | Types.ObjectId,
+  ) {
     const eligibleRoles = await Role.find({
       organizationId,
       permissions: requiredPermission,
@@ -395,7 +461,7 @@ class TicketService {
       return {
         users: [],
         requiredPermission,
-        ticketType: ticket.type,
+        ticketType,
       };
     }
 
@@ -406,15 +472,17 @@ class TicketService {
       return id;
     });
 
-    // Find active users assigned to the ticket's location with an eligible role,
-    // excluding the ticket creator (they can't fulfill their own request)
-    const users = await User.find({
+    const userFilter: Record<string, unknown> = {
       organizationId,
-      locations: ticket.locationId,
+      locations: new Types.ObjectId(locationId),
       roleId: { $in: eligibleRoleIds },
       status: "active",
-      _id: { $ne: ticket.createdBy },
-    })
+    };
+    if (excludeUserId) {
+      userFilter._id = { $ne: excludeUserId };
+    }
+
+    const users = await User.find(userFilter)
       .select("name email roleId")
       .lean();
 
@@ -427,7 +495,7 @@ class TicketService {
         roleName: roleIdToName[u.roleId] ?? null,
       })),
       requiredPermission,
-      ticketType: ticket.type,
+      ticketType,
     };
   }
 

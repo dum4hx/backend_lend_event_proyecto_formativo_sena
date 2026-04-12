@@ -8,7 +8,6 @@ import { Package } from "../package/models/package.model.ts";
 import { MaterialModel } from "../material/models/material_type.model.ts";
 import { Customer } from "../customer/models/customer.model.ts";
 import { MaterialInstance } from "../material/models/material_instance.model.ts";
-import { Loan } from "../loan/models/loan.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
@@ -872,14 +871,8 @@ export const requestService = {
 
   /**
    * Returns material instances that could fulfil a request's needs,
-   * classified by current availability and split by user-accessible locations.
-   *
-   * Availability categories per instance:
-   * - "available"  – status is currently "available" (can be assigned now)
-   * - "upcoming"   – status is "reserved" or "loaned" but the holding
-   *                   loan/request ends before this request's startDate
-   * - excluded     – instances that are damaged/maintenance/retired/lost
-   *                   or won't be free in time are omitted
+   * split by user-accessible locations. Only instances whose current
+   * status is "available" are returned.
    */
   async getAvailableMaterials(
     requestId: string | Types.ObjectId,
@@ -921,102 +914,26 @@ export const requestService = {
       ...new Set(materialTypeIds.map((id) => id.toString())),
     ].map((id) => new Types.ObjectId(id));
 
-    // 3. Fetch all non-retired/non-lost instances of needed types
-    const candidateStatuses = ["available", "reserved", "loaned"];
+    // 3. Fetch only currently available instances of needed types
     const instances = await MaterialInstance.find({
       organizationId,
       modelId: { $in: uniqueTypeIds },
-      status: { $in: candidateStatuses },
+      status: "available",
     }).lean();
 
     if (instances.length === 0) {
       return { currentUserLocations: [], otherLocations: [] };
     }
 
-    // 4. For reserved/loaned instances, check whether they'll be free before startDate
-    const reservedOrLoaned = instances.filter(
-      (i) => i.status === "reserved" || i.status === "loaned",
-    );
+    const qualifiedIds = instances.map((i) => new Types.ObjectId(i._id));
 
-    const busyInstanceIds = new Set<string>();
-
-    if (reservedOrLoaned.length > 0) {
-      const instanceIdsToCheck = reservedOrLoaned.map((i) =>
-        new Types.ObjectId(i._id).toString(),
-      );
-
-      // Check active loans whose endDate overlaps the request startDate
-      const blockingLoans = await Loan.find({
-        organizationId,
-        "materialInstances.materialInstanceId": {
-          $in: instanceIdsToCheck.map((id) => new Types.ObjectId(id)),
-        },
-        status: { $in: ["active", "overdue"] },
-        endDate: { $gte: request.startDate },
-      }).lean();
-
-      for (const loan of blockingLoans) {
-        for (const mi of loan.materialInstances) {
-          busyInstanceIds.add(
-            new Types.ObjectId(mi.materialInstanceId).toString(),
-          );
-        }
-      }
-
-      // Check requests (approved/assigned/ready) whose endDate overlaps
-      const blockingRequests = await LoanRequest.find({
-        organizationId,
-        _id: { $ne: new Types.ObjectId(String(requestId)) },
-        status: { $in: ["approved", "assigned", "ready"] },
-        "assignedMaterials.materialInstanceId": {
-          $in: instanceIdsToCheck.map((id) => new Types.ObjectId(id)),
-        },
-        endDate: { $gte: request.startDate },
-      }).lean();
-
-      for (const req of blockingRequests) {
-        for (const am of req.assignedMaterials ?? []) {
-          busyInstanceIds.add(
-            new Types.ObjectId(am.materialInstanceId).toString(),
-          );
-        }
-      }
-    }
-
-    // 5. Classify each instance
-    type AvailabilityTag = "available" | "upcoming";
-    const classifiedIds: { id: string; availability: AvailabilityTag }[] = [];
-
-    for (const instance of instances) {
-      const instanceId = new Types.ObjectId(instance._id).toString();
-
-      if (instance.status === "available") {
-        classifiedIds.push({ id: instanceId, availability: "available" });
-      } else {
-        // reserved or loaned
-        if (!busyInstanceIds.has(instanceId)) {
-          classifiedIds.push({ id: instanceId, availability: "upcoming" });
-        }
-        // else: won't be free in time → excluded
-      }
-    }
-
-    if (classifiedIds.length === 0) {
-      return { currentUserLocations: [], otherLocations: [] };
-    }
-
-    // 6. Resolve user locations for the split
+    // 4. Resolve user locations for the split
     const user = await User.findById(userId).select("locations").lean();
     const userLocationIds: Types.ObjectId[] = (user?.locations ?? []).map(
       (id) => new Types.ObjectId(String(id)),
     );
 
-    // 7. Aggregation pipeline: enrich and split by user locations
-    const availabilityMap = new Map(
-      classifiedIds.map((c) => [c.id, c.availability]),
-    );
-    const qualifiedIds = classifiedIds.map((c) => new Types.ObjectId(c.id));
-
+    // 5. Aggregation pipeline: enrich and split by user locations
     const pipeline = [
       { $match: { _id: { $in: qualifiedIds } } },
       { $sort: { createdAt: -1 as const } },
@@ -1043,6 +960,7 @@ export const requestService = {
           isUserLocation: {
             $in: ["$locationId", userLocationIds],
           },
+          availability: "available",
         },
       },
       {
@@ -1097,23 +1015,9 @@ export const requestService = {
 
     const [result] = await MaterialInstance.aggregate(pipeline);
 
-    // 8. Inject the availability tag into each instance
-    const injectAvailability = (
-      groups: Array<{ location: any; instances: any[] }>,
-    ) =>
-      groups.map((group) => ({
-        ...group,
-        instances: group.instances.map((inst) => ({
-          ...inst,
-          availability: availabilityMap.get(
-            new Types.ObjectId(inst._id).toString(),
-          ),
-        })),
-      }));
-
     return {
-      currentUserLocations: injectAvailability(result.currentUserLocations),
-      otherLocations: injectAvailability(result.otherLocations),
+      currentUserLocations: result.currentUserLocations,
+      otherLocations: result.otherLocations,
     };
   },
 };

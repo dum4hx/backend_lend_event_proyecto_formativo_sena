@@ -84,6 +84,11 @@ const ticketSchema = new Schema(
     payload: {
       type: Schema.Types.Mixed,
     },
+    code: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -92,6 +97,7 @@ const ticketSchema = new Schema(
 
 /* ---------- Indexes ---------- */
 
+ticketSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 ticketSchema.index({ organizationId: 1, locationId: 1, status: 1 });
 ticketSchema.index({ organizationId: 1, createdBy: 1 });
 ticketSchema.index({ organizationId: 1, assigneeId: 1 }, { sparse: true });

@@ -733,9 +733,7 @@ test.describe("Requests Module", () => {
 
     // Maintenance instances should not appear
     expect(
-      allInstances.every(
-        (i) => i.availability === "available" || i.availability === "upcoming",
-      ),
+      allInstances.every((i) => i.availability === "available"),
     ).toBeTruthy();
   });
 
