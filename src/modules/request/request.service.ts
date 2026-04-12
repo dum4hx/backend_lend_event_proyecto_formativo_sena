@@ -262,6 +262,8 @@ export const requestService = {
       .populate("customerId", "email name phone address")
       .populate("createdBy", "_id name email")
       .populate("approvedBy", "_id name email")
+      .populate("assignedBy", "_id name email")
+      .populate("preparedBy", "_id name email")
       .populate(
         "assignedMaterials.materialInstanceId",
         "serialNumber status modelId",
@@ -586,6 +588,8 @@ export const requestService = {
           mappedAssignments as unknown as LoanRequestDocument["assignedMaterials"];
         request.assignedBy = new Types.ObjectId(userId);
         request.assignedAt = new Date();
+        request.preparedBy = new Types.ObjectId(userId);
+        request.preparedAt = new Date();
         await request.save({ session });
 
         updatedRequest = (await LoanRequest.findById(request._id, null, {
@@ -594,6 +598,8 @@ export const requestService = {
           .populate("customerId", "email name phone address")
           .populate("createdBy", "_id name email")
           .populate("approvedBy", "_id name email")
+          .populate("assignedBy", "_id name email")
+          .populate("preparedBy", "_id name email")
           .populate(
             "assignedMaterials.materialInstanceId",
             "serialNumber status modelId",
