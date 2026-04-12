@@ -42,8 +42,50 @@ const INVITE_EXPIRY_HOURS = parseInt(
   process.env.INVITE_EXPIRY_HOURS || "48",
   10,
 );
-const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://app.test.local";
+
+function parseDurationToMs(
+  rawValue: string | undefined,
+  fallbackMs: number,
+): number {
+  if (!rawValue) return fallbackMs;
+
+  const value = rawValue.trim().toLowerCase();
+  const match = value.match(/^(\d+)(ms|s|m|h|d)?$/);
+  if (!match) return fallbackMs;
+
+  const amount = Number(match[1]);
+  const unit = match[2] ?? "s";
+
+  if (!Number.isFinite(amount) || amount <= 0) return fallbackMs;
+
+  switch (unit) {
+    case "ms":
+      return amount;
+    case "s":
+      return amount * 1000;
+    case "m":
+      return amount * 60 * 1000;
+    case "h":
+      return amount * 60 * 60 * 1000;
+    case "d":
+      return amount * 24 * 60 * 60 * 1000;
+    default:
+      return fallbackMs;
+  }
+}
+
+const REFRESH_TOKEN_TTL_MS = parseDurationToMs(
+  process.env.JWT_REFRESH_EXPIRATION,
+  DEFAULT_REFRESH_TOKEN_TTL_MS,
+);
+
+const SESSION_IDLE_TIMEOUT_MS =
+  process.env.AUTH_IDLE_TIMEOUT === "0"
+    ? 0
+    : parseDurationToMs(process.env.AUTH_IDLE_TIMEOUT, DEFAULT_IDLE_TIMEOUT_MS);
 
 /* ---------- Internal Helpers ---------- */
 
@@ -91,30 +133,66 @@ export const authService = {
     const currentHash = authService.hashRefreshToken(currentRefreshToken);
     const nextHash = authService.hashRefreshToken(nextRefreshToken);
 
-    const activeSession = await RefreshTokenSession.findOne({
+    const session = await RefreshTokenSession.findOne({
       userId,
       organizationId,
       tokenHash: currentHash,
-      revokedAt: null,
-      expiresAt: { $gt: new Date() },
     });
 
-    if (!activeSession) {
+    if (!session) {
       throw AppError.unauthorized(
         "Sesión inválida o expirada. Por favor inicia sesión nuevamente.",
+        { code: "SESSION_NOT_FOUND" },
       );
     }
 
-    activeSession.revokedAt = new Date();
-    activeSession.lastUsedAt = new Date();
-    activeSession.replacedByTokenHash = nextHash;
-    await activeSession.save();
+    if (session.revokedAt) {
+      throw AppError.unauthorized(
+        "La sesión ya no está activa. Por favor inicia sesión nuevamente.",
+        { code: "SESSION_REVOKED" },
+      );
+    }
+
+    const now = Date.now();
+    if (session.expiresAt.getTime() <= now) {
+      session.revokedAt = new Date(now);
+      session.lastUsedAt = new Date(now);
+      await session.save();
+
+      throw AppError.unauthorized(
+        "La sesión expiró por tiempo máximo permitido. Por favor inicia sesión nuevamente.",
+        { code: "SESSION_EXPIRED" },
+      );
+    }
+
+    if (SESSION_IDLE_TIMEOUT_MS > 0) {
+      const lastActivity = session.lastUsedAt ?? session.createdAt;
+      if (lastActivity && now - new Date(lastActivity).getTime() > SESSION_IDLE_TIMEOUT_MS) {
+        session.revokedAt = new Date(now);
+        session.lastUsedAt = new Date(now);
+        await session.save();
+
+        throw AppError.unauthorized(
+          "La sesión se cerró por inactividad.",
+          {
+            code: "INACTIVITY_TIMEOUT",
+            idleTimeoutMs: SESSION_IDLE_TIMEOUT_MS,
+          },
+        );
+      }
+    }
+
+    session.revokedAt = new Date(now);
+    session.lastUsedAt = new Date(now);
+    session.replacedByTokenHash = nextHash;
+    await session.save();
 
     await RefreshTokenSession.create({
       userId,
       organizationId,
       tokenHash: nextHash,
-      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      expiresAt: new Date(now + REFRESH_TOKEN_TTL_MS),
+      lastUsedAt: new Date(now),
     });
   },
 

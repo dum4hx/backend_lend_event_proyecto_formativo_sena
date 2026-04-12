@@ -6,6 +6,8 @@ import { logger } from "./logger.ts";
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
 const SMTP_FROM = process.env.SMTP_FROM || "noreply@lendevent.com";
+const NODE_ENV = process.env.NODE_ENV || "development";
+const IS_PRODUCTION = NODE_ENV === "production";
 
 if (!BREVO_API_KEY) {
   logger.warn("BREVO_API_KEY not set. Email features will be unavailable.");
@@ -18,6 +20,32 @@ const transporter = nodemailer.createTransport(
     apiKey: string;
   }) => nodemailer.Transport)({ apiKey: BREVO_API_KEY }),
 );
+
+function shouldSkipEmailDelivery(): boolean {
+  return NODE_ENV === "test" || (!IS_PRODUCTION && !BREVO_API_KEY);
+}
+
+async function sendEmailOrSkip(
+  mailOptions: nodemailer.SendMailOptions,
+  metadata: { type: string; to: string },
+): Promise<void> {
+  if (shouldSkipEmailDelivery()) {
+    logger.info("Email delivery skipped for environment", {
+      type: metadata.type,
+      to: metadata.to,
+      nodeEnv: NODE_ENV,
+    });
+    return;
+  }
+
+  if (!BREVO_API_KEY) {
+    throw new Error(
+      "BREVO_API_KEY es requerido en producción para envío de correos",
+    );
+  }
+
+  await transporter.sendMail(mailOptions);
+}
 
 /* ---------- Email Service ---------- */
 
@@ -45,12 +73,15 @@ export const emailService = {
       </div>
     `;
 
-    await transporter.sendMail({
+    await sendEmailOrSkip(
+      {
       from: `"LendEvent" <${SMTP_FROM}>`,
       to,
       subject: "Verify your LendEvent account",
       html,
-    });
+      },
+      { type: "email_verification", to },
+    );
 
     logger.info("Email verification code sent", { to });
   },
@@ -78,12 +109,15 @@ export const emailService = {
       </div>
     `;
 
-    await transporter.sendMail({
+    await sendEmailOrSkip(
+      {
       from: `"LendEvent" <${SMTP_FROM}>`,
       to,
       subject: "Password Reset Verification Code",
       html,
-    });
+      },
+      { type: "password_reset", to },
+    );
 
     logger.info("Password reset code sent", { to });
   },
@@ -116,12 +150,15 @@ export const emailService = {
       </div>
     `;
 
-    await transporter.sendMail({
+    await sendEmailOrSkip(
+      {
       from: `"LendEvent" <${SMTP_FROM}>`,
       to,
       subject: `You're invited to join ${organizationName} on LendEvent`,
       html,
-    });
+      },
+      { type: "invite", to },
+    );
 
     logger.info("Invite email sent", { to, organizationName });
   },
@@ -358,12 +395,15 @@ export const emailService = {
       </div>
     `;
 
-    await transporter.sendMail({
+    await sendEmailOrSkip(
+      {
       from: `"LendEvent" <${SMTP_FROM}>`,
       to,
       subject: "LendEvent Login Verification Code",
       html,
-    });
+      },
+      { type: "login_otp", to },
+    );
 
     logger.info("Login OTP code sent", { to });
   },

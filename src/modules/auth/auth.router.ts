@@ -20,6 +20,8 @@ import {
   authenticate,
   accessTokenCookieOptions,
   refreshTokenCookieOptions,
+  clearAccessTokenCookieOptions,
+  clearRefreshTokenCookieOptions,
   COOKIE_NAME,
   REFRESH_COOKIE_NAME,
 } from "../../middleware/auth.ts";
@@ -234,8 +236,8 @@ authRouter.post(
       });
     } catch (err) {
       // If refresh fails, force a clean browser auth state.
-      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
-      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+      res.clearCookie(COOKIE_NAME, clearAccessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshTokenCookieOptions);
       next(err);
     }
   },
@@ -257,8 +259,8 @@ authRouter.post(
         await authService.revokeRefreshSession(refreshToken);
       }
 
-      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
-      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+      res.clearCookie(COOKIE_NAME, clearAccessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshTokenCookieOptions);
 
       res.json({
         status: "success",
@@ -281,8 +283,8 @@ authRouter.post(
     try {
       await authService.revokeAllRefreshSessions(req.user!.userId);
 
-      res.clearCookie(COOKIE_NAME, accessTokenCookieOptions);
-      res.clearCookie(REFRESH_COOKIE_NAME, refreshTokenCookieOptions);
+      res.clearCookie(COOKIE_NAME, clearAccessTokenCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, clearRefreshTokenCookieOptions);
 
       res.json({
         status: "success",

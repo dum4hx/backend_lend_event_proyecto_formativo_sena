@@ -111,11 +111,22 @@ test.describe.serial("Auth Module", () => {
   });
 
   test("POST /auth/logout-all should reject unauthenticated requests", async ({
-    request,
+    playwright,
   }) => {
-    const response = await request.post("auth/logout-all");
+    const anonymousRequest = await playwright.request.newContext({
+      baseURL:
+        process.env.PLAYWRIGHT_BASE_URL ?? "https://api.test.local/api/v1/",
+      ignoreHTTPSErrors: true,
+      storageState: {
+        cookies: [],
+        origins: [],
+      },
+    });
 
+    const response = await anonymousRequest.post("auth/logout-all");
     expect(response.status()).toBe(401);
+
+    await anonymousRequest.dispose();
   });
 
   // Additional tests for logout, refresh...

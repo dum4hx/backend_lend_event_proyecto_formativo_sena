@@ -1,6 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
-import { verifyAccessToken, type JWTPayload } from "../utils/auth/jwt.ts";
+import {
+  verifyAccessToken,
+  verifyRefreshToken,
+  type JWTPayload,
+} from "../utils/auth/jwt.ts";
 import { AppError } from "../errors/AppError.ts";
 import {
   Role,
@@ -9,6 +13,7 @@ import {
 } from "../modules/roles/models/role.model.ts";
 import { Organization } from "../modules/organization/models/organization.model.ts";
 import { User } from "../modules/user/models/user.model.ts";
+import { authService } from "../modules/auth/auth.service.ts";
 
 /* ---------- Extend Express Request ---------- */
 
@@ -112,6 +117,45 @@ export const refreshTokenCookieOptions = {
   path: "/api/v1/auth", // Only sent to auth endpoints
 };
 
+export const clearAccessTokenCookieOptions = {
+  ...cookieOptions,
+};
+
+export const clearRefreshTokenCookieOptions = {
+  ...cookieOptions,
+  path: "/api/v1/auth",
+};
+
+async function refreshFromCookie(
+  req: Request,
+  res: Response,
+): Promise<JWTPayload> {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+
+  if (!refreshToken) {
+    throw AppError.unauthorized("Autenticación requerida", {
+      code: "MISSING_REFRESH_TOKEN",
+    });
+  }
+
+  const refreshPayload = await verifyRefreshToken(refreshToken);
+  const tokenPair = await authService.refreshTokens(
+    refreshPayload.sub,
+    refreshPayload.org,
+    refreshToken,
+  );
+
+  // Sliding session: when refresh succeeds, rotate cookies and continue the request.
+  res.cookie(COOKIE_NAME, tokenPair.accessToken, accessTokenCookieOptions);
+  res.cookie(
+    REFRESH_COOKIE_NAME,
+    tokenPair.refreshToken,
+    refreshTokenCookieOptions,
+  );
+
+  return verifyAccessToken(tokenPair.accessToken);
+}
+
 /* ---------- Authentication Middleware ---------- */
 
 /**
@@ -126,13 +170,21 @@ export const authenticate = async (
   try {
     // Extract token from cookie
     const token = req.cookies?.[COOKIE_NAME] as string | undefined;
+    let payload: JWTPayload;
 
     if (!token) {
-      throw AppError.unauthorized("Autenticación requerida");
+      payload = await refreshFromCookie(req, res);
+    } else {
+      try {
+        payload = await verifyAccessToken(token);
+      } catch (err: unknown) {
+        if (err instanceof AppError && err.statusCode === 401) {
+          payload = await refreshFromCookie(req, res);
+        } else {
+          throw err;
+        }
+      }
     }
-
-    // Verify the token
-    const payload: JWTPayload = await verifyAccessToken(token);
 
     // Validate payload structure — `roleId` is the JWT claim name (matches JWTPayload interface)
     if (!payload.sub || !payload.org || !payload.roleId || !payload.email) {
