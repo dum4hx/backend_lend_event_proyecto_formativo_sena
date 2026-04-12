@@ -23,6 +23,7 @@ import reportsRouter from "../modules/reports/reports.router.ts";
 import operationsRouter from "../modules/operations/operations.router.ts";
 import maintenanceRouter from "../modules/maintenance/maintenance.router.ts";
 import codeSchemeRouter from "../modules/code_scheme/code_scheme.router.ts";
+import ticketRouter from "../modules/ticket/ticket.router.ts";
 
 export {
   authRouter,
@@ -50,4 +51,5 @@ export {
   operationsRouter,
   maintenanceRouter,
   codeSchemeRouter,
+  ticketRouter,
 };

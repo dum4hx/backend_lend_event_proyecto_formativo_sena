@@ -395,6 +395,22 @@ export const loanService = {
 
         await loan.save({ session });
 
+        // Transition the linked request from shipped → completed
+        if (loan.requestId) {
+          const linkedRequest = await LoanRequest.findById(
+            loan.requestId,
+          ).session(session);
+          if (linkedRequest && linkedRequest.status === "shipped") {
+            validateTransition(
+              linkedRequest.status,
+              "completed",
+              LOAN_REQUEST_TRANSITIONS,
+            );
+            linkedRequest.status = "completed" as any;
+            await linkedRequest.save({ session });
+          }
+        }
+
         result = loan;
       });
 

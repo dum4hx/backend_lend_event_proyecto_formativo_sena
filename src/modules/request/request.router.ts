@@ -67,7 +67,9 @@ const createRequestSchema = LoanRequestBaseZodSchema.pick({
     items: z
       .array(createRequestItemSchema)
       .min(1, "Se requiere al menos un artículo"),
-    depositAmount: z.number().min(0),
+    depositAmount: z
+      .number()
+      .positive("El monto del depósito debe ser mayor a cero"),
   })
   .refine((data) => data.endDate > data.startDate, {
     message: "La fecha de fin debe ser posterior a la fecha de inicio",
