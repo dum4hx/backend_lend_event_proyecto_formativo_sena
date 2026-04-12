@@ -337,10 +337,16 @@ const loanSchema = new Schema(
 
 loanSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 loanSchema.index({ organizationId: 1, customerId: 1 });
+loanSchema.index({ organizationId: 1, requestId: 1 });
 loanSchema.index({ organizationId: 1, status: 1 });
 loanSchema.index({ organizationId: 1, endDate: 1 });
 loanSchema.index({ organizationId: 1, createdAt: -1 });
 loanSchema.index({ organizationId: 1, locationId: 1 });
+loanSchema.index({
+  organizationId: 1,
+  "materialInstances.materialInstanceId": 1,
+  createdAt: -1,
+});
 loanSchema.index({ "materialInstances.materialInstanceId": 1 });
 
 /* ---------- Export ---------- */

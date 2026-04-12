@@ -262,6 +262,12 @@ const loanRequestSchema = new Schema(
 loanRequestSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 loanRequestSchema.index({ organizationId: 1, customerId: 1 });
 loanRequestSchema.index({ organizationId: 1, status: 1 });
+loanRequestSchema.index({
+  organizationId: 1,
+  "assignedMaterials.materialInstanceId": 1,
+  status: 1,
+  createdAt: -1,
+});
 loanRequestSchema.index({ organizationId: 1, createdAt: -1 });
 loanRequestSchema.index({ organizationId: 1, startDate: 1, endDate: 1 });
 loanRequestSchema.index(

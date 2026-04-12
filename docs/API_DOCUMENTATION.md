@@ -4646,6 +4646,55 @@ Gets a specific material instance.
 
 **Permission Required:** `materials:read`
 
+**Response (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "instance": {
+      "_id": "6614db5e22111f21ef33af10",
+      "serialNumber": "SN-1001",
+      "status": "reserved",
+      "model": {
+        "_id": "6614db5e22111f21ef33af00",
+        "name": "Canon EOS",
+        "description": "Camera",
+        "pricePerDay": 1000,
+        "categoryId": "6614db5e22111f21ef33ae90"
+      },
+      "loanContext": {
+        "loanId": null,
+        "loanCode": null,
+        "requestId": "6614db5e22111f21ef33b000",
+        "requestCode": "REQ-2026-0012",
+        "source": "request"
+      }
+    }
+  }
+}
+```
+
+`loanContext` contract:
+
+| Field       | Type                 | Description                                                                           |
+| ----------- | -------------------- | ------------------------------------------------------------------------------------- |
+| loanId      | string \| null        | Loan ID when a direct active/overdue loan relation exists                            |
+| loanCode    | string \| null        | Loan code when `loanId` exists                                                       |
+| requestId   | string \| null        | Related request ID (from the loan's request or fallback assignment lookup)           |
+| requestCode | string \| null        | Related request code                                                                  |
+| source      | `loan` \| `request` \| null | Indicates whether relation was resolved from a loan (`loan`) or directly from request |
+
+Behavior by material instance status:
+
+- `reserved` and `loaned`: backend resolves and returns `loanContext` relation values when found.
+- Any other status (`available`, `returned`, `maintenance`, `damaged`, `lost`, `retired`): `loanContext` is returned with `null` values.
+
+Resolution order used by backend:
+
+1. Direct loan relation (`loans.materialInstances.materialInstanceId`) scoped by `organizationId`.
+2. Fallback request relation (`requests.assignedMaterials.materialInstanceId`) scoped by `organizationId` and request state.
+
 ---
 
 #### POST /materials/instances

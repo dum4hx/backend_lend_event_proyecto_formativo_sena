@@ -5,6 +5,8 @@ import { MaterialAttribute } from "./models/material_attribute.model.ts";
 import { MaterialInstance } from "./models/material_instance.model.ts";
 import { InventoryMovement } from "./models/inventory_movement.model.ts";
 import { LocationService } from "../location/location.service.ts";
+import { Loan } from "../loan/models/loan.model.ts";
+import { LoanRequest } from "../request/models/request.model.ts";
 import { AppError } from "../../errors/AppError.ts";
 import { logger } from "../../utils/logger.ts";
 import { renameProperty } from "../../utils/renameProperty.ts";
@@ -103,6 +105,103 @@ const resolveEffectiveSerialAndBarcode = (opts: {
 
   return { serialNumber, barcode };
 };
+
+type LoanContextSource = "loan" | "request";
+
+type MaterialInstanceLoanContext = {
+  loanId: string | null;
+  loanCode: string | null;
+  requestId: string | null;
+  requestCode: string | null;
+  source: LoanContextSource | null;
+};
+
+const EMPTY_LOAN_CONTEXT: MaterialInstanceLoanContext = {
+  loanId: null,
+  loanCode: null,
+  requestId: null,
+  requestCode: null,
+  source: null,
+};
+
+const INSTANCE_STATUSES_WITH_RELATION_CONTEXT = new Set(["reserved", "loaned"]);
+
+const REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS: Record<string, string[]> = {
+  reserved: ["assigned", "ready"],
+  loaned: ["shipped", "completed", "assigned", "ready"],
+};
+
+async function resolveMaterialInstanceLoanContext(args: {
+  organizationId: Types.ObjectId | string;
+  materialInstanceId: Types.ObjectId | string;
+  instanceStatus: string;
+}): Promise<MaterialInstanceLoanContext> {
+  const { organizationId, materialInstanceId, instanceStatus } = args;
+
+  if (!INSTANCE_STATUSES_WITH_RELATION_CONTEXT.has(instanceStatus)) {
+    return EMPTY_LOAN_CONTEXT;
+  }
+
+  const normalizedOrganizationId =
+    typeof organizationId === "string"
+      ? new Types.ObjectId(organizationId)
+      : organizationId;
+  const normalizedInstanceId =
+    typeof materialInstanceId === "string"
+      ? new Types.ObjectId(materialInstanceId)
+      : materialInstanceId;
+
+  const activeLoan = await Loan.findOne({
+    organizationId: normalizedOrganizationId,
+    "materialInstances.materialInstanceId": normalizedInstanceId,
+    status: { $in: ["active", "overdue"] },
+  })
+    .select("_id code requestId")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (activeLoan) {
+    const linkedRequest = await LoanRequest.findOne({
+      _id: activeLoan.requestId,
+      organizationId: normalizedOrganizationId,
+    })
+      .select("_id code")
+      .lean();
+
+    return {
+      loanId: activeLoan._id.toString(),
+      loanCode: activeLoan.code ?? null,
+      requestId: linkedRequest?._id?.toString() ?? null,
+      requestCode: linkedRequest?.code ?? null,
+      source: "loan",
+    };
+  }
+
+  const requestStatuses =
+    REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS[instanceStatus] ??
+    REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS.loaned;
+
+  const relatedRequest = await LoanRequest.findOne({
+    organizationId: normalizedOrganizationId,
+    "assignedMaterials.materialInstanceId": normalizedInstanceId,
+    status: { $in: requestStatuses },
+  })
+    .select("_id code")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!relatedRequest) {
+    return EMPTY_LOAN_CONTEXT;
+  }
+
+  return {
+    loanId: null,
+    loanCode: null,
+    requestId: relatedRequest._id.toString(),
+    requestCode: relatedRequest.code ?? null,
+    source: "request",
+  };
+}
 
 /* ---------- Internal helpers ---------- */
 
@@ -1230,7 +1329,21 @@ export const materialService = {
       throw AppError.notFound("Instancia de material no encontrada");
     }
 
-    return renameProperty(instance, "modelId", "model");
+    const mappedInstance = renameProperty(instance, "modelId", "model") as {
+      _id: Types.ObjectId | string;
+      status: string;
+      [key: string]: unknown;
+    };
+
+    mappedInstance.loanContext = organizationId
+      ? await resolveMaterialInstanceLoanContext({
+          organizationId,
+          materialInstanceId: mappedInstance._id,
+          instanceStatus: mappedInstance.status,
+        })
+      : EMPTY_LOAN_CONTEXT;
+
+    return mappedInstance;
   },
 
   async createInstance(
