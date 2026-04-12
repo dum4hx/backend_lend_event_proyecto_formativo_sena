@@ -1091,7 +1091,7 @@ export class LocationService {
           update: {
             $set: {
               materialCapacities,
-            },
+            } as any,
           },
         },
       };

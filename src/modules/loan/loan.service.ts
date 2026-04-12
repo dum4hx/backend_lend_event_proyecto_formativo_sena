@@ -296,6 +296,8 @@ export const loanService = {
               deposit,
               totalAmount: request.totalAmount ?? 0,
               pricingSnapshot: pricingService.buildLoanPricingSnapshot(request),
+              preparedBy: request.preparedBy,
+              preparedAt: request.preparedAt,
               checkedOutBy: new Types.ObjectId(userId),
               status: "active",
               code,
@@ -314,6 +316,7 @@ export const loanService = {
           .session(session)
           .populate("customerId", "email name")
           .populate("checkedOutBy", "_id name email")
+          .populate("preparedBy", "_id name email")
           .populate(
             "materialInstances.materialInstanceId",
             "serialNumber modelId",
@@ -582,6 +585,7 @@ export const loanService = {
         .limit(limit)
         .populate("customerId", "email name")
         .populate("checkedOutBy", "_id name email")
+        .populate("preparedBy", "_id name email")
         .sort({ [sortBy]: sortDirection }),
       Loan.countDocuments(filter),
     ]);
@@ -730,6 +734,17 @@ export const loanService = {
         },
       },
       { $unwind: { path: "$checkedOutBy", preserveNullAndEmptyArrays: true } },
+      // Populate preparedBy user
+      {
+        $lookup: {
+          from: "users",
+          localField: "preparedBy",
+          foreignField: "_id",
+          as: "preparedBy",
+          pipeline: [{ $project: { _id: 1, name: 1, email: 1 } }],
+        },
+      },
+      { $unwind: { path: "$preparedBy", preserveNullAndEmptyArrays: true } },
       // Unwind materialInstances for per-instance lookups
       { $unwind: "$materialInstances" },
       // Populate materialInstance details — write result back into materialInstances.materialInstanceId

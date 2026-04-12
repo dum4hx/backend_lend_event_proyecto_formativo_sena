@@ -253,6 +253,10 @@ const loanSchema = new Schema(
       index: true,
     },
     // User references
+    preparedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     checkedOutBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -263,6 +267,7 @@ const loanSchema = new Schema(
       ref: "User",
     },
     // Dates
+    preparedAt: Date,
     startDate: {
       type: Date,
       required: true,

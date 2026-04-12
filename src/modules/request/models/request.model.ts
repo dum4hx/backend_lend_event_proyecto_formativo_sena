@@ -232,6 +232,13 @@ const loanRequestSchema = new Schema(
     assignedAt: {
       type: Date,
     },
+    preparedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    preparedAt: {
+      type: Date,
+    },
     // Calculated totals
     totalDays: { type: Number, min: 1 },
     subtotal: { type: Number, min: 0 },
