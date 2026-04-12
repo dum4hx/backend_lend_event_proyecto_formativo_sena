@@ -4,6 +4,7 @@ import {
   type Response,
   type NextFunction,
 } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { loanStatusOptions } from "../loan/models/loan.model.ts";
 import { loanService } from "./loan.service.ts";
@@ -51,11 +52,34 @@ const returnLoanSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const materialStatusOptions = [
+  "available",
+  "reserved",
+  "loaned",
+  "returned",
+  "maintenance",
+  "damaged",
+  "lost",
+  "retired",
+] as const;
+
 const getLoanQuerySchema = z.object({
   groupByMaterialType: z
     .string()
     .optional()
     .transform((val) => val === "true"),
+  materialSearch: z.string().trim().max(120).optional(),
+});
+
+const listLoanMaterialsQuerySchema = paginationSchema.extend({
+  search: z.string().trim().max(120).optional(),
+  status: z.enum(materialStatusOptions as [string, ...string[]]).optional(),
+  materialTypeId: z
+    .string()
+    .refine((value) => Types.ObjectId.isValid(value), {
+      message: "Formato de ID de tipo de material no válido",
+    })
+    .optional(),
 });
 
 /* ---------- Routes ---------- */
@@ -124,6 +148,7 @@ loanRouter.get(
  *
  * Query Parameters:
  * - groupByMaterialType: If true, materialInstances are grouped by materialTypeId.
+ * - materialSearch: Filtra materiales asociados por serial, barcode, nombre o tipo.
  */
 loanRouter.get(
   "/:id",
@@ -134,24 +159,79 @@ loanRouter.get(
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
       const loanId = req.params.id;
-      const { groupByMaterialType } = req.query as any;
+      const { groupByMaterialType, materialSearch } = req.query as any;
 
       if (!loanId || typeof loanId !== "string") {
         throw AppError.badRequest("ID de préstamo no válido");
       }
+      if (!Types.ObjectId.isValid(loanId)) {
+        throw AppError.badRequest("Formato de ID de préstamo no válido");
+      }
 
-      const opts =
-        groupByMaterialType !== undefined ? { groupByMaterialType } : undefined;
+      if (groupByMaterialType && materialSearch) {
+        throw AppError.badRequest(
+          "materialSearch no es compatible con groupByMaterialType",
+        );
+      }
+
+      const opts = {
+        ...(groupByMaterialType !== undefined ? { groupByMaterialType } : {}),
+        ...(materialSearch ? { materialSearch } : {}),
+      };
       const loan = await loanService.getLoanById(
         loanId,
         organizationId,
         user.id,
-        opts,
+        Object.keys(opts).length > 0 ? opts : undefined,
       );
 
       res.json({
         status: "success",
         data: { loan },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/loans/:id/materials
+ * Lists materials associated with a specific loan (paginated).
+ */
+loanRouter.get(
+  "/:id/materials",
+  requirePermission("loans:read"),
+  validateQuery(listLoanMaterialsQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const organizationId = getOrgId(req);
+      const user = getAuthUser(req);
+      const loanId = req.params.id;
+      const { page = 1, limit = 20, search, status, materialTypeId } =
+        req.query as any;
+
+      if (!loanId || typeof loanId !== "string") {
+        throw AppError.badRequest("ID de préstamo no válido");
+      }
+      if (!Types.ObjectId.isValid(loanId)) {
+        throw AppError.badRequest("Formato de ID de préstamo no válido");
+      }
+
+      const result = await loanService.listLoanMaterials({
+        loanId,
+        organizationId,
+        userId: user.id,
+        page: Number(page),
+        limit: Number(limit),
+        search,
+        status,
+        materialTypeId,
+      });
+
+      res.json({
+        status: "success",
+        data: result,
       });
     } catch (err) {
       next(err);

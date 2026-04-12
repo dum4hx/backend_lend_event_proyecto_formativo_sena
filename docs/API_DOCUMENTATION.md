@@ -5630,10 +5630,15 @@ Gets a specific loan with full details. The response includes populated `custome
 | Parameter           | Type    | Required | Description                                                                   |
 | ------------------- | ------- | -------- | ----------------------------------------------------------------------------- |
 | groupByMaterialType | boolean | No       | If `true`, group material instances by material type ID (see response below). |
+| materialSearch      | string  | No       | Filtra materiales del préstamo por serial, barcode, nombre, ID de instancia o tipo. |
+
+**Regla de compatibilidad:**
+
+- `materialSearch` no se puede usar junto con `groupByMaterialType=true` (retorna `400 BAD_REQUEST`).
 
 **Fields populated in response:**
 
-- `materialInstances`: Array of instances (default behavior). Each instance includes `materialInstanceId` (with `serialNumber`, `status`, `modelId`, `name`), `materialTypeId`, and `materialType` (with `_id` and `name`).
+- `materialInstances`: Array of instances (default behavior). Cada instancia incluye `materialInstanceId` (con `_id`, `serialNumber`, `barcode`, `status`, `modelId`, `name`), `materialTypeId`, y `materialType` (con `_id` y `name`).
 - `materialInstancesByType`: Object with material type IDs as keys and arrays of instances as values (only when `groupByMaterialType=true`). The `materialInstances` field is omitted in this case. Each instance includes the same populated fields as above.
 
 **Example Response (default):**
@@ -5700,6 +5705,69 @@ When the loan has a deposit (`deposit.amount > 0`), the response includes two co
 | `deposit.refundableAmount` | number  | The remaining deposit amount after subtracting any applied damage charges                        |
 
 These fields are also included in `GET /loans` list responses.
+
+---
+
+#### GET /loans/:id/materials
+
+Lista únicamente los materiales asociados a un préstamo específico, con paginación y filtros para búsquedas en frontend.
+
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:read`
+
+| Parameter      | Location | Type   | Required | Description                                                                             |
+| -------------- | -------- | ------ | -------- | --------------------------------------------------------------------------------------- |
+| id             | path     | string | Yes      | ID del préstamo                                                                         |
+| page           | query    | number | No       | Número de página (default: `1`)                                                        |
+| limit          | query    | number | No       | Tamaño de página (default: `20`)                                                       |
+| search         | query    | string | No       | Búsqueda parcial por `serialNumber`, `barcode`, nombre de instancia o nombre de tipo   |
+| status         | query    | string | No       | Estado de instancia de material (`available`, `loaned`, `returned`, etc.)              |
+| materialTypeId | query    | string | No       | Filtra por tipo de material                                                             |
+
+**Success (200):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "loan": {
+      "_id": "680f...",
+      "code": "LOAN-00021",
+      "status": "returned"
+    },
+    "materials": [
+      {
+        "materialInstanceId": {
+          "_id": "6810...",
+          "serialNumber": "SN-DEP-001",
+          "barcode": "BC-DEP-001",
+          "status": "returned",
+          "modelId": "680a...",
+          "name": "Proyector Epson"
+        },
+        "materialTypeId": "680a...",
+        "materialType": {
+          "_id": "680a...",
+          "name": "Proyectores"
+        },
+        "conditionAtCheckout": "good",
+        "conditionAtReturn": "good",
+        "notes": "Sin novedades"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+**Common errors:**
+
+| Code              | Condition                                 |
+| ----------------- | ----------------------------------------- |
+| `400 BAD_REQUEST` | ID de préstamo o filtros inválidos        |
+| `403 FORBIDDEN`   | Usuario sin permiso `loans:read`          |
+| `404 NOT_FOUND`   | Préstamo no encontrado o fuera de alcance |
 
 ---
 

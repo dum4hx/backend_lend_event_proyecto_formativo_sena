@@ -172,6 +172,83 @@ test.describe("Loans – Deposit Lifecycle", () => {
     expect(loan.deposit.transactions[0].type).toBe("held");
   });
 
+  test("GET /loans/:id admite materialSearch para filtrar materiales asociados", async ({
+    request,
+  }) => {
+    const { loanId, materialInstanceId } = await buildReturnedLoan(request, 0);
+
+    const instanceRes = await request.get(
+      `/api/v1/materials/instances/${materialInstanceId}`,
+    );
+    expect(instanceRes.status()).toBe(200);
+    const serialNumber = (await instanceRes.json()).data.instance.serialNumber;
+
+    const baseLoanRes = await request.get(`/api/v1/loans/${loanId}`);
+    expect(baseLoanRes.status()).toBe(200);
+    const baseLoan = (await baseLoanRes.json()).data.loan;
+    expect(baseLoan.materialInstances.length).toBeGreaterThan(0);
+
+    const filteredLoanRes = await request.get(
+      `/api/v1/loans/${loanId}?materialSearch=${encodeURIComponent(serialNumber.slice(0, 6))}`,
+    );
+    expect(filteredLoanRes.status()).toBe(200);
+    const filteredLoan = (await filteredLoanRes.json()).data.loan;
+    expect(filteredLoan.materialInstances.length).toBe(1);
+
+    const noMatchLoanRes = await request.get(
+      `/api/v1/loans/${loanId}?materialSearch=${encodeURIComponent("SIN-COINCIDENCIA-TEST")}`,
+    );
+    expect(noMatchLoanRes.status()).toBe(200);
+    const noMatchLoan = (await noMatchLoanRes.json()).data.loan;
+    expect(noMatchLoan.materialInstances).toHaveLength(0);
+  });
+
+  test("GET /loans/:id rechaza materialSearch con groupByMaterialType", async ({
+    request,
+  }) => {
+    const { loanId } = await buildReturnedLoan(request, 0);
+
+    const res = await request.get(
+      `/api/v1/loans/${loanId}?groupByMaterialType=true&materialSearch=abc`,
+    );
+    expect(res.status()).toBe(400);
+  });
+
+  test("GET /loans/:id/materials lista materiales con paginación y búsqueda", async ({
+    request,
+  }) => {
+    const { loanId, materialInstanceId } = await buildReturnedLoan(request, 0);
+
+    const instanceRes = await request.get(
+      `/api/v1/materials/instances/${materialInstanceId}`,
+    );
+    expect(instanceRes.status()).toBe(200);
+    const serialNumber = (await instanceRes.json()).data.instance.serialNumber;
+
+    const listRes = await request.get(`/api/v1/loans/${loanId}/materials`);
+    expect(listRes.status()).toBe(200);
+    const listBody = await listRes.json();
+
+    expect(listBody.status).toBe("success");
+    expect(listBody.data.loan._id).toBe(loanId);
+    expect(Array.isArray(listBody.data.materials)).toBeTruthy();
+    expect(listBody.data.materials.length).toBeGreaterThan(0);
+    expect(listBody.data.total).toBeGreaterThan(0);
+
+    const searchRes = await request.get(
+      `/api/v1/loans/${loanId}/materials?search=${encodeURIComponent(serialNumber.slice(0, 6))}&limit=5&page=1`,
+    );
+    expect(searchRes.status()).toBe(200);
+    const searchBody = await searchRes.json();
+
+    expect(searchBody.data.page).toBe(1);
+    expect(searchBody.data.totalPages).toBeGreaterThan(0);
+    expect(searchBody.data.materials.length).toBeGreaterThan(0);
+    expect(
+      searchBody.data.materials[0].materialInstanceId.serialNumber,
+    ).toContain(serialNumber.slice(0, 6));
+  });
+
   /* ---- Test 2: Deposit fully covers damage → status = "applied", invoice = "paid" ---- */
 
   test("inspection – deposit fully covers damage: deposit 'applied', invoice 'paid'", async ({
