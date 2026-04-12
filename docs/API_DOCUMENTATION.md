@@ -6702,38 +6702,6 @@ Dismisses an open or acknowledged incident. Dismissal means the incident was a f
 
 ### Invoice Endpoints
 
-**Invoice Status Lifecycle:**
-
-An invoice progresses through various states depending on its lifecycle:
-
-```
-draft → pending → partially_paid → paid
-                  ↓
-                cancelled (can be cancelled from draft, pending, or partially_paid)
-                  ↓
-refunded (final state after refund processing)
-
-overdue (special state: pending invoice with dueDate < now)
-```
-
-| Status | Description |
-|--------|-------------|
-| `draft` | Invoice created but not yet sent to customer |
-| `pending` | Invoice sent to customer, awaiting payment |
-| `partially_paid` | At least partial payment received, but balance remains due |
-| `paid` | Full payment received (amountDue ≤ 0) |
-| `overdue` | Pending invoice with past due date |
-| `cancelled` | Invoice voided/cancelled, no longer valid |
-| `refunded` | Full refund issued, final state |
-
-**Automatic Status Calculation:**
-- Status is automatically calculated during save based on amounts:
-  - If `amountPaid > 0` AND `amountDue > 0` → `partially_paid`
-  - If `amountDue ≤ 0` → `paid`
-  - If `status = pending` AND `dueDate < now` → `overdue`
-
----
-
 #### GET /invoices
 
 Lists all invoices.
@@ -6823,17 +6791,11 @@ Creates a new invoice.
 
 Records a payment against an invoice. The endpoint validates the provided `paymentMethodId` belongs to the authenticated organization and is active. On success it returns the newly recorded payment record (not the full invoice document).
 
-**Status Transitions:**
-- If payment equals the outstanding balance → status becomes `paid`
-- If payment is less than the outstanding balance → status becomes `partially_paid`
-- If invoice was `partially_paid` and this payment completes it → status becomes `paid`
-
 | Parameter       | Location | Type   | Required | Description                                   |
 | --------------- | -------- | ------ | -------- | --------------------------------------------- |
 | amount          | body     | number | Yes      | Payment amount (same units as invoice totals) |
 | paymentMethodId | body     | string | Yes      | Payment method ObjectId (organization-scoped) |
 | reference       | body     | string | No       | Optional payment reference or transaction id  |
-| notes           | body     | string | No       | Optional payment notes                        |
 
 **Response `200`:**
 
@@ -6856,8 +6818,7 @@ Records a payment against an invoice. The endpoint validates the provided `payme
 **Notes:**
 
 - The returned `payment` object is the newly appended payment subdocument stored on the invoice (the last element in the `payments` array).
-- Clients that need the updated invoice (to see the new `status` field) should call `GET /invoices/:id` after recording the payment.
-- The `status` field transitions automatically based on the `amountPaid` vs `totalAmount` comparison.
+- Clients that need the updated invoice should call `GET /invoices/:id` after recording the payment.
 
 **Errors:**
 

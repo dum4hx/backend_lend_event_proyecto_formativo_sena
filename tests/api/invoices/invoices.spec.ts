@@ -210,63 +210,6 @@ test.describe.serial("Invoices Module", () => {
     expect(res.status()).toBe(400);
   });
 
-  test("POST /invoices/:id/pay - should transition to partially_paid on partial payment", async ({
-    request,
-  }) => {
-    if (!customerId || !paymentMethodId) test.skip();
-
-    // Create a new invoice for this test
-    const createRes = await request.post("invoices", {
-      data: {
-        customerId,
-        type: "additional_service",
-        items: [
-          {
-            description: "Partial payment test",
-            quantity: 1,
-            unitPrice: 1000,
-          },
-        ],
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        taxRate: 0.19,
-      },
-    });
-    expect(createRes.status()).toBe(201);
-    const partialInvoiceId = (await createRes.json()).data.invoice._id;
-
-    // Send invoice (transition to pending)
-    const sendRes = await request.post(`invoices/${partialInvoiceId}/send`);
-    expect(sendRes.status()).toBe(200);
-
-    // Get invoice to know total amount
-    const getRes = await request.get(`invoices/${partialInvoiceId}`);
-    const inv = (await getRes.json()).data.invoice;
-    const totalAmount = inv.totalAmount;
-    const partialAmount = totalAmount * 0.5; // Pay 50%
-
-    // Make partial payment
-    const payRes = await request.post(`invoices/${partialInvoiceId}/pay`, {
-      data: {
-        amount: partialAmount,
-        paymentMethodId,
-        reference: `PARTIAL-${Date.now()}`,
-        notes: "Partial payment test",
-      },
-    });
-    expect(payRes.status()).toBe(200);
-
-    // Verify status is now partially_paid
-    const verifyRes = await request.get(`invoices/${partialInvoiceId}`);
-    const updatedInvoice = (await verifyRes.json()).data.invoice;
-    expect(updatedInvoice.status).toBe("partially_paid");
-    expect(updatedInvoice.amountPaid).toBeGreaterThan(0);
-    expect(updatedInvoice.amountDue).toBeGreaterThan(0);
-    expect(updatedInvoice.amountPaid + updatedInvoice.amountDue).toBeCloseTo(
-      totalAmount,
-      2,
-    );
-  });
-
   /* ===================== VOID ===================== */
 
   test("POST /invoices/:id/void - should void a new invoice", async ({
