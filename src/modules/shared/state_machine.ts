@@ -38,7 +38,7 @@ export const MATERIAL_TRANSITIONS: Record<string, readonly string[]> = {
   available: ["reserved", "maintenance", "damaged", "lost", "retired"],
   reserved: ["available", "loaned"],
   loaned: ["returned"],
-  returned: ["available", "maintenance", "damaged", "lost"],
+  returned: ["available", "maintenance", "damaged", "lost", "retired"],
   maintenance: ["available", "retired", "damaged", "lost"],
   damaged: ["maintenance", "retired", "lost"],
   lost: ["retired"],
