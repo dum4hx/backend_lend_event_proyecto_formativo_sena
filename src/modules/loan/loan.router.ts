@@ -73,7 +73,7 @@ const getLoanQuerySchema = z.object({
 
 const listLoanMaterialsQuerySchema = paginationSchema.extend({
   search: z.string().trim().max(120).optional(),
-  status: z.enum(materialStatusOptions as [string, ...string[]]).optional(),
+  status: z.enum([...materialStatusOptions]).optional(),
   materialTypeId: z
     .string()
     .refine((value) => Types.ObjectId.isValid(value), {
@@ -208,8 +208,13 @@ loanRouter.get(
       const organizationId = getOrgId(req);
       const user = getAuthUser(req);
       const loanId = req.params.id;
-      const { page = 1, limit = 20, search, status, materialTypeId } =
-        req.query as any;
+      const {
+        page = 1,
+        limit = 20,
+        search,
+        status,
+        materialTypeId,
+      } = req.query as any;
 
       if (!loanId || typeof loanId !== "string") {
         throw AppError.badRequest("ID de préstamo no válido");
