@@ -70,18 +70,14 @@ export type MaintenanceBatchItemInput = z.infer<
 export const MaintenanceBatchCreateZodSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   description: z.string().max(1000).trim().optional(),
-  scheduledStartDate: z
-    .preprocess(
-      (val) => (typeof val === "string" ? new Date(val) : val),
-      z.date(),
-    )
-    .optional(),
-  scheduledEndDate: z
-    .preprocess(
-      (val) => (typeof val === "string" ? new Date(val) : val),
-      z.date(),
-    )
-    .optional(),
+  scheduledStartDate: z.preprocess(
+    (val) => (typeof val === "string" ? new Date(val) : val),
+    z.date(),
+  ),
+  scheduledEndDate: z.preprocess(
+    (val) => (typeof val === "string" ? new Date(val) : val),
+    z.date(),
+  ),
   assignedTo: z
     .string()
     .refine((val) => Types.ObjectId.isValid(val), {
@@ -198,8 +194,8 @@ const maintenanceBatchSchema = new Schema(
       enum: batchStatusOptions,
       default: "draft",
     },
-    scheduledStartDate: { type: Date },
-    scheduledEndDate: { type: Date },
+    scheduledStartDate: { type: Date, required: true },
+    scheduledEndDate: { type: Date, required: true },
     startedAt: { type: Date },
     completedAt: { type: Date },
     assignedTo: {
