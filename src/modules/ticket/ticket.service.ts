@@ -2,6 +2,8 @@ import { AppError } from "../../errors/AppError.ts";
 import { Ticket } from "./models/ticket.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { Location } from "../location/models/location.model.ts";
+import { MaterialInstance } from "../material/models/material_instance.model.ts";
+import { transferService } from "../transfer/transfer.service.ts";
 import { Role } from "../roles/models/role.model.ts";
 import { codeGenerationService } from "../code_scheme/code_generation.service.ts";
 import { Types } from "mongoose";
@@ -496,6 +498,194 @@ class TicketService {
       })),
       requiredPermission,
       ticketType,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Auto-resolution & Trazability                                      */
+  /* ------------------------------------------------------------------ */
+
+  async getFulfillmentOptions(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    ticketId: string,
+  ) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw AppError.badRequest("Formato de ID de ticket no válido");
+    }
+
+    const ticket = await Ticket.findOne({
+      _id: ticketId,
+      organizationId,
+    }).lean();
+
+    if (!ticket) throw AppError.notFound("Ticket no encontrado");
+
+    if (ticket.type !== "transfer_request") {
+      throw AppError.badRequest(
+        "Las opciones de cumplimiento solo están disponibles para tickets transfer_request",
+      );
+    }
+
+    // El ticket es válido. Extraemos los requerimientos de la payload original.
+    const payload = ticket.payload as any;
+    const items = payload?.items as Array<{
+      materialTypeId: string;
+      quantity: number;
+    }>;
+    if (!items || items.length === 0) {
+      throw AppError.badRequest("El ticket no tiene items válidos para cumplir");
+    }
+
+    // Buscamos cuantos disponibles hay de los modelIds solicitados en cada location distinta.
+    const requestedModelIds = items.map((i) => new Types.ObjectId(i.materialTypeId));
+    const toLocationId = payload.toLocationId ? new Types.ObjectId(payload.toLocationId) : ticket.locationId;
+
+    const stockAgg = await MaterialInstance.aggregate([
+      {
+        $match: {
+          organizationId: new Types.ObjectId(organizationId.toString()),
+          modelId: { $in: requestedModelIds },
+          status: "available",
+          locationId: { $ne: toLocationId },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            locationId: "$locationId",
+            modelId: "$modelId",
+          },
+          availableQuantity: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.locationId",
+          stock: {
+            $push: {
+              modelId: "$_id.modelId",
+              availableQuantity: "$availableQuantity",
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "locations",
+          localField: "_id",
+          foreignField: "_id",
+          as: "locationObj",
+        },
+      },
+      { $unwind: "$locationObj" },
+      {
+        $match: { "locationObj.isActive": true },
+      },
+    ]);
+
+    const options = stockAgg.map((locStock) => {
+      let satisfiesAll = true;
+      const availableItems = items.map((requestedItem) => {
+        const stockData = locStock.stock.find(
+          (s: any) => s.modelId.toString() === requestedItem.materialTypeId
+        );
+        const availableQuantity = stockData ? stockData.availableQuantity : 0;
+        if (availableQuantity < requestedItem.quantity) {
+          satisfiesAll = false;
+        }
+        return {
+          materialTypeId: requestedItem.materialTypeId,
+          requestedQuantity: requestedItem.quantity,
+          availableQuantity,
+        };
+      });
+
+      return {
+        location: {
+          _id: locStock._id,
+          name: locStock.locationObj.name,
+          code: locStock.locationObj.code,
+        },
+        satisfiesAll,
+        availableItems,
+      };
+    });
+
+    // Se devuelven solo las ubicaciones que poseen stock para cumplir TODO lo requerido
+    // en función de lo que solicitó el usuario para facilitar la integración.
+    return options.filter((o) => o.satisfiesAll);
+  }
+
+  async generateTransferFromTicket(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    ticketId: string,
+    fromLocationId: string,
+    notes?: string,
+  ) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw AppError.badRequest("Formato de ID de ticket no válido");
+    }
+
+    const ticket = await Ticket.findOne({
+      _id: ticketId,
+      organizationId,
+    });
+    if (!ticket) throw AppError.notFound("Ticket no encontrado");
+
+    if (ticket.status !== "approved") {
+      throw AppError.badRequest(
+        "El ticket debe estar aprobado para generar una transferencia",
+      );
+    }
+    if (ticket.type !== "transfer_request") {
+      throw AppError.badRequest(
+        "Solo los tickets transfer_request pueden generar transferencias mediante este método",
+      );
+    }
+
+    // El ticket es válido. Extraemos los requerimientos de la payload original.
+    const payload = ticket.payload as any;
+    if (!payload.items || payload.items.length === 0) {
+      throw AppError.badRequest("Múltiples elementos son requeridos para la transferencia");
+    }
+
+    // Transforma para TransferRequestInput
+    const transferItems = payload.items.map((i: any) => ({
+      modelId: i.materialTypeId,
+      quantity: i.quantity,
+      fulfilledQuantity: 0, // Transfer service default handled but to be robust
+    }));
+
+    const toLocationId = payload.toLocationId || ticket.locationId.toString();
+
+    const transferPayload = {
+      fromLocationId,
+      toLocationId,
+      items: transferItems,
+      notes: notes || `Generado a partir del ticket ${ticket.code}`,
+      neededBy: payload.neededBy,
+    };
+
+    // Esto lanzará sus propias excepciones (Location no existe, etc)
+    const transferReq = await transferService.createRequest(
+      organizationId,
+      userId,
+      transferPayload as any
+    );
+
+    // Guarda trazabilidad
+    ticket.resolutionEntities.push({
+      entityId: transferReq._id,
+      entityType: "TransferRequest",
+    });
+
+    await ticket.save();
+
+    return {
+      ticket: ticket.toObject(),
+      transferRequest: transferReq,
     };
   }
 

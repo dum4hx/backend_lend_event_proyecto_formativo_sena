@@ -81,6 +81,12 @@ const ticketSchema = new Schema(
       maxlength: 1000,
       trim: true,
     },
+    resolutionEntities: [
+      {
+        entityId: { type: Schema.Types.ObjectId, required: true },
+        entityType: { type: String, required: true },
+      },
+    ],
     payload: {
       type: Schema.Types.Mixed,
     },

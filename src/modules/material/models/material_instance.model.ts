@@ -130,23 +130,6 @@ export const MaterialInstanceCreateZodSchema = z
         message: "barcode es requerido cuando useBarcodeAsSerial es verdadero",
       });
     }
-
-    if (data.useBarcodeAsSerial === false && !data.serialNumber) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["serialNumber"],
-        message: "serialNumber es requerido cuando useBarcodeAsSerial es falso",
-      });
-    }
-
-    // Backward compatibility: when the switch is not sent, preserve existing behavior.
-    if (data.useBarcodeAsSerial === undefined && !data.serialNumber) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["serialNumber"],
-        message: "serialNumber es requerido",
-      });
-    }
   });
 
 export const MaterialInstanceUpdateZodSchema = z

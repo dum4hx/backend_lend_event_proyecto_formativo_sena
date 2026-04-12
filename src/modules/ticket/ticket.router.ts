@@ -18,6 +18,7 @@ import {
   resolveTicketBodySchema,
   rejectTicketBodySchema,
   capableUsersQuerySchema,
+  createTransferFromTicketSchema,
 } from "./ticket.schemas.ts";
 
 const ticketRouter = Router();
@@ -230,6 +231,55 @@ ticketRouter.get(
         req.params.id,
       );
       res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /tickets/:id/fulfillment-options
+ * Devuelve las sedes que pueden suplir todos los items solicitados en un ticket
+ * de tipo transfer_request.
+ * Requiere: transfers:create
+ */
+ticketRouter.get(
+  "/:id/fulfillment-options",
+  requirePermission("transfers:create"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await ticketService.getFulfillmentOptions(
+        getOrgId(req),
+        getUserId(req),
+        req.params.id,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /tickets/:id/create-transfer
+ * Genera automáticamente una solicitud de transferencia basada en un ticket
+ * (tipo transfer_request) aprobado.
+ * Requiere: transfers:create
+ */
+ticketRouter.post(
+  "/:id/create-transfer",
+  requirePermission("transfers:create"),
+  validateBody(createTransferFromTicketSchema),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await ticketService.generateTransferFromTicket(
+        getOrgId(req),
+        getUserId(req),
+        req.params.id,
+        req.body.fromLocationId,
+        req.body.notes,
+      );
+      res.status(201).json({ status: "success", data });
     } catch (err) {
       next(err);
     }

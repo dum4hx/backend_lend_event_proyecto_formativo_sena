@@ -10408,3 +10408,87 @@ Cancels a ticket. Only the **creator** of the ticket may cancel it.
 - `403` — User is not the creator of the ticket.
 - `404` — Ticket not found.
 - `409` — Invalid status transition (e.g. already approved/rejected/cancelled).
+
+### GET /tickets/:id/fulfillment-options
+
+Busca y devuelve todas las sedes que poseen suficiente inventario para suplir **todos** los requerimientos (`materials/items`) de una solicitud de transferencia (`transfer_request`).
+
+**Permission:** `transfers:create`
+
+**Params:**
+- `id` (path): The ticket ID.
+
+**Response `200`:**
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "location": {
+        "_id": "673...",
+        "name": "Sede Principal",
+        "code": "SP-001"
+      },
+      "satisfiesAll": true,
+      "availableItems": [
+        {
+          "materialTypeId": "63fa...",
+          "requestedQuantity": 2,
+          "availableQuantity": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Errors:**
+- `400` — Invalid ticket ID, not a `transfer_request`, or no valid items payload.
+- `403` — User lacks `transfers:create` permission.
+- `404` — Ticket not found.
+
+### POST /tickets/:id/create-transfer
+
+Genera automáticamente un `TransferRequest` originario a partir de un ticket `transfer_request` previamente aprobado. Esta acción guarda registro de la transferencia generada den el array `resolutionEntities` del ticket.
+
+**Permission:** `transfers:create`
+
+**Request Body:**
+
+| Field          | Type   | Required | Description                                                    |
+| -------------- | ------ | -------- | -------------------------------------------------------------- |
+| fromLocationId | string | Yes      | ID de la sede origen (de donde saldrá el material solicitado). |
+| notes          | string | No       | Notas adicionales sobre la transferencia generada.             |
+
+**Response `201`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "ticket": {
+      "_id": "683a...",
+      "status": "approved",
+      "resolutionEntities": [
+        {
+          "entityId": "69fb...",
+          "entityType": "TransferRequest",
+          "_id": "6abc..."
+        }
+      ]
+    },
+    "transferRequest": {
+      "_id": "69fb...",
+      "status": "requested",
+      "fromLocationId": "...",
+      "toLocationId": "..."
+    }
+  }
+}
+```
+
+**Errors:**
+- `400` — Ticket no validado, tipo de ticket incorrecto o estado distinto a `approved`.
+- `403` — Carece de permisos para generar transferencias.
+- `404` — Ticket no encontrado.

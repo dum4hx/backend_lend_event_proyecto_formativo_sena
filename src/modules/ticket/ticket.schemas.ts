@@ -70,6 +70,11 @@ export const genericPayloadSchema = z.object({
     .max(2000, "Máximo 2000 caracteres"),
 });
 
+export const createTransferFromTicketSchema = z.object({
+  fromLocationId: objectIdString("ubicación de origen"),
+  notes: z.string().max(500, "Máximo 500 caracteres").trim().optional(),
+});
+
 /** Maps ticket type → payload validation schema. */
 export const payloadSchemasByType: Record<string, z.ZodType> = {
   transfer_request: transferRequestPayloadSchema,
