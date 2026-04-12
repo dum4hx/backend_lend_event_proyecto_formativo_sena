@@ -177,9 +177,14 @@ async function resolveMaterialInstanceLoanContext(args: {
     };
   }
 
-  const requestStatuses =
+  const requestStatuses: string[] =
     REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS[instanceStatus] ??
-    REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS.loaned;
+      REQUEST_RELATION_STATUSES_BY_INSTANCE_STATUS.loaned ?? [
+        "shipped",
+        "completed",
+        "assigned",
+        "ready",
+      ];
 
   const relatedRequest = await LoanRequest.findOne({
     organizationId: normalizedOrganizationId,

@@ -41,6 +41,9 @@ const listLoansQuerySchema = paginationSchema.extend({
 
 const extendLoanSchema = z.object({
   newEndDate: z.string().datetime(),
+  extensionFee: z
+    .number()
+    .min(0, "La tarifa de extensión debe ser mayor o igual a 0"),
   notes: z.string().max(500).optional(),
 });
 
@@ -213,6 +216,7 @@ loanRouter.post(
         loanId,
         organizationId,
         newEndDate,
+        req.body.extensionFee,
         req.body.notes,
       );
 

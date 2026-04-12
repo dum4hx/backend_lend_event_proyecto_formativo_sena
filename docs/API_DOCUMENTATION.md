@@ -4677,12 +4677,12 @@ Gets a specific material instance.
 
 `loanContext` contract:
 
-| Field       | Type                 | Description                                                                           |
-| ----------- | -------------------- | ------------------------------------------------------------------------------------- |
-| loanId      | string \| null        | Loan ID when a direct active/overdue loan relation exists                            |
-| loanCode    | string \| null        | Loan code when `loanId` exists                                                       |
-| requestId   | string \| null        | Related request ID (from the loan's request or fallback assignment lookup)           |
-| requestCode | string \| null        | Related request code                                                                  |
+| Field       | Type                        | Description                                                                           |
+| ----------- | --------------------------- | ------------------------------------------------------------------------------------- |
+| loanId      | string \| null              | Loan ID when a direct active/overdue loan relation exists                             |
+| loanCode    | string \| null              | Loan code when `loanId` exists                                                        |
+| requestId   | string \| null              | Related request ID (from the loan's request or fallback assignment lookup)            |
+| requestCode | string \| null              | Related request code                                                                  |
 | source      | `loan` \| `request` \| null | Indicates whether relation was resolved from a loan (`loan`) or directly from request |
 
 Behavior by material instance status:
@@ -5900,12 +5900,29 @@ Lists all loans that have been returned but have not yet been inspected. This en
 
 #### POST /loans/:id/extend
 
-Extends a loan's end date.
+Extends a loan's end date and applies an extension fee.
 
-| Parameter  | Location | Type   | Required | Description             |
-| ---------- | -------- | ------ | -------- | ----------------------- |
-| newEndDate | body     | string | Yes      | New end date (ISO 8601) |
-| notes      | body     | string | No       | Extension notes         |
+**Auth:** `authenticate` + `requireActiveOrganization` + `loans:update`
+
+| Parameter    | Location | Type   | Required | Description                     |
+| ------------ | -------- | ------ | -------- | ------------------------------- |
+| newEndDate   | body     | string | Yes      | New end date (ISO 8601)         |
+| extensionFee | body     | number | Yes      | Extension fee amount (>= 0)     |
+| notes        | body     | string | No       | Extension notes (max 500 chars) |
+
+**Behavior:**
+
+- The `extensionFee` is accumulated in the loan's `extensionFees` field (supports multiple extensions).
+- The loan's `totalAmount` is incremented by the `extensionFee`.
+- If the loan is `overdue`, it transitions back to `active`.
+
+**Errors:**
+
+| Code              | Condition                                          |
+| ----------------- | -------------------------------------------------- |
+| `400 BAD_REQUEST` | New end date is not after the current end date     |
+| `400 BAD_REQUEST` | Extension fee is negative                          |
+| `404 NOT_FOUND`   | Loan not found or not in `active`/`overdue` status |
 
 ---
 
@@ -9929,24 +9946,24 @@ All endpoints require `authenticate` middleware. Tickets are internal requests c
 
 ### Ticket Types
 
-| Type                   | Description                                         |
-| ---------------------- | --------------------------------------------------- |
-| `transfer_request`     | Solicitud de transferencia de material               |
-| `incident_report`      | Reporte de incidente con materiales o préstamos      |
-| `maintenance_request`  | Solicitud de mantenimiento de instancias de material |
-| `inspection_request`   | Solicitud de inspección de un préstamo               |
-| `generic`              | Solicitud genérica con texto libre                   |
+| Type                  | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `transfer_request`    | Solicitud de transferencia de material               |
+| `incident_report`     | Reporte de incidente con materiales o préstamos      |
+| `maintenance_request` | Solicitud de mantenimiento de instancias de material |
+| `inspection_request`  | Solicitud de inspección de un préstamo               |
+| `generic`             | Solicitud genérica con texto libre                   |
 
 ### Ticket Statuses
 
-| Status      | Description                                         |
-| ----------- | --------------------------------------------------- |
-| `pending`   | Recién creado, esperando revisión                    |
-| `in_review` | Siendo revisado por un asignado                      |
-| `approved`  | Aprobado                                             |
-| `rejected`  | Rechazado (con nota de resolución)                   |
-| `cancelled` | Cancelado por el creador o por cambio de ubicación   |
-| `expired`   | Expirado por pasar la fecha límite de respuesta      |
+| Status      | Description                                        |
+| ----------- | -------------------------------------------------- |
+| `pending`   | Recién creado, esperando revisión                  |
+| `in_review` | Siendo revisado por un asignado                    |
+| `approved`  | Aprobado                                           |
+| `rejected`  | Rechazado (con nota de resolución)                 |
+| `cancelled` | Cancelado por el creador o por cambio de ubicación |
+| `expired`   | Expirado por pasar la fecha límite de respuesta    |
 
 ---
 
@@ -9958,59 +9975,59 @@ Creates a new ticket. The creator must belong to the specified location. The opt
 
 **Request body:**
 
-| Field            | Type   | Required | Description                                                                 |
-| ---------------- | ------ | -------- | --------------------------------------------------------------------------- |
-| locationId       | string | Yes      | ObjectId of the location this ticket belongs to                             |
+| Field            | Type   | Required | Description                                                                                           |
+| ---------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| locationId       | string | Yes      | ObjectId of the location this ticket belongs to                                                       |
 | type             | string | Yes      | One of: `transfer_request`, `incident_report`, `maintenance_request`, `inspection_request`, `generic` |
-| title            | string | Yes      | Ticket title (max 200 chars)                                                |
-| description      | string | No       | Extended description (max 2000 chars)                                       |
-| assigneeId       | string | No       | ObjectId of the assigned user (must share location)                         |
-| responseDeadline | string | No       | ISO date-time for auto-expiration                                           |
-| payload          | object | Yes      | Type-specific data (see Payload Schemas below)                              |
+| title            | string | Yes      | Ticket title (max 200 chars)                                                                          |
+| description      | string | No       | Extended description (max 2000 chars)                                                                 |
+| assigneeId       | string | No       | ObjectId of the assigned user (must share location)                                                   |
+| responseDeadline | string | No       | ISO date-time for auto-expiration                                                                     |
+| payload          | object | Yes      | Type-specific data (see Payload Schemas below)                                                        |
 
 **Payload schemas per type:**
 
 **`transfer_request`:**
 
-| Field                     | Type     | Required | Description                        |
-| ------------------------- | -------- | -------- | ---------------------------------- |
-| toLocationId              | string   | Yes      | Destination location ObjectId      |
-| items                     | array    | Yes      | At least 1 item                    |
-| items[].materialTypeId    | string   | Yes      | Material type ObjectId             |
-| items[].quantity           | number   | Yes      | Integer ≥ 1                        |
-| neededBy                  | string   | No       | ISO date-time                      |
+| Field                  | Type   | Required | Description                   |
+| ---------------------- | ------ | -------- | ----------------------------- |
+| toLocationId           | string | Yes      | Destination location ObjectId |
+| items                  | array  | Yes      | At least 1 item               |
+| items[].materialTypeId | string | Yes      | Material type ObjectId        |
+| items[].quantity       | number | Yes      | Integer ≥ 1                   |
+| neededBy               | string | No       | ISO date-time                 |
 
 **`incident_report`:**
 
-| Field              | Type     | Required | Description                                              |
-| ------------------ | -------- | -------- | -------------------------------------------------------- |
-| materialInstanceIds| string[] | No       | Array of material instance ObjectIds                     |
-| loanId             | string   | No       | Loan ObjectId                                            |
-| severity           | string   | Yes      | `low`, `medium`, `high`, or `critical`                   |
-| context            | string   | Yes      | `transit`, `storage`, `loan`, `maintenance`, or `other`  |
-| description        | string   | No       | Max 2000 chars                                           |
+| Field               | Type     | Required | Description                                             |
+| ------------------- | -------- | -------- | ------------------------------------------------------- |
+| materialInstanceIds | string[] | No       | Array of material instance ObjectIds                    |
+| loanId              | string   | No       | Loan ObjectId                                           |
+| severity            | string   | Yes      | `low`, `medium`, `high`, or `critical`                  |
+| context             | string   | Yes      | `transit`, `storage`, `loan`, `maintenance`, or `other` |
+| description         | string   | No       | Max 2000 chars                                          |
 
 **`maintenance_request`:**
 
-| Field              | Type     | Required | Description                                |
-| ------------------ | -------- | -------- | ------------------------------------------ |
-| materialInstanceIds| string[] | Yes      | At least 1 material instance ObjectId      |
-| entryReason        | string   | Yes      | `damaged` or `other`                       |
-| estimatedCost      | number   | No       | Non-negative number                        |
-| notes              | string   | No       | Max 1000 chars                             |
+| Field               | Type     | Required | Description                           |
+| ------------------- | -------- | -------- | ------------------------------------- |
+| materialInstanceIds | string[] | Yes      | At least 1 material instance ObjectId |
+| entryReason         | string   | Yes      | `damaged` or `other`                  |
+| estimatedCost       | number   | No       | Non-negative number                   |
+| notes               | string   | No       | Max 1000 chars                        |
 
 **`inspection_request`:**
 
-| Field  | Type   | Required | Description            |
-| ------ | ------ | -------- | ---------------------- |
-| loanId | string | Yes      | Loan ObjectId          |
-| notes  | string | No       | Max 1000 chars         |
+| Field  | Type   | Required | Description    |
+| ------ | ------ | -------- | -------------- |
+| loanId | string | Yes      | Loan ObjectId  |
+| notes  | string | No       | Max 1000 chars |
 
 **`generic`:**
 
-| Field   | Type   | Required | Description                      |
-| ------- | ------ | -------- | -------------------------------- |
-| details | string | Yes      | Free-text details (max 2000)     |
+| Field   | Type   | Required | Description                  |
+| ------- | ------ | -------- | ---------------------------- |
+| details | string | Yes      | Free-text details (max 2000) |
 
 **Response `201`:**
 
@@ -10054,13 +10071,13 @@ Lists tickets where the authenticated user is either the creator or the assignee
 
 **Query params:**
 
-| Param      | Type   | Required | Description                                      |
-| ---------- | ------ | -------- | ------------------------------------------------ |
-| page       | number | No       | Page number (default 1)                          |
-| limit      | number | No       | Items per page (default 20)                      |
-| status     | string | No       | Filter by status                                 |
-| type       | string | No       | Filter by ticket type                            |
-| locationId | string | No       | Filter by location ObjectId                      |
+| Param      | Type   | Required | Description                 |
+| ---------- | ------ | -------- | --------------------------- |
+| page       | number | No       | Page number (default 1)     |
+| limit      | number | No       | Items per page (default 20) |
+| status     | string | No       | Filter by status            |
+| type       | string | No       | Filter by ticket type       |
+| locationId | string | No       | Filter by location ObjectId |
 
 **Response `200`:**
 
@@ -10122,6 +10139,50 @@ Retrieves a single ticket by ID. Only the creator or the assignee may view it.
 
 ---
 
+### GET /tickets/:id/capable-users
+
+**Smart endpoint.** Returns the list of active users in the ticket's location whose role holds the domain-specific permission needed to _fulfill_ the request. Only the ticket creator or assignee may call this endpoint.
+
+The permission looked up per ticket type is:
+
+| Ticket type           | Required domain permission |
+| --------------------- | -------------------------- |
+| `transfer_request`    | `transfers:create`         |
+| `incident_report`     | `incidents:create`         |
+| `maintenance_request` | `maintenance:create`       |
+| `inspection_request`  | `inspections:create`       |
+| `generic`             | `tickets:approve`          |
+
+**Permission:** `tickets:read`
+
+**Response `200`:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "ticketType": "transfer_request",
+    "requiredPermission": "transfers:create",
+    "users": [
+      {
+        "_id": "682d...",
+        "name": { "firstName": "Ana", "firstSurname": "Gómez" },
+        "email": "ana.gomez@example.com",
+        "roleId": "681f...",
+        "roleName": "Gerente"
+      }
+    ]
+  }
+}
+```
+
+**Errors:**
+
+- `400` — Invalid ticket ID format.
+- `403`/`404` — Ticket not found or user is neither creator nor assignee.
+
+---
+
 ### PATCH /tickets/:id/review
 
 Moves a ticket to `in_review` status. The reviewer must be the assignee or a member of the same location (and not the creator).
@@ -10159,9 +10220,9 @@ Approves a ticket. Optional resolution note. Same reviewer rules as `/review`.
 
 **Request body:**
 
-| Field          | Type   | Required | Description                         |
-| -------------- | ------ | -------- | ----------------------------------- |
-| resolutionNote | string | No       | Optional note (max 1000 chars)      |
+| Field          | Type   | Required | Description                    |
+| -------------- | ------ | -------- | ------------------------------ |
+| resolutionNote | string | No       | Optional note (max 1000 chars) |
 
 **Response `200`:**
 
@@ -10195,9 +10256,9 @@ Rejects a ticket. A resolution note is **required**.
 
 **Request body:**
 
-| Field          | Type   | Required | Description                                    |
-| -------------- | ------ | -------- | ---------------------------------------------- |
-| resolutionNote | string | Yes      | Reason for rejection (max 1000 chars)           |
+| Field          | Type   | Required | Description                           |
+| -------------- | ------ | -------- | ------------------------------------- |
+| resolutionNote | string | Yes      | Reason for rejection (max 1000 chars) |
 
 **Response `200`:**
 

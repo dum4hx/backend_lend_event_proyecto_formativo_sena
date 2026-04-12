@@ -311,6 +311,11 @@ const loanSchema = new Schema(
       min: 0,
       default: 0,
     },
+    extensionFees: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     // Status
     status: {
       type: String,

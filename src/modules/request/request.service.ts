@@ -446,7 +446,7 @@ export const requestService = {
     request.approvedAt = new Date();
 
     if (notes) {
-      request.notes = (request.notes ?? "") + `\nApproval notes: ${notes}`;
+      request.notes = (request.notes ?? "") + `\nNotas de aprobación: ${notes}`;
     }
 
     await request.save();

@@ -184,4 +184,28 @@ ticketRouter.patch(
   },
 );
 
+/**
+ * GET /tickets/:id/capable-users
+ * Devuelve los usuarios activos de la sede del ticket cuyo rol incluye el
+ * permiso de dominio requerido para satisfacer el tipo de solicitud.
+ * Solo el creador o destinatario del ticket puede consultar este endpoint.
+ * Requiere: tickets:read
+ */
+ticketRouter.get(
+  "/:id/capable-users",
+  requirePermission("tickets:read"),
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    try {
+      const data = await ticketService.getCapableUsers(
+        getOrgId(req),
+        getUserId(req),
+        req.params.id,
+      );
+      res.status(200).json({ status: "success", data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default ticketRouter;

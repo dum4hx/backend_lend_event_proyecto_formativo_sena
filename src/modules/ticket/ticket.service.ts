@@ -2,6 +2,7 @@ import { AppError } from "../../errors/AppError.ts";
 import { Ticket } from "./models/ticket.model.ts";
 import { User } from "../user/models/user.model.ts";
 import { Location } from "../location/models/location.model.ts";
+import { Role } from "../roles/models/role.model.ts";
 import { Types } from "mongoose";
 import {
   validateTransition,
@@ -12,6 +13,19 @@ import {
   type CreateTicketBody,
   type ListTicketsQuery,
 } from "./ticket.schemas.ts";
+
+/**
+ * Maps each ticket type to the domain-specific permission that a user needs
+ * in order to *fulfill* the requested action (e.g., actually create the
+ * transfer, start the maintenance batch, etc.).
+ */
+const TICKET_TYPE_DOMAIN_PERMISSION: Record<string, string> = {
+  transfer_request: "transfers:create",
+  incident_report: "incidents:create",
+  maintenance_request: "maintenance:create",
+  inspection_request: "inspections:create",
+  generic: "tickets:approve",
+};
 
 class TicketService {
   /* ------------------------------------------------------------------ */
@@ -321,6 +335,100 @@ class TicketService {
       $set: { status: "expired" },
     });
     return result.modifiedCount;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Private Helpers                                                     */
+  /* ------------------------------------------------------------------ */
+
+  /* ------------------------------------------------------------------ */
+  /*  Smart: Capable Users                                               */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Returns the list of active users in the ticket's location whose role
+   * includes the domain-specific permission required to fulfill the ticket
+   * type (e.g. `transfers:create` for a transfer_request).
+   *
+   * Access is restricted to the ticket creator or assignee.
+   */
+  async getCapableUsers(
+    organizationId: string | Types.ObjectId,
+    userId: string | Types.ObjectId,
+    ticketId: string,
+  ) {
+    if (!Types.ObjectId.isValid(ticketId)) {
+      throw AppError.badRequest("Formato de ID de ticket no válido");
+    }
+
+    const ticket = await Ticket.findOne({
+      _id: ticketId,
+      organizationId,
+    }).lean();
+
+    if (!ticket) throw AppError.notFound("Ticket no encontrado");
+
+    // Only the creator or assignee may query capable users
+    const userIdStr = userId.toString();
+    const isCreator = ticket.createdBy.toString() === userIdStr;
+    const isAssignee = ticket.assigneeId?.toString() === userIdStr;
+    if (!isCreator && !isAssignee) {
+      throw AppError.notFound("Ticket no encontrado");
+    }
+
+    const requiredPermission = TICKET_TYPE_DOMAIN_PERMISSION[ticket.type];
+    if (!requiredPermission) {
+      throw AppError.internal(
+        `Tipo de ticket sin mapeo de permiso: ${ticket.type}`,
+      );
+    }
+
+    // Find all roles in this org whose permissions include the required one
+    const eligibleRoles = await Role.find({
+      organizationId,
+      permissions: requiredPermission,
+    })
+      .select("_id name")
+      .lean();
+
+    if (eligibleRoles.length === 0) {
+      return {
+        users: [],
+        requiredPermission,
+        ticketType: ticket.type,
+      };
+    }
+
+    const roleIdToName: Record<string, string> = {};
+    const eligibleRoleIds: string[] = eligibleRoles.map((r) => {
+      const id = r._id.toString();
+      roleIdToName[id] = (r as { _id: unknown; name: string }).name;
+      return id;
+    });
+
+    // Find active users assigned to the ticket's location with an eligible role,
+    // excluding the ticket creator (they can't fulfill their own request)
+    const users = await User.find({
+      organizationId,
+      locations: ticket.locationId,
+      roleId: { $in: eligibleRoleIds },
+      status: "active",
+      _id: { $ne: ticket.createdBy },
+    })
+      .select("name email roleId")
+      .lean();
+
+    return {
+      users: users.map((u) => ({
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        roleId: u.roleId,
+        roleName: roleIdToName[u.roleId] ?? null,
+      })),
+      requiredPermission,
+      ticketType: ticket.type,
+    };
   }
 
   /* ------------------------------------------------------------------ */

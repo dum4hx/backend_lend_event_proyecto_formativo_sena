@@ -500,6 +500,7 @@ export const loanService = {
     loanId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
     newEndDate: Date,
+    extensionFee: number,
     notes?: string,
   ): Promise<LoanDocument> {
     const loan = await Loan.findOne({
@@ -522,6 +523,10 @@ export const loanService = {
     if (loan.status === "overdue") {
       transitionLoanStatus(loan, "active");
     }
+
+    loan.extensionFees = (loan.extensionFees ?? 0) + extensionFee;
+    loan.totalAmount = loan.totalAmount + extensionFee;
+
     if (notes) {
       loan.notes = (loan.notes ?? "") + `\nExtension: ${notes}`;
     }
