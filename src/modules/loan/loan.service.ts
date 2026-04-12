@@ -50,6 +50,10 @@ function enrichDepositWithRefundInfo(deposit: any): any {
   };
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Calculates and applies a late fee to an overdue loan.
  * Idempotent: skips if a late_fee invoice already exists with the same amount;
@@ -687,8 +691,16 @@ export const loanService = {
     loanId: string | Types.ObjectId,
     organizationId: string | Types.ObjectId,
     userId: string | Types.ObjectId,
-    opts?: { groupByMaterialType?: boolean },
+    opts?: { groupByMaterialType?: boolean; materialSearch?: string },
   ): Promise<LoanDocument> {
+    const materialSearch = opts?.materialSearch?.trim();
+
+    if (opts?.groupByMaterialType && materialSearch) {
+      throw AppError.badRequest(
+        "materialSearch no es compatible con groupByMaterialType",
+      );
+    }
+
     const loanIdObj = new Types.ObjectId(loanId);
     const orgIdObj = new Types.ObjectId(organizationId);
 
@@ -760,7 +772,15 @@ export const loanService = {
           foreignField: "_id",
           as: "materialInstances.materialInstanceId",
           pipeline: [
-            { $project: { serialNumber: 1, status: 1, modelId: 1, name: 1 } },
+            {
+              $project: {
+                serialNumber: 1,
+                barcode: 1,
+                status: 1,
+                modelId: 1,
+                name: 1,
+              },
+            },
           ],
         },
       },
@@ -857,6 +877,88 @@ export const loanService = {
           },
         },
       );
+
+      if (materialSearch) {
+        const escapedPattern = escapeRegex(materialSearch);
+
+        pipeline.push({
+          $addFields: {
+            materialInstances: {
+              $filter: {
+                input: "$materialInstances",
+                as: "instance",
+                cond: {
+                  $or: [
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: [
+                            "$$instance.materialInstanceId.serialNumber",
+                            "",
+                          ],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: ["$$instance.materialInstanceId.barcode", ""],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: ["$$instance.materialInstanceId.name", ""],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: ["$$instance.materialType.name", ""],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: [
+                            { $toString: "$$instance.materialInstanceId._id" },
+                            "",
+                          ],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                    {
+                      $regexMatch: {
+                        input: {
+                          $ifNull: [
+                            { $toString: "$$instance.materialTypeId" },
+                            "",
+                          ],
+                        },
+                        regex: escapedPattern,
+                        options: "i",
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        });
+      }
     }
 
     const [loan] = await Loan.aggregate(pipeline);
@@ -869,5 +971,242 @@ export const loanService = {
     loanObj.deposit = enrichDepositWithRefundInfo(loanObj.deposit);
 
     return loanObj as LoanDocument;
+  },
+
+  /**
+   * Lists material instances associated with a loan, with pagination and search.
+   */
+  async listLoanMaterials(params: {
+    loanId: string | Types.ObjectId;
+    organizationId: string | Types.ObjectId;
+    userId: string | Types.ObjectId;
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    materialTypeId?: string;
+  }): Promise<{
+    loan: { _id: string; code: string | null; status: string };
+    materials: Array<{
+      materialInstanceId: any;
+      materialTypeId: string;
+      materialType: any;
+      conditionAtCheckout?: string;
+      conditionAtReturn?: string;
+      notes?: string;
+    }>;
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    const {
+      loanId,
+      organizationId,
+      userId,
+      page = 1,
+      limit = 20,
+      search,
+      status,
+      materialTypeId,
+    } = params;
+
+    const safePage = Number.isFinite(page) && page > 0 ? page : 1;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 20;
+    const skip = (safePage - 1) * safeLimit;
+
+    const loanIdObj = new Types.ObjectId(loanId);
+    const orgIdObj = new Types.ObjectId(organizationId);
+
+    const user = await User.findById(userId).select("locations").lean();
+    const userLocationIds = (user?.locations ?? []).map(
+      (id) => new Types.ObjectId(String(id)),
+    );
+
+    const textPattern = search ? escapeRegex(search.trim()) : undefined;
+
+    const pipeline: any[] = [
+      {
+        $match: {
+          _id: loanIdObj,
+          organizationId: orgIdObj,
+          locationId: { $in: userLocationIds },
+        },
+      },
+      { $unwind: "$materialInstances" },
+      {
+        $lookup: {
+          from: "materialinstances",
+          localField: "materialInstances.materialInstanceId",
+          foreignField: "_id",
+          as: "materialInstances.materialInstanceId",
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                serialNumber: 1,
+                barcode: 1,
+                status: 1,
+                modelId: 1,
+                name: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: {
+          path: "$materialInstances.materialInstanceId",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "materialtypes",
+          localField: "materialInstances.materialTypeId",
+          foreignField: "_id",
+          as: "materialInstances.materialType",
+          pipeline: [{ $project: { _id: 1, name: 1 } }],
+        },
+      },
+      {
+        $unwind: {
+          path: "$materialInstances.materialType",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+    ];
+
+    const materialFilters: Record<string, unknown> = {};
+    if (status) {
+      materialFilters["materialInstances.materialInstanceId.status"] = status;
+    }
+    if (materialTypeId) {
+      materialFilters["materialInstances.materialTypeId"] = new Types.ObjectId(
+        materialTypeId,
+      );
+    }
+
+    if (textPattern) {
+      materialFilters.$or = [
+        {
+          "materialInstances.materialInstanceId.serialNumber": {
+            $regex: textPattern,
+            $options: "i",
+          },
+        },
+        {
+          "materialInstances.materialInstanceId.barcode": {
+            $regex: textPattern,
+            $options: "i",
+          },
+        },
+        {
+          "materialInstances.materialInstanceId.name": {
+            $regex: textPattern,
+            $options: "i",
+          },
+        },
+        {
+          "materialInstances.materialType.name": {
+            $regex: textPattern,
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+    if (Object.keys(materialFilters).length > 0) {
+      pipeline.push({ $match: materialFilters });
+    }
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 1,
+          code: 1,
+          status: 1,
+          material: {
+            materialInstanceId: "$materialInstances.materialInstanceId",
+            materialTypeId: "$materialInstances.materialTypeId",
+            materialType: "$materialInstances.materialType",
+            conditionAtCheckout: "$materialInstances.conditionAtCheckout",
+            conditionAtReturn: "$materialInstances.conditionAtReturn",
+            notes: "$materialInstances.notes",
+          },
+        },
+      },
+      {
+        $sort: {
+          "material.materialInstanceId.serialNumber": 1,
+        },
+      },
+      {
+        $facet: {
+          rows: [{ $skip: skip }, { $limit: safeLimit }],
+          totalRows: [{ $count: "count" }],
+        },
+      },
+    );
+
+    const [result] = await Loan.aggregate(pipeline);
+    const rows = result?.rows ?? [];
+    const total = result?.totalRows?.[0]?.count ?? 0;
+
+    if (total === 0) {
+      const exists = await Loan.exists({
+        _id: loanIdObj,
+        organizationId: orgIdObj,
+        locationId: { $in: userLocationIds },
+      });
+      if (!exists) {
+        throw AppError.notFound("Préstamo no encontrado");
+      }
+    }
+
+    const loanMetaRow = rows[0] ?? null;
+    const loanMeta = loanMetaRow
+      ? {
+          _id: String(loanMetaRow._id),
+          code: loanMetaRow.code ?? null,
+          status: loanMetaRow.status,
+        }
+      : (() => {
+          // When filters return no rows, retrieve loan metadata with a lightweight query.
+          return null;
+        })();
+
+    if (!loanMeta) {
+      const loanDoc = await Loan.findOne({
+        _id: loanIdObj,
+        organizationId: orgIdObj,
+        locationId: { $in: userLocationIds },
+      })
+        .select("_id code status")
+        .lean();
+
+      if (!loanDoc) {
+        throw AppError.notFound("Préstamo no encontrado");
+      }
+
+      return {
+        loan: {
+          _id: String(loanDoc._id),
+          code: loanDoc.code ?? null,
+          status: loanDoc.status,
+        },
+        materials: [],
+        total,
+        page: safePage,
+        totalPages: Math.ceil(total / safeLimit),
+      };
+    }
+
+    return {
+      loan: loanMeta,
+      materials: rows.map((row: any) => row.material),
+      total,
+      page: safePage,
+      totalPages: Math.ceil(total / safeLimit),
+    };
   },
 };
