@@ -95,7 +95,7 @@ materialRouter.get(
  */
 materialRouter.post(
   "/categories",
-  requirePermission("materials:create"),
+  requirePermission("categories:create"),
   validateBody(CategoryZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -491,7 +491,7 @@ materialRouter.get(
  */
 materialRouter.post(
   "/types",
-  requirePermission("materials:create"),
+  requirePermission("material_types:create"),
   validateBody(MaterialModelZodSchema.omit({ organizationId: true })),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -681,7 +681,7 @@ materialRouter.get(
  */
 materialRouter.post(
   "/instances",
-  requirePermission("materials:create"),
+  requirePermission("material_instances:create"),
   validateBody(MaterialInstanceCreateZodSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

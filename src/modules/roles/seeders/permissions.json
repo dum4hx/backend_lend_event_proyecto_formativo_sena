@@ -176,9 +176,25 @@
     "requires": ["customers:read"]
   },
   {
-    "_id": "materials:create",
-    "displayName": "Crear Materiales",
-    "description": "Permite agregar nuevos materiales o artículos de inventario.",
+    "_id": "material_types:create",
+    "displayName": "Crear Tipos de Material",
+    "description": "Permite crear nuevos tipos de material en el catálogo.",
+    "category": "Materials",
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
+  },
+  {
+    "_id": "categories:create",
+    "displayName": "Crear Categorías",
+    "description": "Permite crear nuevas categorías de materiales.",
+    "category": "Materials",
+    "isPlatformPermission": false,
+    "requires": ["materials:read"]
+  },
+  {
+    "_id": "material_instances:create",
+    "displayName": "Crear Instancias de Material",
+    "description": "Permite registrar nuevas instancias (unidades físicas) de materiales en el inventario.",
     "category": "Materials",
     "isPlatformPermission": false,
     "requires": ["materials:read"]
@@ -742,5 +758,53 @@
     "category": "Code_schemes",
     "isPlatformPermission": false,
     "requires": ["code_schemes:read"]
+  },
+  {
+    "_id": "tickets:read",
+    "displayName": "Ver Tickets",
+    "description": "Permite ver los tickets internos propios (creados o asignados al usuario).",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": []
+  },
+  {
+    "_id": "tickets:create",
+    "displayName": "Crear Tickets",
+    "description": "Permite crear nuevos tickets (solicitudes internas) dirigidos a otros usuarios de la misma sede.",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": ["tickets:read"]
+  },
+  {
+    "_id": "tickets:review",
+    "displayName": "Revisar Tickets",
+    "description": "Permite marcar tickets como en revisión.",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": ["tickets:read"]
+  },
+  {
+    "_id": "tickets:approve",
+    "displayName": "Aprobar Tickets",
+    "description": "Permite aprobar tickets internos.",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": ["tickets:read"]
+  },
+  {
+    "_id": "tickets:reject",
+    "displayName": "Rechazar Tickets",
+    "description": "Permite rechazar tickets internos con una nota de resolución.",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": ["tickets:read"]
+  },
+  {
+    "_id": "tickets:cancel",
+    "displayName": "Cancelar Tickets",
+    "description": "Permite cancelar tickets propios que estén en estado pendiente o en revisión.",
+    "category": "Tickets",
+    "isPlatformPermission": false,
+    "requires": ["tickets:read"]
   }
 ]

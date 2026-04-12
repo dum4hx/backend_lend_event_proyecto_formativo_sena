@@ -52,6 +52,16 @@ export const INSPECTION_TRANSITIONS: Record<string, readonly string[]> = {
   completed: [],
 };
 
+/** Allowed status transitions for tickets (internal user solicitations). */
+export const TICKET_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ["in_review", "approved", "rejected", "cancelled", "expired"],
+  in_review: ["approved", "rejected", "cancelled", "expired"],
+  approved: [],
+  rejected: [],
+  cancelled: [],
+  expired: [],
+};
+
 /* ---------- Validation ---------- */
 
 /**

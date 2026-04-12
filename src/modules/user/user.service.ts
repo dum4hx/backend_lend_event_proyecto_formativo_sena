@@ -5,6 +5,7 @@ import { organizationService } from "../organization/organization.service.ts";
 import { logger } from "../../utils/logger.ts";
 import rolesService from "../roles/roles.service.ts";
 import { LocationService } from "../location/location.service.ts";
+import { ticketService } from "../ticket/ticket.service.ts";
 import crypto from "crypto";
 
 const OWNER_ROLE_NAME_VARIANTS = new Set(["propietario", "owner"]);
@@ -183,8 +184,31 @@ export const userService = {
       );
     }
 
+    // Capture old locations before mutation for ticket auto-cancel
+    const previousLocationIds =
+      data.locations !== undefined
+        ? (existingUser.locations ?? []).map((loc) => loc.toString())
+        : [];
+
     Object.assign(existingUser, data);
     const user = await existingUser.save();
+
+    // Auto-cancel pending tickets for locations that were removed
+    if (data.locations !== undefined) {
+      const newLocationIds = new Set(
+        data.locations.map((loc) => loc.toString()),
+      );
+      const removedLocationIds = previousLocationIds.filter(
+        (id) => !newLocationIds.has(id),
+      );
+      for (const removedLocId of removedLocationIds) {
+        await ticketService.cancelTicketsByUserAndLocation(
+          organizationId,
+          userId,
+          removedLocId,
+        );
+      }
+    }
 
     if (!user) {
       throw AppError.notFound("Usuario no encontrado");

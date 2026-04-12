@@ -66,6 +66,24 @@ function transitionRequestStatus(
   request.status = nextStatus as any;
 }
 
+/**
+ * If both deposit and rental fee are paid while the request is still pending,
+ * automatically transition it to approved.
+ * Does NOT save — caller is responsible for persisting.
+ */
+function tryAutoApprove(
+  request: LoanRequestDocument & { status: string },
+): void {
+  if (
+    request.status === "pending" &&
+    request.depositPaidAt &&
+    request.rentalFeePaidAt
+  ) {
+    transitionRequestStatus(request, "approved");
+    request.approvedAt = new Date();
+  }
+}
+
 function normalizeRequestItem(
   item: RequestItemInput,
   itemIndex: number,
@@ -357,6 +375,11 @@ export const requestService = {
       entityType: "loan",
     });
 
+    // Compute totalDays inline so pricing can run before first save
+    const startMs = new Date(data.startDate).getTime();
+    const endMs = new Date(data.endDate).getTime();
+    const totalDays = Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24));
+
     const request = await LoanRequest.create({
       ...data,
       items: normalizedItems,
@@ -365,7 +388,12 @@ export const requestService = {
       locationId: new Types.ObjectId(String(locationId)),
       status: "pending",
       code,
+      totalDays,
     });
+
+    // Calculate pricing right after creation so amounts are available for payments
+    await pricingService.calculateRequestPricing(request);
+    await request.save();
 
     const populatedRequest = await LoanRequest.findById(request._id)
       .populate("customerId", "email name")
@@ -399,6 +427,18 @@ export const requestService = {
       throw AppError.notFound("Solicitud no encontrada");
     }
 
+    // Guard: both payments must be recorded before approving
+    if (!request.depositPaidAt) {
+      throw AppError.badRequest(
+        "No se puede aprobar la solicitud: el depósito no ha sido pagado",
+      );
+    }
+    if (!request.rentalFeePaidAt) {
+      throw AppError.badRequest(
+        "No se puede aprobar la solicitud: la tarifa de alquiler no ha sido pagada",
+      );
+    }
+
     transitionRequestStatus(request, "approved");
     request.approvedBy = new Types.ObjectId(userId);
     request.approvedAt = new Date();
@@ -406,8 +446,6 @@ export const requestService = {
     if (notes) {
       request.notes = (request.notes ?? "") + `\nApproval notes: ${notes}`;
     }
-
-    await pricingService.calculateRequestPricing(request);
 
     await request.save();
 
@@ -586,6 +624,10 @@ export const requestService = {
           mappedAssignments as unknown as LoanRequestDocument["assignedMaterials"];
         request.assignedBy = new Types.ObjectId(userId);
         request.assignedAt = new Date();
+
+        // Auto-mask: transition directly to ready after assignment
+        transitionRequestStatus(request, "ready");
+
         await request.save({ session });
 
         updatedRequest = (await LoanRequest.findById(request._id, null, {
@@ -707,7 +749,9 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: { $in: ["approved", "deposit_pending", "assigned", "ready"] },
+      status: {
+        $in: ["pending", "approved", "deposit_pending", "assigned", "ready"],
+      },
     });
 
     if (!request) {
@@ -727,6 +771,7 @@ export const requestService = {
     }
 
     request.depositPaidAt = new Date();
+    tryAutoApprove(request);
     await request.save();
 
     logger.info("Deposit payment recorded for request", {
@@ -748,7 +793,9 @@ export const requestService = {
     const request = await LoanRequest.findOne({
       _id: requestId,
       organizationId,
-      status: { $in: ["approved", "deposit_pending", "assigned", "ready"] },
+      status: {
+        $in: ["pending", "approved", "deposit_pending", "assigned", "ready"],
+      },
     });
 
     if (!request) {
@@ -770,6 +817,7 @@ export const requestService = {
     }
 
     request.rentalFeePaidAt = new Date();
+    tryAutoApprove(request);
     await request.save();
 
     logger.info("Rental fee payment recorded for request", {

@@ -161,6 +161,9 @@ app.use(`${apiV1}/maintenance`, routers.maintenanceRouter);
 // Code scheme routes
 app.use(`${apiV1}/code-schemes`, routers.codeSchemeRouter);
 
+// Ticket routes (internal user solicitations)
+app.use(`${apiV1}/tickets`, routers.ticketRouter);
+
 /* ---------- 404 Handler ---------- */
 
 app.use((req: Request, res: Response, next: NextFunction) => {
