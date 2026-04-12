@@ -249,6 +249,23 @@ test.describe("Loans – Deposit Lifecycle", () => {
     ).toContain(serialNumber.slice(0, 6));
   });
 
+  test("POST /loans/:id/return registra trazabilidad de retiro y devolución", async ({
+    request,
+  }) => {
+    const { loanId } = await buildReturnedLoan(request, 0);
+
+    const loanRes = await request.get(`/api/v1/loans/${loanId}`);
+    expect(loanRes.status()).toBe(200);
+    const loan = (await loanRes.json()).data.loan;
+
+    expect(Array.isArray(loan.traceabilityEvents)).toBeTruthy();
+    expect(loan.traceabilityEvents.length).toBeGreaterThanOrEqual(2);
+
+    const eventTypes = loan.traceabilityEvents.map((event: any) => event.eventType);
+    expect(eventTypes).toContain("checkout");
+    expect(eventTypes).toContain("return_received");
+  });
+
   /* ---- Test 2: Deposit fully covers damage → status = "applied", invoice = "paid" ---- */
 
   test("inspection – deposit fully covers damage: deposit 'applied', invoice 'paid'", async ({

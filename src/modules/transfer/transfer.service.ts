@@ -14,6 +14,31 @@ import { LocationService } from "../location/location.service.ts";
 import { User } from "../user/models/user.model.ts";
 import { Types, startSession, type ClientSession } from "mongoose";
 
+async function resolveTraceabilityActor(params: {
+  organizationId: string | Types.ObjectId;
+  userId: string | Types.ObjectId;
+  session: ClientSession;
+}): Promise<{
+  actorId: Types.ObjectId;
+  actorName: string;
+  actorEmail?: string;
+}> {
+  const actorId = new Types.ObjectId(String(params.userId));
+  const actor = await User.findOne({
+    _id: params.userId,
+    organizationId: params.organizationId,
+  })
+    .select("name email")
+    .session(params.session)
+    .lean();
+
+  return {
+    actorId,
+    actorName: actor?.name ?? "Usuario desconocido",
+    actorEmail: actor?.email,
+  };
+}
+
 class TransferService {
   /**
    * Create a new transfer request
@@ -353,6 +378,12 @@ class TransferService {
     // 4. Atomically update instances, create transfer record, and fulfil the request
     const session = await startSession();
     return await session.withTransaction(async () => {
+      const actor = await resolveTraceabilityActor({
+        organizationId,
+        userId,
+        session,
+      });
+
       await MaterialInstance.updateMany(
         { _id: { $in: instanceIds } },
         { $set: { status: "in_use" } },
@@ -369,6 +400,18 @@ class TransferService {
             pickedBy: userId,
             status: "in_transit" as const,
             sentAt: new Date(),
+            traceabilityEvents: [
+              {
+                eventType: "sent",
+                occurredAt: new Date(),
+                performedBy: actor.actorId,
+                performedByName: actor.actorName,
+                ...(actor.actorEmail && {
+                  performedByEmail: actor.actorEmail,
+                }),
+                ...(payload.senderNotes && { notes: payload.senderNotes }),
+              },
+            ],
             ...(payload.requestId !== undefined && {
               requestId: payload.requestId,
             }),
@@ -439,6 +482,12 @@ class TransferService {
   ) {
     const session = await startSession();
     return await session.withTransaction(async () => {
+      const actor = await resolveTraceabilityActor({
+        organizationId,
+        userId,
+        session,
+      });
+
       const transfer = await Transfer.findOne({
         _id: transferId,
         organizationId,
@@ -456,6 +505,17 @@ class TransferService {
       transfer.receivedBy = userId as any;
       transfer.receivedAt = new Date();
       if (receiverNotes) transfer.receiverNotes = receiverNotes;
+      (transfer as any).traceabilityEvents = [
+        ...((transfer as any).traceabilityEvents ?? []),
+        {
+          eventType: "received",
+          occurredAt: transfer.receivedAt,
+          performedBy: actor.actorId,
+          performedByName: actor.actorName,
+          ...(actor.actorEmail && { performedByEmail: actor.actorEmail }),
+          ...(receiverNotes && { notes: receiverNotes }),
+        },
+      ];
 
       // Apply per-item received conditions if provided
       if (itemConditions && itemConditions.length > 0) {

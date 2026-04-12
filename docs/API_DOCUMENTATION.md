@@ -4979,6 +4979,13 @@ Initiates a physical transfer (shipment) at the **instance level**. Marks the it
 
 **Permission Required:** `transfers:send`
 
+**Traceability:** On creation, the transfer stores a `traceabilityEvents` entry with:
+
+- `eventType: "sent"`
+- `occurredAt`
+- `performedBy`, `performedByName`, `performedByEmail`
+- `notes` (copied from `senderNotes` when provided)
+
 ---
 
 #### PATCH /transfers/:id/receive
@@ -4991,6 +4998,13 @@ Marks a transfer as received at the destination location. Updates the location o
 | items         | body     | array  | No       | List of `{ instanceId, receivedCondition }` to record per-item received condition. `receivedCondition` enum: `OK`, `DAMAGED`, `MISSING_PARTS`, `DIRTY`, `REPAIR_REQUIRED`, `LOST` |
 
 **Permission Required:** `transfers:receive`
+
+**Traceability:** Receiving a transfer appends a `traceabilityEvents` entry with:
+
+- `eventType: "received"`
+- `occurredAt`
+- `performedBy`, `performedByName`, `performedByEmail`
+- `notes` (copied from `receiverNotes` when provided)
 
 ---
 
@@ -5625,6 +5639,8 @@ Gets all overdue loans (auto-updates overdue status).
 
 Gets a specific loan with full details. The response includes populated `customerId`, `requestId`, `checkedOutBy`, and `materialInstances`.
 
+**Traceability:** The response includes `traceabilityEvents` with the history of checkout and return reception actions.
+
 **Query Parameters:**
 
 | Parameter           | Type    | Required | Description                                                                   |
@@ -5640,6 +5656,7 @@ Gets a specific loan with full details. The response includes populated `custome
 
 - `materialInstances`: Array of instances (default behavior). Cada instancia incluye `materialInstanceId` (con `_id`, `serialNumber`, `barcode`, `status`, `modelId`, `name`), `materialTypeId`, y `materialType` (con `_id` y `name`).
 - `materialInstancesByType`: Object with material type IDs as keys and arrays of instances as values (only when `groupByMaterialType=true`). The `materialInstances` field is omitted in this case. Each instance includes the same populated fields as above.
+- `traceabilityEvents`: Array ordenado cronológicamente con `{ eventType, occurredAt, performedBy, performedByName, performedByEmail, notes }`. Valores esperados de `eventType`: `checkout`, `return_received`.
 
 **Example Response (default):**
 
@@ -6020,6 +6037,8 @@ The loan must be in `active` or `overdue` status.
 - If the loan has a deposit with `status: "held"`, it transitions to `"refund_pending"`.
 - Late fees are calculated and applied if the loan was returned past its end date.
 - **The linked loan request is automatically transitioned from `shipped` → `completed`.**
+- The loan now stores `returnedBy` with the authenticated user.
+- A new `traceabilityEvents` entry is appended with `eventType: "return_received"`, timestamp, user snapshot, and optional notes.
 
 **Response:** `200 OK`
 

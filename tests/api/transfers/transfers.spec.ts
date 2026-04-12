@@ -125,6 +125,8 @@ test.describe("Transfers Module", () => {
     const body = await response.json();
     expect(body.status).toBe("success");
     expect(body.data.status).toBe("in_transit");
+    expect(Array.isArray(body.data.traceabilityEvents)).toBeTruthy();
+    expect(body.data.traceabilityEvents.some((event: any) => event.eventType === "sent")).toBeTruthy();
     transferId = body.data._id;
 
     // Verify instance status is changed (in this case 'in_use' as implemented in service)
@@ -147,6 +149,10 @@ test.describe("Transfers Module", () => {
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(body.data.status).toBe("received");
+    expect(Array.isArray(body.data.traceabilityEvents)).toBeTruthy();
+    const eventTypes = body.data.traceabilityEvents.map((event: any) => event.eventType);
+    expect(eventTypes).toContain("sent");
+    expect(eventTypes).toContain("received");
 
     // Verify instance location and status
     const instRes = await request.get(

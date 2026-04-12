@@ -29,6 +29,14 @@ export const TransferStatusEnum = z.enum([
 
 export type TransferStatus = z.infer<typeof TransferStatusEnum>;
 
+export const transferTraceabilityEventTypeOptions = [
+  "sent",
+  "received",
+] as const;
+
+export type TransferTraceabilityEventType =
+  (typeof transferTraceabilityEventTypeOptions)[number];
+
 export const TransferZodSchema = z.object({
   requestId: z
     .string()
@@ -60,6 +68,41 @@ export const TransferZodSchema = z.object({
 });
 
 export type TransferInput = z.infer<typeof TransferZodSchema>;
+
+const transferTraceabilityEventSchema = new Schema(
+  {
+    eventType: {
+      type: String,
+      enum: transferTraceabilityEventTypeOptions,
+      required: true,
+    },
+    occurredAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    performedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    performedByName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    performedByEmail: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      maxlength: 500,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
 
 const transferSchema = new Schema(
   {
@@ -136,6 +179,10 @@ const transferSchema = new Schema(
     receivedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
+    },
+    traceabilityEvents: {
+      type: [transferTraceabilityEventSchema],
+      default: [],
     },
   },
   {

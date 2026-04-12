@@ -21,6 +21,14 @@ export type LoanStatus = (typeof loanStatusOptions)[number];
 export const LoanStatusZod = z.enum(loanStatusOptions);
 export type LoanStatusZodType = z.infer<typeof LoanStatusZod>;
 
+export const loanTraceabilityEventTypeOptions = [
+  "checkout",
+  "return_received",
+] as const;
+
+export type LoanTraceabilityEventType =
+  (typeof loanTraceabilityEventTypeOptions)[number];
+
 /* ---------- Condition Option Enums & Zod Schemas ---------- */
 
 // Re-export condition options from shared module
@@ -219,6 +227,41 @@ const loanMaterialInstanceSchema = new Schema(
   { _id: false },
 );
 
+const loanTraceabilityEventSchema = new Schema(
+  {
+    eventType: {
+      type: String,
+      enum: loanTraceabilityEventTypeOptions,
+      required: true,
+    },
+    occurredAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    performedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    performedByName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    performedByEmail: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      maxlength: 500,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 /* ---------- Loan Mongoose Schema ---------- */
 
 const loanSchema = new Schema(
@@ -281,6 +324,10 @@ const loanSchema = new Schema(
       default: Date.now,
     },
     returnedAt: Date,
+    traceabilityEvents: {
+      type: [loanTraceabilityEventSchema],
+      default: [],
+    },
     // Materials
     materialInstances: {
       type: [loanMaterialInstanceSchema],
