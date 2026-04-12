@@ -54,31 +54,6 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function resolveTraceabilityActor(params: {
-  organizationId: string | Types.ObjectId;
-  userId: string | Types.ObjectId;
-  session: ClientSession;
-}): Promise<{
-  actorId: Types.ObjectId;
-  actorName: string;
-  actorEmail?: string;
-}> {
-  const actorId = new Types.ObjectId(String(params.userId));
-  const actor = await User.findOne({
-    _id: params.userId,
-    organizationId: params.organizationId,
-  })
-    .select("name email")
-    .session(params.session)
-    .lean();
-
-  return {
-    actorId,
-    actorName: actor?.name ?? "Usuario desconocido",
-    actorEmail: actor?.email,
-  };
-}
-
 /**
  * Calculates and applies a late fee to an overdue loan.
  * Idempotent: skips if a late_fee invoice already exists with the same amount;
@@ -228,12 +203,6 @@ export const loanService = {
 
     try {
       await session.withTransaction(async () => {
-        const actor = await resolveTraceabilityActor({
-          organizationId,
-          userId,
-          session,
-        });
-
         // Find and validate request
         const request = await LoanRequest.findOne({
           _id: requestId,
@@ -334,18 +303,6 @@ export const loanService = {
               preparedBy: request.preparedBy,
               preparedAt: request.preparedAt,
               checkedOutBy: new Types.ObjectId(userId),
-              traceabilityEvents: [
-                {
-                  eventType: "checkout",
-                  occurredAt: new Date(),
-                  performedBy: actor.actorId,
-                  performedByName: actor.actorName,
-                  ...(actor.actorEmail && {
-                    performedByEmail: actor.actorEmail,
-                  }),
-                  notes: "Materiales entregados al cliente",
-                },
-              ],
               status: "active",
               code,
             },
@@ -400,12 +357,6 @@ export const loanService = {
 
     try {
       await session.withTransaction(async () => {
-        const actor = await resolveTraceabilityActor({
-          organizationId,
-          userId,
-          session,
-        });
-
         const loan = await Loan.findOne({
           _id: loanId,
           organizationId,
@@ -428,22 +379,9 @@ export const loanService = {
           { session },
         );
         loan.returnedAt = new Date();
-        loan.returnedBy = new Types.ObjectId(String(userId));
         if (notes) {
           loan.notes = (loan.notes ?? "") + `\nReturn notes: ${notes}`;
         }
-
-        (loan as any).traceabilityEvents = [
-          ...((loan as any).traceabilityEvents ?? []),
-          {
-            eventType: "return_received",
-            occurredAt: loan.returnedAt,
-            performedBy: actor.actorId,
-            performedByName: actor.actorName,
-            ...(actor.actorEmail && { performedByEmail: actor.actorEmail }),
-            ...(notes && { notes }),
-          },
-        ];
 
         // Transition deposit from held to refund_pending now that materials are back
         const loanDeposit = (loan as any).deposit;
